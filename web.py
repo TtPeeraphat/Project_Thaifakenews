@@ -1,151 +1,147 @@
 import streamlit as st
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import pickle
+import os
 from torch_geometric.data import Data
-from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import normalize 
-from collections import Counter
-from transformers import AutoTokenizer, AutoModel
 from torch_geometric.nn import GCNConv
-import torch.nn.functional as F
-import re
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import normalize
+from sentence_transformers import SentenceTransformer
+from collections import Counter
 
 # ==========================================
-# 1. SETUP & LOAD DATA
+# 1. Config & Device
 # ==========================================
-st.set_page_config(page_title="AI ข่าวปลอม Detector", page_icon="🕵️")
-
-@st.cache_resource
-def load_resources():
-    # A) โหลด BERT
-    tokenizer = AutoTokenizer.from_pretrained('xlm-roberta-base')
-    lm_model = AutoModel.from_pretrained('xlm-roberta-base')
-    
-    # B) โหลดข้อมูลประกอบ
-    with open('artifacts.pkl', 'rb') as f:
-        artifacts = pickle.load(f)
-    
-    # C) สร้างระบบค้นหา (KNN)
-    nbrs = NearestNeighbors(n_neighbors=artifacts['k'], metric='cosine')
-    nbrs.fit(artifacts['x_np'])
-    
-    return tokenizer, lm_model, artifacts, nbrs
-
-# เรียกใช้ฟังก์ชันโหลด
-tokenizer, lm_model, artifacts, nbrs = load_resources()
+st.set_page_config(page_title="Fake News Detector", page_icon="🕵️")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # ==========================================
-# 2. DEFINE MODEL CLASS
+# 2. Define Model Architecture (ต้องเหมือนตอนเทรนเป๊ะๆ)
 # ==========================================
-class GCN(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels):
-        super(GCN, self).__init__()
-        self.conv1 = GCNConv(in_channels, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, out_channels)
+class GCNNet(nn.Module):
+    def __init__(self, num_node_features, num_classes, hidden_channels=256, dropout_rate=0.4):
+        super().__init__()
+        self.conv1 = GCNConv(num_node_features, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, num_classes)
+        self.dropout_rate = dropout_rate
 
     def forward(self, data):
-        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
-        x = self.conv1(x, edge_index, edge_weight=edge_attr)
+        x, edge_index = data.x, data.edge_index
+        edge_weight = getattr(data, 'edge_attr', None)
+        
+        x = self.conv1(x, edge_index, edge_weight=edge_weight)
         x = F.relu(x)
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.conv2(x, edge_index, edge_weight=edge_attr)
+        x = F.dropout(x, p=self.dropout_rate, training=self.training)
+        x = self.conv2(x, edge_index, edge_weight=edge_weight)
         return x
 
 # ==========================================
-# 3. LOAD TRAINED MODEL
+# 3. Define Prediction Function (ตัวที่ Error เมื่อกี้)
 # ==========================================
-model = GCN(in_channels=768, hidden_channels=256, out_channels=2) 
-model.load_state_dict(torch.load('best_model.pth', map_location=device))
-model.to(device)
-model.eval()
+def predict_news(content, topn, x_np, label2id, id2label, y_cat_np, id2cat, device, nbrs, model_gnn, embed_fn):  
+    # 1) Embedding
+    emb_batch = embed_fn([content])
+    content_emb = emb_batch[0]
+    emb = normalize(content_emb.reshape(1, -1), axis=1, norm='l2')[0]
 
-# ==========================================
-# 4. PREDICTION FUNCTION
-# ==========================================
-
-def get_bert_embeddings_batch(texts, tokenizer, model, device, max_length=256, batch_size=32, use_mean_pool=True):
-    model.eval()
-    all_embeddings = []
-    for start_idx in range(0, len(texts), batch_size):
-        batch_texts = texts[start_idx:start_idx + batch_size]
-        batch_texts = ["" if (isinstance(t, float) and np.isnan(t)) else str(t) for t in batch_texts]
-        
-        inputs = tokenizer(batch_texts, truncation=True, padding=True, max_length=max_length, return_tensors='pt').to(device)
-        with torch.no_grad():
-            outputs = model(**inputs)
-            last_hidden = outputs.last_hidden_state
-            
-            if use_mean_pool:
-                attn = inputs['attention_mask'].unsqueeze(-1)
-                summed = (last_hidden * attn).sum(dim=1)
-                denom = attn.sum(dim=1).clamp(min=1)
-                emb = (summed / denom).cpu().numpy()
-            else:
-                emb = last_hidden[:, 0, :].cpu().numpy()
-        all_embeddings.append(emb)
-    return np.vstack(all_embeddings)
-def clean_text(text):
-    # ลบ URL
-    text = re.sub(r'http\S+', '', text)
-    # ลบตัวอักษรพิเศษ (เหลือแค่ ไทย อังกฤษ ตัวเลข)
-    text = re.sub(r'[^a-zA-Z0-9\u0E00-\u0E7F\s]', '', text)
-    # ลบช่องว่างซ้ำๆ
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
-
-def predict(content):
-    content = clean_text(content)
-    # 1. Embed (ใช้ค่าดิบๆ ไม่ต้อง Normalize)
-    emb = get_bert_embeddings_batch([content], tokenizer, lm_model, device, max_length=256, use_mean_pool=True)
-    emb_vec = emb[0] 
-    
-    # ⚠️ แก้ไขจุดสำคัญ: ใช้ vector ดิบๆ เลย ไม่ต้อง Normalize จะได้ตรงกับ Training Data
-    emb_norm = normalize(emb_vec.reshape(1, -1), axis=1, norm='l2')[0]
-    
-    # 2. KNN Search
-    dists, idxs = nbrs.kneighbors(emb_norm.reshape(1, -1))
+    # 2) KNN Search
+    dists, idxs = nbrs.kneighbors(emb.reshape(1, -1), n_neighbors=topn)
     idxs = idxs[0]
     
-    # 3. Logic หาหมวดหมู่
-    neighbor_cats = [artifacts['id2cat'][artifacts['y_cat_np'][i]] for i in idxs]
-    most_common_cat = Counter(neighbor_cats).most_common(1)[0][0]
-    
-    # 4. สร้าง Graph
-    topn = artifacts['k']
-    X_new = np.vstack([emb_norm, artifacts['x_np'][idxs]]) # รวมโหนดข่าวใหม่กับเพื่อนบ้าน
-    
+    # Predict Category
+    pred_category = "ไม่ระบุ"
+    neighbor_cats = []
+    if y_cat_np is not None and id2cat is not None:
+        neighbor_cat_ids = y_cat_np[idxs]
+        neighbor_cats = [id2cat[cid] for cid in neighbor_cat_ids]
+        most_common = Counter(neighbor_cats).most_common(1)
+        if most_common:
+            pred_category = most_common[0][0]
+
+    # 3) Build Graph
+    X_new = np.vstack([emb, x_np[idxs]])
     center = 0
     neighbors = np.arange(1, topn + 1)
-    edge_index = np.concatenate([
+    
+    edge_index_new = np.concatenate([
         np.stack([np.full(topn, center), neighbors]),
         np.stack([neighbors, np.full(topn, center)])
     ], axis=1)
     
-    edge_attr = np.concatenate([1 - dists[0], 1 - dists[0]])
-    
+    edge_weight_new = np.concatenate([1 - dists[0], 1 - dists[0]])
+
     data_new = Data(
         x=torch.tensor(X_new, dtype=torch.float, device=device),
-        edge_index=torch.tensor(edge_index, dtype=torch.long, device=device),
-        edge_attr=torch.tensor(edge_attr, dtype=torch.float, device=device),
-        batch=torch.zeros(X_new.shape[0], dtype=torch.long, device=device)
+        edge_index=torch.tensor(edge_index_new, dtype=torch.long, device=device),
+        edge_attr=torch.tensor(edge_weight_new, dtype=torch.float, device=device),
     )
-    
-    # 5. เข้า Model
+
+    # 4) Predict Real/Fake
+    model_gnn.eval()
     with torch.no_grad():
-        logits = model(data_new)
-        probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-        pred_id = int(np.argmax(probs))
-    
+        logits = model_gnn(data_new)
+        probas = torch.softmax(logits, dim=1)[0].cpu().numpy()
+        pred_id = int(np.argmax(probas)) 
+        label_pred = id2label[pred_id]
+
     return {
-        'label': artifacts['id2label'][pred_id],
-        'prob': probs[pred_id],
-        'category': most_common_cat,
-        'neighbors': neighbor_cats,
-        'pred_id': pred_id,
-        'raw_probs': probs.tolist()
+        'label': label_pred,           
+        'probability': float(probas[pred_id]), 
+        'proba_all': probas.tolist(),  
+        'category': pred_category,     
+        'neighbor_cats': neighbor_cats, # 🔥 ตัวสำคัญที่ต้องมี
+        'pred_id': pred_id             
     }
+
+# ==========================================
+# 4. Load Resources (Cache เพื่อให้โหลดครั้งเดียว)
+# ==========================================
+@st.cache_resource
+def load_resources():
+    print("🔄 Loading resources...")
+    
+    # 1. Load Artifacts
+    if not os.path.exists('artifacts.pkl'):
+        st.error("❌ ไม่พบไฟล์ artifacts.pkl")
+        return None
+        
+    with open('artifacts.pkl', 'rb') as f:
+        artifacts = pickle.load(f)
+
+    # 2. Build KNN Engine (สดๆ หน้าเว็บ)
+    # หมายเหตุ: n_neighbors ต้องไม่เกินจำนวนข้อมูลที่มี
+    k = min(10, len(artifacts['x_np']))
+    nbrs_engine = NearestNeighbors(n_neighbors=k, metric='cosine').fit(artifacts['x_np'])
+
+    # 3. Load SentenceBERT
+    bert_model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2')
+    embed_fn = lambda x: bert_model.encode(x)
+
+    # 4. Load GCN Model
+    model = GCNNet(num_node_features=artifacts['x_np'].shape[1], num_classes=2).to(device)
+    
+    if os.path.exists('best_model.pth'):
+        model.load_state_dict(torch.load('best_model.pth', map_location=device))
+        print("✅ Model loaded.")
+    else:
+        st.warning("⚠️ ไม่พบไฟล์ best_model.pth (จะใช้โมเดลเปล่าๆ)")
+
+    return artifacts, nbrs_engine, embed_fn, model
+
+# เรียกใช้ฟังก์ชันโหลดของ
+resources = load_resources()
+
+if resources:
+    artifacts, nbrs_engine, embed_fn, model = resources
+    x_bal = artifacts['x_np']
+    y_cat_bal = artifacts.get('y_cat_np') # ใช้ .get กัน error
+    id2label = artifacts['id2label']
+    id2cat = artifacts['id2cat']
+else:
+    st.stop() # หยุดทำงานถ้าโหลดของไม่ได้
 
 # ==========================================
 # 5. UI (ส่วนหน้าเว็บ)
@@ -161,8 +157,20 @@ if st.button("ตรวจสอบความถูกต้อง"):
     else:
         with st.spinner('AI กำลังวิเคราะห์...'):
             try:
-                # เรียกใช้ฟังก์ชันแค่ครั้งเดียวพอ
-                result = predict(news_text)
+                # เรียกใช้ฟังก์ชัน predict_news ที่ประกาศไว้ด้านบน
+                result = predict_news(
+                    content=news_text,
+                    topn=10,
+                    x_np=x_bal,
+                    label2id=None,
+                    id2label=id2label,
+                    y_cat_np=y_cat_bal,
+                    id2cat=id2cat,
+                    device=device,
+                    nbrs=nbrs_engine,
+                    model_gnn=model,
+                    embed_fn=embed_fn
+                )
                 
                 # แสดงผล
                 st.divider()
@@ -173,18 +181,28 @@ if st.button("ตรวจสอบความถูกต้อง"):
                         st.success(f"## ✅ {result['label']}")
                     else:
                         st.error(f"## 🚨 {result['label']}")
-                    st.metric("ความมั่นใจ (Confidence)", f"{result['prob']*100:.2f}%")
+                    
+                    st.metric("ความมั่นใจ (Confidence)", f"{result['probability']*100:.2f}%")
                 
                 with col2:
-                    st.info(f"**หมวดหมู่:** {result['category']}")
-                    st.write("**วิเคราะห์จากข่าวใกล้เคียง:**")
-                    st.write(result['neighbors'])
+                    st.info(f"**หมวดหมู่หลัก:** {result['category']}")
+                    st.write("**🕵️ เพื่อนบ้าน 10 อันดับแรก:**")
                     
-                # ส่วน Debug
-                with st.expander("🛠️ Debug Information"):
-                    st.write(f"**Predicted ID:** {result['pred_id']}")
-                    st.write(f"**Label Mapping:** {artifacts['id2label']}")
-                    st.write(f"**Raw Probabilities:** {result['raw_probs']}")
-                    
+                    neighbor_cats = result.get('neighbor_cats', [])
+                    if neighbor_cats:
+                        for i, cat in enumerate(neighbor_cats):
+                            st.markdown(f"**{i+1}.** <span style='color:gray'>(หมวด: {cat})</span>", unsafe_allow_html=True)
+                    else:
+                        st.write("- ไม่พบข้อมูล")
+
+                # Debug
+                with st.expander("🔍 Debug Information"):
+                    st.write(f"Predicted ID: {result.get('pred_id')}")
+                    st.write("Neighbors Categories:", neighbor_cats)
+                    from collections import Counter
+                    if neighbor_cats:
+                        st.write("Count:", Counter(neighbor_cats))
+
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาด: {e}")
+                st.write(e)
