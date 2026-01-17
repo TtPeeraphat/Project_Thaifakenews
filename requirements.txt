@@ -1,0 +1,20 @@
+# --- Web & API ---
+fastapi
+uvicorn
+streamlit
+requests
+
+# --- AI & Deep Learning ---
+torch
+torch-geometric
+transformers
+sentencepiece
+
+# --- Data & Math ---
+numpy
+pandas
+scikit-learn
+networkx
+
+# --- Visualization ---
+matplotlib
