@@ -32,6 +32,7 @@ class GCNNet(nn.Module):
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
         edge_weight = getattr(data, 'edge_attr', None)
+        
         x = self.conv1(x, edge_index, edge_weight=edge_weight)
         x = F.relu(x)
         x = F.dropout(x, p=self.dropout_rate, training=self.training)
@@ -108,22 +109,34 @@ def predict(req: NewsRequest):
         id2cat = artifacts['id2cat']
         y_cat_np = artifacts.get('y_cat_np')
 
-        # --- 1) Embedding with WangchanBERTa (🔥 แก้ไข Logic ตรงนี้) ---
-        # Tokenize
-        inputs = tokenizer([content], padding=True, truncation=True, max_length=512, return_tensors="pt").to(device)
+        # --- 1) Embedding with WangchanBERTa (Updated: Match Training Logic) ---
         
-        # Pass through Model
+        # 1.1 Tokenize (แก้ max_length เป็น 256 ให้เท่าตอนเทรน)
+        inputs = tokenizer(
+            [content], 
+            padding=True, 
+            truncation=True, 
+            max_length=256,   # ⚠️ ต้องเท่ากับตอน Train (256)
+            return_tensors="pt"
+        ).to(device)
+        
+        # 1.2 Pass through Model
         with torch.no_grad():
             outputs = bert_model(**inputs)
         
-        # Mean Pooling (หาค่าเฉลี่ยของทุก token เพื่อเป็นตัวแทนประโยค)
-        # ผลลัพธ์จะเป็น (1, 768)
-        content_emb = outputs.last_hidden_state.mean(dim=1).cpu().numpy()[0]
+        # 1.3 Mean Pooling (แบบละเอียด: ใช้ Attention Mask เหมือนตอน Train)
+        last_hidden = outputs.last_hidden_state  # Shape: (1, Seq_Len, 768)
+        attn = inputs['attention_mask'].unsqueeze(-1)  # Shape: (1, Seq_Len, 1)
         
-        # Normalize
+        # สูตรเดียวกับ get_bert_embeddings_batch
+        summed = (last_hidden * attn).sum(dim=1)       # ผลรวมเฉพาะคำจริง
+        denom = attn.sum(dim=1).clamp(min=1)           # จำนวนคำจริง (ไม่นับ Padding)
+        content_emb = (summed / denom).cpu().numpy()[0] # ค่าเฉลี่ยที่ถูกต้อง
+        
+        # 1.4 Normalize (คงไว้ เพราะตอน Train ปกติจะทำก่อนเข้า KNN)
         emb = normalize(content_emb.reshape(1, -1), axis=1, norm='l2')[0]
 
-        # --- 2) KNN Search ---
+        # --- 2) KNN Search (เหมือนเดิม) ---
         dists, idxs = nbrs.kneighbors(emb.reshape(1, -1), n_neighbors=topn)
         idxs = idxs[0]
         
