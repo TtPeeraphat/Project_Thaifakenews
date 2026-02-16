@@ -1,265 +1,433 @@
-import sqlite3
 import hashlib
 from datetime import datetime
-
-# กำหนดชื่อ Database ชื่อเดียวเพื่อไม่ให้สับสน
-DB_NAME = "core_data.db"
-
-# ==========================================
-# 0. System & Connection
-# ==========================================
-
-def create_connection():
-    """สร้างการเชื่อมต่อกับฐานข้อมูล SQLite"""
-    conn = None
-    try:
-        # check_same_thread=False จำเป็นมากสำหรับ Streamlit
-        conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-        return conn
-    except Exception as e:
-        print(f"❌ Error connecting to DB: {e}")
-        return None
-
-def init_db():
-    """สร้างตารางทั้งหมดถ้ายังไม่มี (กัน Error: no such table)"""
-    conn = create_connection()
-    if conn:
-        c = conn.cursor()
-        
-        # 1. ตาราง Users
-        c.execute('''CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            email TEXT,
-            role TEXT DEFAULT 'user',
-            created_at DATETIME
-        )''')
-
-        # 2. ตาราง Predictions (เปลี่ยนชื่อคอลัมน์ให้ตรงกับ Admin Dashboard)
-        c.execute('''CREATE TABLE IF NOT EXISTS predictions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            title TEXT,
-            text TEXT,
-            url TEXT,
-            result TEXT,
-            confidence REAL,
-            timestamp DATETIME,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )''')
-
-        # 3. ตาราง Feedbacks
-        c.execute('''CREATE TABLE IF NOT EXISTS feedbacks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            prediction_id INTEGER,
-            user_report TEXT,
-            comment TEXT,
-            status TEXT DEFAULT 'pending',
-            timestamp DATETIME,
-            FOREIGN KEY(prediction_id) REFERENCES predictions(id)
-        )''')
-
-        # 4. ตาราง Trending News
-        c.execute('''CREATE TABLE IF NOT EXISTS trending_news (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            headline TEXT,
-            content TEXT,
-            label TEXT,
-            updated_at DATETIME
-        )''')
-
-        # 5. ตาราง Logs
-        c.execute('''CREATE TABLE IF NOT EXISTS system_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            action TEXT,
-            timestamp DATETIME
-        )''')
-
-        conn.commit()
-        conn.close()
-        print("✅ Database & Tables initialized successfully.")
+import smtplib
+from email.mime.text import MIMEText
+import random
+import string
+from supabase import create_client, Client
+from typing import List, Dict, Any, Optional, Tuple, Union, cast
 
 # ==========================================
-# 1. Users (Login/Register)
+# 🔑 ใส่ค่า CONFIG ของคุณที่นี่
+# ==========================================
+SUPABASE_URL = "https://orxtfxdernqmpkfmsijj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yeHRmeGRlcm5xbXBrZm1zaWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMDQ5OTgsImV4cCI6MjA4Njc4MDk5OH0.6dDVQio5hQpTQj6jnnS6yZBqR2GBReqFwazza6TqolQ"
+SENDER_EMAIL = "nantwtf00@gmail.com"
+SENDER_PASSWORD = "aiga bqgc jbrl rltl"
+
+def get_supabase() -> Client:
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ==========================================
+# 1. Users
 # ==========================================
 
-def create_user(username, password, email, role='user'):
-    conn = create_connection()
-    if not conn: return False
-    
+def create_user(username, password, email, role='user') -> bool:
+    supabase = get_supabase()
     pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    
+    data_payload = {
+        "username": username,
+        "password_hash": pw_hash,
+        "email": email,
+        "role": role,
+        "created_at": datetime.now().isoformat()
+    }
+    
     try:
-        c = conn.cursor()
-        c.execute("INSERT INTO users (username, password_hash, email, role, created_at) VALUES (?, ?, ?, ?, ?)",
-                  (username, pw_hash, email, role, datetime.now()))
-        conn.commit()
-        return True
+        response = supabase.table("users").insert(data_payload).execute()
+        # เช็คว่าเป็น List และไม่ว่าง
+        if response.data is not None and isinstance(response.data, list) and len(response.data) > 0:
+            return True
+        return False
     except Exception as e:
         print(f"Register Error: {e}")
         return False
-    finally:
-        conn.close()
 
-def authenticate_user(username, password):
-    conn = create_connection()
-    if not conn: return None
-    
+def authenticate_user(username, password) -> Optional[Tuple[int, str, str]]:
+    supabase = get_supabase()
     pw_hash = hashlib.sha256(password.encode()).hexdigest()
-    c = conn.cursor()
-    c.execute("SELECT id, username, role FROM users WHERE username = ? AND password_hash = ?", (username, pw_hash))
-    user = c.fetchone() # คืนค่า (id, username, role)
-    conn.close()
-    return user 
-
-# ==========================================
-# 2. Predictions (Check News)
-# ==========================================
-
-def create_prediction(user_id, title, text, url, result, confidence):
-    conn = create_connection()
-    if not conn: return None
     
     try:
-        c = conn.cursor()
-        # ใช้ชื่อคอลัมน์ title, text ให้ตรงกับตอนดึงข้อมูล
-        c.execute("""INSERT INTO predictions (user_id, title, text, url, result, confidence, timestamp) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                  (user_id, title, text, url, result, confidence, datetime.now()))
-        conn.commit()
-        return c.lastrowid # คืนค่า ID ล่าสุด
+        response = supabase.table("users").select("id, username, role")\
+            .eq("username", username)\
+            .eq("password_hash", pw_hash)\
+            .execute()
+            
+        data = response.data
+        
+        if data is not None and isinstance(data, list) and len(data) > 0:
+            user_data = data[0]
+            if isinstance(user_data, dict):
+                # ✅ FIX: แปลงเป็น str ก่อน แล้วค่อย int เพื่อหลอก Pylance ว่าไม่ใช่ Dict
+                uid = int(str(user_data.get('id', 0)))
+                uname = str(user_data.get('username', ''))
+                urole = str(user_data.get('role', ''))
+                
+                return (uid, uname, urole)
+        
+        return None
+    except Exception as e:
+        print(f"Auth Error: {e}")
+        return None
+
+# ==========================================
+# 2. Predictions
+# ==========================================
+
+def create_prediction(user_id, title, text, url, result, confidence) -> Optional[int]:
+    supabase = get_supabase()
+    payload = {
+        "user_id": user_id,
+        "title": title,
+        "text": text,
+        "url": url,
+        "result": result,
+        "confidence": confidence,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    try:
+        response = supabase.table("predictions").insert(payload).execute()
+        data = response.data
+        
+        if data is not None and isinstance(data, list) and len(data) > 0:
+            item = data[0]
+            if isinstance(item, dict):
+                # ✅ FIX: แปลงเป็น str ก่อน cast
+                return int(str(item.get('id', 0)))
+        return None
     except Exception as e:
         print(f"Create Prediction Error: {e}")
         return None
-    finally:
-        conn.close()
 
-def read_user_history(user_id):
-    conn = create_connection()
-    if not conn: return []
-    
-    c = conn.cursor()
-    c.execute("SELECT timestamp, title, result, confidence FROM predictions WHERE user_id = ? ORDER BY timestamp DESC", (user_id,))
-    data = c.fetchall()
-    conn.close()
-    return data
+from typing import Optional
+
+def get_user_history(user_id: Any, limit: int = 50):
+    supabase = get_supabase()
+    try:
+        # 1. ตรวจสอบว่ามี user_id มาจริงไหม
+        if user_id is None:
+            return []
+            
+        # 2. Query ข้อมูล (ใช้ .eq แบบไม่ระบุ type เข้มงวด)
+        # ลองสลับจาก select("*") เป็นการระบุชื่อคอลัมน์ชัดๆ
+        response = supabase.table("predictions")\
+            .select("id, user_id, title, text, result, confidence, timestamp")\
+            .eq("user_id", user_id)\
+            .order("timestamp", desc=True)\
+            .limit(limit)\
+            .execute()
+            
+        # 3. เช็คว่ามีข้อมูลออกมาจาก API จริงหรือไม่
+        if hasattr(response, 'data') and response.data is not None:
+            return response.data
+        return []
+        
+    except Exception as e:
+        print(f"❌ Database Error: {e}")
+        return []
 
 # ==========================================
 # 3. Feedbacks
 # ==========================================
 
-def save_feedback(prediction_id, user_report, comment=""):
-    conn = create_connection()
-    if not conn: return False
-    
+def save_feedback(prediction_id, user_report, comment="") -> bool:
+    supabase = get_supabase()
+    payload = {
+        "prediction_id": prediction_id,
+        "user_report": user_report,
+        "comment": comment,
+        "timestamp": datetime.now().isoformat()
+    }
     try:
-        c = conn.cursor()
-        c.execute("INSERT INTO feedbacks (prediction_id, user_report, comment, timestamp) VALUES (?, ?, ?, ?)",
-                  (prediction_id, user_report, comment, datetime.now()))
-        conn.commit()
+        supabase.table("feedbacks").insert(payload).execute()
         return True
     except Exception as e:
         print(f"Feedback Error: {e}")
         return False
-    finally:
-        conn.close()
 
-def read_all_feedbacks():
-    conn = create_connection()
-    if not conn: return []
-    
-    c = conn.cursor()
-    c.execute("""SELECT f.id, p.title, f.user_report, f.comment, f.status 
-                 FROM feedbacks f JOIN predictions p ON f.prediction_id = p.id
-                 ORDER BY f.timestamp DESC""")
-    data = c.fetchall()
-    conn.close()
-    return data
+def read_all_feedbacks() -> List[Tuple[int, str, str, str, str]]:
+    supabase = get_supabase()
+    try:
+        # ดึง predictions(title) มาด้วย (Foreign Key)
+        response = supabase.table("feedbacks")\
+            .select("id, user_report, comment, status, timestamp, predictions(title)")\
+            .order("timestamp", desc=True)\
+            .execute()
+            
+        rows = []
+        data = response.data
+        
+        if data is not None and isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    news_title = "Unknown"
+                    predictions = item.get('predictions')
+                    
+                    # ✅ FIX: Pylance ไม่รู้ว่า predictions เป็น Dict หรือ None
+                    # ต้องเช็ค isinstance อย่างละเอียดก่อนเรียก .get()
+                    if predictions is not None:
+                        if isinstance(predictions, dict):
+                            news_title = str(predictions.get('title', "Unknown"))
+                        elif isinstance(predictions, list) and len(predictions) > 0:
+                            # บางที Supabase ส่งมาเป็น List ถ้าเป็น Relation 1-Many
+                            first_pred = predictions[0]
+                            if isinstance(first_pred, dict):
+                                news_title = str(first_pred.get('title', "Unknown"))
+
+                    rows.append((
+                        int(str(item.get('id', 0))), 
+                        news_title, 
+                        str(item.get('user_report', '')), 
+                        str(item.get('comment', '')), 
+                        str(item.get('status', ''))
+                    ))
+        return rows
+    except Exception as e:
+        print(f"Read Feedback Error: {e}")
+        return []
 
 # ==========================================
 # 4. Trending News
 # ==========================================
 
 def create_trending(headline, content, label):
-    conn = create_connection()
-    if not conn: return
-    c = conn.cursor()
-    c.execute("INSERT INTO trending_news (headline, content, label, updated_at) VALUES (?, ?, ?, ?)",
-              (headline, content, label, datetime.now()))
-    conn.commit()
-    conn.close()
+    supabase = get_supabase()
+    payload = {
+        "headline": headline, 
+        "content": content, 
+        "label": label, 
+        "updated_at": datetime.now().isoformat()
+    }
+    try:
+        supabase.table("trending_news").insert(payload).execute()
+    except Exception as e:
+        print(f"Create Trending Error: {e}")
 
-def get_all_trending():
-    conn = create_connection()
-    if not conn: return []
-    c = conn.cursor()
-    c.execute("SELECT id, headline, content, label, updated_at FROM trending_news ORDER BY updated_at DESC")
-    data = c.fetchall()
-    conn.close()
-    return data
+def get_all_trending() -> List[Tuple[int, str, str, str, str]]:
+    supabase = get_supabase()
+    try:
+        response = supabase.table("trending_news").select("*").order("updated_at", desc=True).execute()
+        rows = []
+        data = response.data
+        
+        if data is not None and isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    rows.append((
+                        int(str(item.get('id', 0))), 
+                        str(item.get('headline', '')), 
+                        str(item.get('content', '')), 
+                        str(item.get('label', '')), 
+                        str(item.get('updated_at', ''))
+                    ))
+        return rows
+    except Exception as e:
+        print(f"Get Trending Error: {e}")
+        return []
 
 def delete_trending(news_id):
-    conn = create_connection()
-    if not conn: return
-    c = conn.cursor()
-    c.execute("DELETE FROM trending_news WHERE id=?", (news_id,))
-    conn.commit()
-    conn.close()
+    supabase = get_supabase()
+    try:
+        supabase.table("trending_news").delete().eq("id", news_id).execute()
+    except Exception as e:
+        print(f"Delete Trending Error: {e}")
 
 # ==========================================
-# 5. Logs & Admin Charts
+# 5. Password Reset System
 # ==========================================
 
-def create_log(user_id, action):
-    conn = create_connection()
-    if not conn: return
-    c = conn.cursor()
-    c.execute("INSERT INTO system_logs (user_id, action, timestamp) VALUES (?, ?, ?)",
-              (user_id, action, datetime.now()))
-    conn.commit()
-    conn.close()
-
-def read_logs_for_chart():
-    conn = create_connection()
-    if not conn: return []
-    c = conn.cursor()
-    c.execute("SELECT strftime('%H', timestamp) as hour, COUNT(*) as count FROM system_logs GROUP BY hour")
-    data = c.fetchall()
-    conn.close()
-    return data
-
-def read_all_predictions():
-    """สำหรับ Admin Dashboard"""
-    conn = create_connection()
-    if not conn: return []
+def send_otp_email(to_email) -> Tuple[bool, str]:
+    supabase = get_supabase()
     
-    c = conn.cursor()
-    # ดึง username จากตาราง users มาแสดงด้วย
-    c.execute('''SELECT p.id, u.username, p.title, p.text, p.result, p.confidence, p.timestamp 
-                 FROM predictions p
-                 JOIN users u ON p.user_id = u.id
-                 ORDER BY p.timestamp DESC''')
-    data = c.fetchall()
-    conn.close()
-    return data
+    try:
+        user_check = supabase.table("users").select("id").eq("email", to_email).execute()
+        if not (user_check.data is not None and isinstance(user_check.data, list) and len(user_check.data) > 0):
+            return False, "❌ ไม่พบอีเมลนี้ในระบบ"
+    except Exception as e:
+        return False, f"Check Email Error: {e}"
 
-def read_all_predictions_limit(limit=10):
-    """สำหรับ Admin Dashboard (ดูตัวอย่างล่าสุด)"""
-    conn = create_connection()
-    if not conn: return []
+    otp = ''.join(random.choices(string.digits, k=6))
     
-    c = conn.cursor()
-    c.execute(f'''SELECT p.id, u.username, p.title, p.text, p.result, p.confidence, p.timestamp 
-                  FROM predictions p
-                  JOIN users u ON p.user_id = u.id
-                  ORDER BY p.timestamp DESC LIMIT ?''', (limit,))
-    data = c.fetchall()
-    conn.close()
-    return data
+    try:
+        supabase.table("users").update({"reset_token": otp}).eq("email", to_email).execute()
+    except Exception as e:
+        return False, f"Database Error: {e}"
 
+    subject = "🔑 รหัสยืนยันการเปลี่ยนรหัสผ่าน (Thai Fake News)"
+    body = f"รหัส OTP ของคุณคือ: {otp}\n\nกรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่"
+    
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = to_email
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
+        return True, "✅ ส่งรหัส OTP ไปที่อีเมลแล้ว"
+    except Exception as e:
+        print(f"Mail Error: {e}")
+        return False, "❌ ส่งอีเมลไม่สำเร็จ (เช็ค App Password)"
+
+def verify_otp_and_reset(email, otp, new_password) -> Tuple[bool, str]:
+    supabase = get_supabase()
+    
+    try:
+        response = supabase.table("users").select("id")\
+            .eq("email", email)\
+            .eq("reset_token", otp)\
+            .execute()
+            
+        data = response.data
+        
+        if data is not None and isinstance(data, list) and len(data) > 0:
+            new_pw_hash = hashlib.sha256(new_password.encode()).hexdigest()
+            
+            supabase.table("users").update({
+                "password_hash": new_pw_hash,
+                "reset_token": None 
+            }).eq("email", email).execute()
+            
+            return True, "✅ เปลี่ยนรหัสผ่านสำเร็จ! กรุณาล็อกอินใหม่"
+        else:
+            return False, "❌ รหัส OTP ไม่ถูกต้อง หรือหมดอายุ"
+    except Exception as e:
+        return False, f"Reset Error: {e}"
 # ==========================================
-# RUN SCRIPT (สร้างตารางเมื่อรันครั้งแรก)
+# ➕ ส่วนเสริมสำหรับ Admin Dashboard
 # ==========================================
-if __name__ == "__main__":
-    init_db()
+
+def read_all_predictions() -> List[Tuple[int, str, str, str, str, float, str]]:
+    """ดึงข้อมูลการทำนายทั้งหมด เพื่อนำไปคำนวณสถิติ"""
+    supabase = get_supabase()
+    try:
+        # join ตาราง users เพื่อเอา username มาแสดงด้วย
+        response = supabase.table("predictions")\
+            .select("*, users(username)")\
+            .order("timestamp", desc=True)\
+            .execute()
+            
+        rows = []
+        data = response.data
+        
+        if data is not None and isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    # จัดการ user object ที่ join มา (อาจเป็น dict หรือ list)
+                    user_obj = item.get('users')
+                    username = "Unknown"
+                    
+                    if isinstance(user_obj, dict):
+                        username = str(user_obj.get('username', 'Unknown'))
+                    elif isinstance(user_obj, list) and len(user_obj) > 0:
+                        first_user = user_obj[0] # type: ignore
+                        if isinstance(first_user, dict):
+                            username = str(first_user.get('username', 'Unknown'))
+
+                    # เรียงลำดับให้ตรงกับที่ frontend.py ต้องการ:
+                    # columns=['ID', 'User', 'Title', 'Text', 'Result', 'Conf', 'Timestamp']
+                    rows.append((
+                        int(str(item.get('id', 0))), 
+                        username,
+                        str(item.get('title', '')), 
+                        str(item.get('text', '')), 
+                        str(item.get('result', '')), 
+                        float(str(item.get('confidence', 0.0))),
+                        str(item.get('timestamp', ''))
+                    ))
+        return rows
+    except Exception as e:
+        print(f"Read All Admin Error: {e}")
+        return []
+
+def read_all_predictions_limit(limit_num: int) -> List[Tuple[int, str, str, str, str, float, str]]:
+    """ดึงข้อมูลล่าสุด N รายการ สำหรับหน้า Review"""
+    supabase = get_supabase()
+    try:
+        response = supabase.table("predictions")\
+            .select("*, users(username)")\
+            .order("timestamp", desc=True)\
+            .limit(limit_num)\
+            .execute()
+            
+        rows = []
+        data = response.data
+        
+        if data is not None and isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    # จัดการ user object
+                    user_obj = item.get('users')
+                    username = "Unknown"
+                    if isinstance(user_obj, dict):
+                        username = str(user_obj.get('username', 'Unknown'))
+                    elif isinstance(user_obj, list) and len(user_obj) > 0:
+                        first_user = user_obj[0] # type: ignore
+                        if isinstance(first_user, dict):
+                            username = str(first_user.get('username', 'Unknown'))
+
+                    rows.append((
+                        int(str(item.get('id', 0))), 
+                        username,
+                        str(item.get('title', '')), 
+                        str(item.get('text', '')), 
+                        str(item.get('result', '')), 
+                        float(str(item.get('confidence', 0.0))),
+                        str(item.get('timestamp', ''))
+                    ))
+        return rows
+    except Exception as e:
+        print(f"Read Limit Admin Error: {e}")
+        return []
+    
+# ==========================================
+# 6. SYSTEM LOGGING (แก้ไขใหม่ แก้ Pylance Error)
+# ==========================================
+
+def get_system_logs(limit: int = 50):
+    supabase = get_supabase()
+    try:
+        # ดึงข้อมูลแบบเรียบง่ายที่สุด (ไม่ Join) เพื่อให้มั่นใจว่าข้อมูลจะโผล่บนเว็บก่อน
+        response = supabase.table("system_logs")\
+            .select("timestamp, action, details, level, user_id")\
+            .order("timestamp", desc=True)\
+            .limit(limit)\
+            .execute()
+            
+        data = response.data
+        rows = []
+
+        if isinstance(data, list):
+            for item in data:
+                # ตรวจสอบว่าเป็น dict แน่ๆ เพื่อปิดปาก Pylance
+                if isinstance(item, dict):
+                    ts = str(item.get('timestamp', '-'))
+                    act = str(item.get('action', '-'))
+                    det = str(item.get('details', '-'))
+                    lvl = str(item.get('level', 'INFO'))
+                    uid = str(item.get('user_id', 'username'))
+                    
+                    rows.append((ts, uid, act, det, lvl))
+        
+        return rows
+    except Exception as e:
+        print(f"❌ Error fetching logs: {e}")
+        return []
+    
+def log_system_event(user_id, action, details, level="INFO"):
+    try:
+        supabase = get_supabase()
+        payload = {
+            "user_id": user_id,
+            
+            "action": action,
+            "details": details,
+            "level": level,
+            "timestamp": datetime.now().isoformat()
+        }
+        supabase.table("system_logs").insert(payload).execute()
+    except Exception as e:
+        print(f"Log Error: {e}")
