@@ -33,6 +33,120 @@ st.markdown("""
 """, unsafe_allow_html=True)
 from datetime import datetime
 
+def show_model_performance():
+    df = db.get_model_performance_data()
+
+    # 🛠️ [DEBUG] ส่วนตรวจสอบข้อมูล (ลบออกเมื่อเสร็จแล้ว)
+    st.error("🕵️‍♂️ Debug Mode: ตรวจสอบการจับคู่ข้อมูล")
+    st.write(f"จำนวนแถวทั้งหมดที่ดึงมา: {len(df)}")
+    if not df.empty:
+        # โชว์เฉพาะคอลัมน์สำคัญ
+        cols = ['id', 'prediction', 'label', 'prediction_id'] 
+        # เลือกเฉพาะคอลัมน์ที่มีอยู่จริง
+        existing_cols = [c for c in cols if c in df.columns]
+        st.dataframe(df[existing_cols]) 
+    else:
+        st.write("ตารางว่างเปล่า!")
+    
+    if df.empty:
+        st.warning("⚠️ ยังไม่มีข้อมูลการทำนายในระบบ")
+        return
+
+    # --- 1. เตรียมข้อมูล & จัดการเรื่องชื่อคอลัมน์เวลา ---
+    # ✅ กำหนดค่าให้ time_col ป้องกัน Error "time_col is not defined"
+    time_col = 'timestamp' if 'timestamp' in df.columns else 'created_at'
+    
+    # กรองเฉพาะข้อมูลที่มีการตอบ Feedback แล้ว (ไม่เป็น pending)
+    # ใช้ .str.lower() เพื่อให้รองรับทั้ง 'Real' และ 'real'
+    valid_labels = ['fake', 'real', 'Fake', 'Real']
+    df_evaluated = df[df['label'].astype(str).str.lower().isin(valid_labels)].copy()
+    
+    # if df_evaluated.empty:
+    #     st.info("💡 ข้อมูลที่มีอยู่ยังรอการตรวจสอบ (Pending) ลองไปแก้สถานะใน DB สัก 2-3 แถวครับ")
+    #     return
+
+    # --- 2. ส่วนคำนวณ Metrics ---
+    y_true = df_evaluated['label'].astype(str).str.lower()
+    y_pred = df_evaluated['prediction'].astype(str).str.lower()
+    
+    total = len(df_evaluated)
+    
+    # ✅ ปรับการคำนวณให้ปลอดภัยจาก nan
+    if total > 0:
+        accuracy = (y_true == y_pred).mean()
+        
+        # คำนวณ TP, FP, FN
+        tp = ((y_true == 'fake') & (y_pred == 'fake')).sum()
+        fp = ((y_true == 'real') & (y_pred == 'fake')).sum()
+        fn = ((y_true == 'fake') & (y_pred == 'real')).sum()
+        
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+    else:
+        # กำหนดค่าเริ่มต้นเป็น 0.0 ทั้งหมดถ้าไม่มีข้อมูล
+        accuracy = precision = recall = f1 = 0.0
+
+    # --- 3. แสดงผล Metric Cards ---
+    col1, col2, col3, col4 = st.columns(4)
+    
+    # ฟังก์ชันช่วยเช็คค่า nan ก่อนใส่ใน progress
+    def safe_progress(value):
+        import math
+        # ถ้าค่าเป็น nan หรือไม่ใช่ตัวเลข ให้ส่ง 0.0 ไปแทน
+        if math.isnan(value): return 0.0
+        return float(max(0.0, min(1.0, value))) # บังคับให้อยู่ระหว่าง 0.0 - 1.0
+
+    with col1:
+        st.metric("Overall Accuracy", f"{accuracy*100:.1f}%")
+        st.progress(safe_progress(accuracy))
+    
+    with col2:
+        st.metric("Precision", f"{precision*100:.1f}%")
+        st.progress(safe_progress(precision))
+    
+    with col3:
+        st.metric("Recall", f"{recall*100:.1f}%")
+        st.progress(safe_progress(recall))
+        
+    with col4:
+        st.metric("F1 Score", f"{f1*100:.1f}%")
+        st.progress(safe_progress(f1))
+
+    # --- 4. ส่วนกราฟแนวโน้ม (Performance Trends) ---
+    st.write("---")
+    st.subheader("Performance Trends")
+
+    # 🚨 ดัก Error กราฟ: ถ้าไม่มีข้อมูลที่ "ถูกต้อง" (ไม่ใช่ pending) ห้ามวาดกราฟ
+    if df_evaluated.empty:
+        st.info("📉 ยังไม่มีข้อมูลที่ตรวจสอบแล้ว (Status: Real/Fake) จึงยังไม่แสดงกราฟ")
+    else:
+        # เตรียมข้อมูลกราฟ
+        df_chart = df_evaluated.copy()
+        df_chart['date'] = pd.to_datetime(df_chart[time_col]).dt.date
+        df_chart['is_correct'] = (y_true == y_pred).astype(int)
+        
+        # คำนวณ (เหมือนเดิม)
+        df_chart['is_tp'] = ((y_true == 'fake') & (y_pred == 'fake')).astype(int)
+        df_chart['is_fp'] = ((y_true == 'real') & (y_pred == 'fake')).astype(int)
+        df_chart['is_fn'] = ((y_true == 'fake') & (y_pred == 'real')).astype(int)
+        
+        daily_stats = df_chart.groupby('date')[['is_correct', 'is_tp', 'is_fp', 'is_fn']].sum()
+        daily_stats['count'] = df_chart.groupby('date').size()
+        
+        daily_stats['Accuracy'] = (daily_stats['is_correct'] / daily_stats['count']) * 100
+        
+        den_prec = daily_stats['is_tp'] + daily_stats['is_fp']
+        daily_stats['Precision'] = (daily_stats['is_tp'] / den_prec).fillna(0) * 100
+        
+        den_rec = daily_stats['is_tp'] + daily_stats['is_fn']
+        daily_stats['Recall'] = (daily_stats['is_tp'] / den_rec).fillna(0) * 100
+        
+        trend_df = daily_stats[['Accuracy', 'Precision', 'Recall']].reset_index()
+        
+        # วาดกราฟ
+        st.line_chart(trend_df.set_index('date'))
+
 def time_ago(timestamp_str):
     """แปลง Timestamp เป็นคำว่า 'X mins ago'"""
     try:
@@ -573,66 +687,12 @@ else:
                             st.caption(time_ago(ts))
             else:
                 st.info("ยังไม่มีประวัติการใช้งานในระบบ")
+                # ในส่วนเมนู (ย่อหน้าต้องตรงกับ elif อื่นๆ)
+# ในส่วนเมนู (ย่อหน้าต้องตรงกับ elif อื่นๆ)
+    elif menu == "📈 Model Performance":
+        if st.session_state.get('role') != 'admin':
+            st.error("⛔ Access Denied")
+        else:
+            st.title("📈 Model Performance Analysis")
+            show_model_performance() 
 
-    def show_model_performance():
-            st.title("📈 Model Performance")
-            st.caption("Monitor and analyze AI model metrics")
-    
-    # ✅ แก้ไขที่ 1: เรียกผ่าน db. และต้องย่อหน้าให้ตรงกันเพื่อให้โค้ดอยู่ภายในฟังก์ชัน
-            df = db.get_model_performance_data() 
-    
-            if df.empty:
-                st.warning("ไม่พบข้อมูลสำหรับการคำนวณ Performance")
-                return # ตอนนี้ return จะทำงานได้ปกติเพราะอยู่ในฟังก์ชันแล้ว
-
-    # --- ส่วนการคำนวณ (Logic) ---
-    # (ตรวจสอบให้แน่ใจว่าโค้ดส่วนนี้ย่อหน้าเข้ามาทั้งหมด)
-            y_true = df['label'].astype(str).str.lower()
-            y_pred = df['prediction'].astype(str).str.lower()
-    
-            total = len(df)
-            correct = (y_true == y_pred).sum()
-    
-            accuracy = correct / total if total > 0 else 0
-    
-            # คำนวณ Precision/Recall
-            tp = ((y_true == 'fake') & (y_pred == 'fake')).sum()
-            fp = ((y_true == 'real') & (y_pred == 'fake')).sum()
-            fn = ((y_true == 'fake') & (y_pred == 'real')).sum()
-    
-            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-
-    # --- 2. แสดงผลการ์ด Metric ---
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Overall Accuracy", f"{accuracy*100:.1f}%")
-                st.progress(accuracy)
-            with col2:
-                st.metric("Precision", f"{precision*100:.1f}%")
-                st.progress(precision)
-            with col3:
-                st.metric("Recall", f"{recall*100:.1f}%")
-                st.progress(recall)
-            with col4:
-                st.metric("F1 Score", f"{f1*100:.1f}%")
-                st.progress(f1)
-
-            # --- 3. กราฟแนวโน้ม ---
-            st.write("---")
-            st.subheader("Performance Trends")
-            df['date'] = pd.to_datetime(df['created_at']).dt.date
-            # ใช้กรุ๊ปข้อมูลเพื่อสร้างกราฟ
-            trend_df = df.groupby('date').apply(lambda x: (x['label'] == x['prediction']).mean()).reset_index()
-            trend_df.columns = ['Date', 'Accuracy']
-            st.line_chart(trend_df.set_index('Date'))
-
-            # --- 4. กราฟ Confidence Score ---
-            st.write("---")
-            st.subheader("Confidence Score Distribution")
-            conf_scores = df['confidence_score'].dropna()
-            bins = [0.6, 0.7, 0.8, 0.9, 1.0]
-            labels = ['60-70%', '70-80%', '80-90%', '90-100%']
-            dist_counts = pd.cut(conf_scores, bins=bins, labels=labels).value_counts().reindex(labels[::-1])
-            st.bar_chart(dist_counts)

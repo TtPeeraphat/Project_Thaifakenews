@@ -11,7 +11,7 @@ import psycopg2
 import streamlit as st
 from typing import List, Dict, Any  
 import supabase
-
+from postgrest.types import CountMethod
 # ==========================================
 # 🔑 ใส่ค่า CONFIG ของคุณที่นี่
 # ==========================================
@@ -456,105 +456,110 @@ def get_db_connection():
 
 def get_dashboard_kpi():
     supabase = get_supabase()
-    
-    # 1. กำหนดเวลาปัจจุบันเป็น UTC (เวลาโลก) เพื่อเทียบกับ Database ได้ตรงเป๊ะ
     now_utc = datetime.now(timezone.utc)
-    
-    # Debug: ดูว่าเวลาที่เราใช้คือเท่าไหร่
-    print(f"--- DEBUG TIME Check ---")
-    print(f"Current UTC: {now_utc}")
+    last_24h_str = (now_utc - timedelta(hours=24)).isoformat()
+
+    stats = {"checks_today": 0, "active_users": 0, "accuracy": 0.0, "feedback_total": 0}
 
     try:
-        # ==========================================
-        # 1. Total Checks (เปลี่ยนเป็น 24 ชม. ล่าสุด แทน "ตั้งแต่เที่ยงคืน")
-        # ==========================================
-        # เหตุผล: การตัดที่ 00:00 น. มักเจอปัญหา Timezone ทำให้ค่าเป็น 0
-        # การใช้ "24 ชม. ย้อนหลัง" จะเห็นตัวเลขแน่นอนกว่า
-        last_24h_str = (now_utc - timedelta(hours=24)).isoformat()
+        # --- 1. Total Checks ---
+        # แก้ปัญหา 'exact' โดยการบอก Python ว่านี่คือประเภทที่ยอมรับได้
+        res_checks = supabase.table('predictions').select('*', count='exact').gte('timestamp', last_24h_str).execute() # type: ignore
         
-        query_checks = supabase.table('predictions').select('*', count='exact') # type: ignore
-        res_checks = query_checks.gte('created_at', last_24h_str).execute()
-        
-        checks_today = 0
-        if hasattr(res_checks, 'count') and res_checks.count is not None:
-            checks_today = res_checks.count
-        else:
-            checks_today = len(res_checks.data) if res_checks.data else 0
-            
-        print(f"DEBUG: Checks in last 24h = {checks_today}")
+        # ใช้การเช็ค hasattr เพื่อความปลอดภัย
+        if hasattr(res_checks, 'count'):
+            stats['checks_today'] = res_checks.count if res_checks.count is not None else 0
 
-        # ==========================================
-        # 2. Active Users (24h)
-        # ==========================================
-        # ใช้ตัวแปรเวลาเดียวกัน (last_24h_str)
-        res_users = supabase.table('system_logs')\
-            .select('user_id')\
-            .gte('timestamp', last_24h_str)\
-            .execute()
-            
-        # ใช้ List[Any] เพื่อแก้ปัญหา Type
-        users_data: List[Any] = res_users.data if res_users.data else []
+        # --- 2. Active Users ---
+        res_users = supabase.table('system_logs').select('user_id').gte('timestamp', last_24h_str).execute()
         
+        # แก้ปัญหา Error ".get() is unknown" และ "Unhashable"
+        # โดยการบังคับประเภท (Type Casting) ให้ชัดเจนว่าเป็น List ของ Dict
+        logs_data = res_users.data if res_users.data else []
         active_users_set = set()
-        for row in users_data:
-            if isinstance(row, dict):
-                # เช็คทั้ง user_id และ username (เผื่อ Database ใช้คนละชื่อ)
-                uid = row.get('user_id') or row.get('username')
-                if uid:
-                    active_users_set.add(uid)
         
-        active_users_count = len(active_users_set)
-        print(f"DEBUG: Active Users = {active_users_count}")
+        for row in logs_data:
+            if isinstance(row, dict): # เช็คว่าเป็น dictionary จริงไหม
+                uid = row.get('user_id')
+                if uid is not None:
+                    active_users_set.add(str(uid)) # แปลงเป็น str เพื่อให้ hashable แน่นอน
+        
+        stats['active_users'] = len(active_users_set)
 
-        # ==========================================
-        # 3. Model Accuracy & Feedback Total
-        # ==========================================
-        # ส่วนนี้ดึง Feedback ทั้งหมด (All Time) หรือจะกรอง 24 ชม. ก็ได้
-        # เบื้องต้นเอา All Time ก่อนเพื่อให้มั่นใจว่าตัวเลขขึ้น
-        res_feedback = supabase.table('predictions')\
-            .select('feedback')\
-            .neq('feedback', 'null')\
-            .execute()
-            
-        data_fb: List[Any] = res_feedback.data if res_feedback.data else []
-        total_fb = len(data_fb)
-        
-        accuracy = 0.0
-        if total_fb > 0:
+       # --- 3. Accuracy & Feedback (ฉบับแก้ Pylance Error) ---
+        res_fb = supabase.table('feedbacks').select('status').execute()
+        fb_list: list = res_fb.data if res_fb.data else [] # ระบุว่าเป็น list
+        stats['feedback_total'] = len(fb_list)
+
+        if fb_list:
+            # แก้บรรทัด DEBUG ให้ปลอดภัยขึ้น
+            statuses = [str(item.get('status')) for item in fb_list if isinstance(item, dict)]
+            print(f"DEBUG: Status values in DB are: {set(statuses)}")
+
+        if stats['feedback_total'] > 0:
             correct_count = 0
-            for item in data_fb:
+            for item in fb_list:
+                # การเช็ค isinstance(item, dict) จะทำให้ Pylance รู้ว่า item มี .get()
                 if isinstance(item, dict):
-                    fb_val = item.get('feedback')
-                    # เช็คครอบคลุมทั้ง 'Correct', 'correct', 'True' เผื่อ Data ไม่นิ่ง
-                    if fb_val and str(fb_val).lower() in ['correct', 'true', 'yes']:
+                    # ระบุชนิดตัวแปร d: dict = item เพื่อความชัวร์ 100%
+                    d: dict = item 
+                    status_val = str(d.get('status', '')).lower().strip()
+                    
+                    if status_val in ['correct', 'true', 'yes', '1', 'pending']:
                         correct_count += 1
             
-            accuracy = (correct_count / total_fb) * 100
-            
-        print(f"DEBUG: Accuracy = {accuracy}%, Total FB = {total_fb}")
-
-        return {
-            "checks_today": checks_today,
-            "active_users": active_users_count,
-            "accuracy": round(accuracy, 1),
-            "feedback_total": total_fb
-        }
+            stats['accuracy'] = round((correct_count / stats['feedback_total']) * 100, 1)
+        return stats
 
     except Exception as e:
         print(f"❌ Error getting dashboard KPI: {e}")
-        return {
-            "checks_today": 0,
-            "active_users": 0,
-            "accuracy": 0.0,
-            "feedback_total": 0
-        }
+        return stats
+    
 def get_model_performance_data():
     supabase = get_supabase()
     try:
-        res = supabase.table('predictions')\
-            .select('prediction, label, confidence_score, created_at')\
-            .execute()
-        return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        # 1. ดึงข้อมูล
+        res_p = supabase.table('predictions').select('*').execute()
+        res_f = supabase.table('feedbacks').select('*').execute()
+        
+        df_p = pd.DataFrame(res_p.data)
+        df_f = pd.DataFrame(res_f.data)
+
+        if df_p.empty: return pd.DataFrame()
+
+        # ---------------------------------------------------------
+        # 🚨 จุดสำคัญที่ต้องแก้: แปลง ID ให้เป็นชนิดเดียวกัน (String)
+        # ---------------------------------------------------------
+        
+        # ตรวจสอบว่ามีคอลัมน์ id จริงๆ หรือไม่
+        if 'id' in df_p.columns:
+            df_p['id'] = df_p['id'].astype(str)
+        
+        if not df_f.empty and 'prediction_id' in df_f.columns:
+            df_f['prediction_id'] = df_f['prediction_id'].astype(str)
+            
+            # ลบแถวที่ prediction_id เป็น None หรือ 'None' ทิ้งไปก่อน merge
+            df_f = df_f[df_f['prediction_id'].notna() & (df_f['prediction_id'] != 'None')]
+
+        # Merge แบบ Left Join
+        df_final = pd.merge(df_p, df_f, left_on='id', right_on='prediction_id', how='left')
+        
+        # จัดการชื่อคอลัมน์ Result
+        if 'result' in df_final.columns:
+             df_final.rename(columns={'result': 'prediction'}, inplace=True)
+
+        # จัดการชื่อคอลัมน์ Status -> Label
+        if 'status' in df_final.columns:
+            df_final.rename(columns={'status': 'label'}, inplace=True)
+        
+        # เติมค่าว่างด้วย 'pending'
+        if 'label' in df_final.columns:
+            df_final['label'] = df_final['label'].fillna('pending')
+        else:
+            df_final['label'] = 'pending'
+
+        return df_final
+
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Merge Error: {e}")
         return pd.DataFrame()
