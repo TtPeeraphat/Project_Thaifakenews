@@ -1,11 +1,16 @@
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import smtplib
 from email.mime.text import MIMEText
 import random
 import string
 from supabase import create_client, Client
 from typing import List, Dict, Any, Optional, Tuple, Union, cast
+import pandas as pd
+import psycopg2
+import streamlit as st
+from typing import List, Dict, Any  
+import supabase
 
 # ==========================================
 # 🔑 ใส่ค่า CONFIG ของคุณที่นี่
@@ -382,6 +387,7 @@ def read_all_predictions_limit(limit_num: int) -> List[Tuple[int, str, str, str,
     except Exception as e:
         print(f"Read Limit Admin Error: {e}")
         return []
+
     
 # ==========================================
 # 6. SYSTEM LOGGING (แก้ไขใหม่ แก้ Pylance Error)
@@ -431,3 +437,124 @@ def log_system_event(user_id, action, details, level="INFO"):
         supabase.table("system_logs").insert(payload).execute()
     except Exception as e:
         print(f"Log Error: {e}")
+# --- เพิ่มใน database_ops.py ---
+
+# เพิ่มฟังก์ชันนี้เพื่อให้เชื่อมต่อ Supabase ได้
+def get_db_connection():
+    # ดึงค่าจาก st.secrets ที่เราตั้งไว้
+    # ตรวจสอบให้แน่ใจว่าใน secrets.toml ใช้ชื่อหัวข้อว่า [supabase] หรือ [postgres]
+    # แนะนำให้ใช้ Connection String ที่ได้จาก Supabase (Transaction Pooler หรือ Session Pooler)
+    
+    conn = psycopg2.connect(
+        host=st.secrets["supabase"]["host"],
+        database=st.secrets["supabase"]["dbname"],
+        user=st.secrets["supabase"]["user"],
+        password=st.secrets["supabase"]["password"],
+        port=st.secrets["supabase"]["port"]
+    )
+    return conn
+
+def get_dashboard_kpi():
+    supabase = get_supabase()
+    
+    # 1. กำหนดเวลาปัจจุบันเป็น UTC (เวลาโลก) เพื่อเทียบกับ Database ได้ตรงเป๊ะ
+    now_utc = datetime.now(timezone.utc)
+    
+    # Debug: ดูว่าเวลาที่เราใช้คือเท่าไหร่
+    print(f"--- DEBUG TIME Check ---")
+    print(f"Current UTC: {now_utc}")
+
+    try:
+        # ==========================================
+        # 1. Total Checks (เปลี่ยนเป็น 24 ชม. ล่าสุด แทน "ตั้งแต่เที่ยงคืน")
+        # ==========================================
+        # เหตุผล: การตัดที่ 00:00 น. มักเจอปัญหา Timezone ทำให้ค่าเป็น 0
+        # การใช้ "24 ชม. ย้อนหลัง" จะเห็นตัวเลขแน่นอนกว่า
+        last_24h_str = (now_utc - timedelta(hours=24)).isoformat()
+        
+        query_checks = supabase.table('predictions').select('*', count='exact') # type: ignore
+        res_checks = query_checks.gte('created_at', last_24h_str).execute()
+        
+        checks_today = 0
+        if hasattr(res_checks, 'count') and res_checks.count is not None:
+            checks_today = res_checks.count
+        else:
+            checks_today = len(res_checks.data) if res_checks.data else 0
+            
+        print(f"DEBUG: Checks in last 24h = {checks_today}")
+
+        # ==========================================
+        # 2. Active Users (24h)
+        # ==========================================
+        # ใช้ตัวแปรเวลาเดียวกัน (last_24h_str)
+        res_users = supabase.table('system_logs')\
+            .select('user_id')\
+            .gte('timestamp', last_24h_str)\
+            .execute()
+            
+        # ใช้ List[Any] เพื่อแก้ปัญหา Type
+        users_data: List[Any] = res_users.data if res_users.data else []
+        
+        active_users_set = set()
+        for row in users_data:
+            if isinstance(row, dict):
+                # เช็คทั้ง user_id และ username (เผื่อ Database ใช้คนละชื่อ)
+                uid = row.get('user_id') or row.get('username')
+                if uid:
+                    active_users_set.add(uid)
+        
+        active_users_count = len(active_users_set)
+        print(f"DEBUG: Active Users = {active_users_count}")
+
+        # ==========================================
+        # 3. Model Accuracy & Feedback Total
+        # ==========================================
+        # ส่วนนี้ดึง Feedback ทั้งหมด (All Time) หรือจะกรอง 24 ชม. ก็ได้
+        # เบื้องต้นเอา All Time ก่อนเพื่อให้มั่นใจว่าตัวเลขขึ้น
+        res_feedback = supabase.table('predictions')\
+            .select('feedback')\
+            .neq('feedback', 'null')\
+            .execute()
+            
+        data_fb: List[Any] = res_feedback.data if res_feedback.data else []
+        total_fb = len(data_fb)
+        
+        accuracy = 0.0
+        if total_fb > 0:
+            correct_count = 0
+            for item in data_fb:
+                if isinstance(item, dict):
+                    fb_val = item.get('feedback')
+                    # เช็คครอบคลุมทั้ง 'Correct', 'correct', 'True' เผื่อ Data ไม่นิ่ง
+                    if fb_val and str(fb_val).lower() in ['correct', 'true', 'yes']:
+                        correct_count += 1
+            
+            accuracy = (correct_count / total_fb) * 100
+            
+        print(f"DEBUG: Accuracy = {accuracy}%, Total FB = {total_fb}")
+
+        return {
+            "checks_today": checks_today,
+            "active_users": active_users_count,
+            "accuracy": round(accuracy, 1),
+            "feedback_total": total_fb
+        }
+
+    except Exception as e:
+        print(f"❌ Error getting dashboard KPI: {e}")
+        return {
+            "checks_today": 0,
+            "active_users": 0,
+            "accuracy": 0.0,
+            "feedback_total": 0
+        }
+def get_model_performance_data():
+    supabase = get_supabase()
+    try:
+        res = supabase.table('predictions')\
+            .select('prediction, label, confidence_score, created_at')\
+            .execute()
+        return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+    except Exception as e:
+        print(f"Error: {e}")
+        return pd.DataFrame()

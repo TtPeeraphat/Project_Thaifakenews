@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import time
 import plotly.express as px
+from supabase_auth import datetime
 
 # --- IMPORT MODULES ของเราเอง ---
 import database_ops as db
@@ -30,6 +31,29 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+from datetime import datetime
+
+def time_ago(timestamp_str):
+    """แปลง Timestamp เป็นคำว่า 'X mins ago'"""
+    try:
+        if isinstance(timestamp_str, str):
+            dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S") # ปรับ format ให้ตรงกับ DB
+        else:
+            dt = timestamp_str
+        
+        diff = datetime.now() - dt
+        seconds = diff.total_seconds()
+        
+        if seconds < 60:
+            return "Just now"
+        elif seconds < 3600:
+            return f"{int(seconds // 60)} mins ago"
+        elif seconds < 86400:
+            return f"{int(seconds // 3600)} hours ago"
+        else:
+            return f"{int(seconds // 86400)} days ago"
+    except:
+        return str(timestamp_str)
 # ==========================================
 # 1. ตั้งค่าหน้าเว็บ (Config)
 # ==========================================
@@ -232,46 +256,79 @@ elif not st.session_state['logged_in']:
 # CASE D: ล็อกอินแล้ว (เข้าสู่ระบบหลัก)
 # ------------------------------------------
 else:
-    # 1. จัดการเลือกเมนูด้วย Session State (ย้ายมาไว้ก่อน Sidebar เพื่อความชัวร์)
-    menu_options = [
-        "🏠 หน้าหลัก", 
-        "📜 ประวัติการตรวจสอบ", 
-        "🔥 ข่าวที่เป็นกระแส", 
-        "📊 Admin Dashboard", 
-        "👤 ข้อมูลส่วนตัว"
-    ]
-
+    # 1. ตั้งค่าเริ่มต้นเมนู (ถ้ายังไม่มี)
     if 'active_menu' not in st.session_state:
         st.session_state.active_menu = "🏠 หน้าหลัก"
 
     # --- SIDEBAR ---
     with st.sidebar:
+        # ส่วนแสดงโปรไฟล์
         st.image("https://cdn-icons-png.flaticon.com/512/9322/9322127.png", width=80)
-        st.markdown(f"### Hello, {st.session_state['username']}")
-        st.caption(f"Role: {st.session_state['role'].upper()}")
+        st.markdown(f"### Hello, {st.session_state.get('username', 'User')}")
+        st.caption(f"Role: {st.session_state.get('role', 'user').upper()}")
         st.divider()
+
+        # -------------------------------------------------------
+        # ส่วนที่ 1: เมนูหลัก (General Menu)
+        # -------------------------------------------------------
+        st.markdown("### 📌 เมนูหลัก")
         
-        st.write("### เมนูหลัก")
-        for option in menu_options:
-            # ตรวจสอบว่าเป็นเมนูที่เลือกอยู่หรือไม่
+        general_menu_options = [
+            "🏠 หน้าหลัก", 
+            "📜 ประวัติการตรวจสอบ", 
+            "🔥 ข่าวที่เป็นกระแส", 
+            "👤 ข้อมูลส่วนตัว"
+        ]
+
+        for option in general_menu_options:
             is_active = st.session_state.active_menu == option
-            
-            # ใช้สไตล์แยกสำหรับปุ่มที่ active (ถ้าเลือกอยู่ให้เปลี่ยนสีพื้นหลัง)
-            button_style = "primary" if is_active else "secondary"
-            
-            if st.button(option, key=f"btn_{option}", 
+            if st.button(option, key=f"nav_{option}", 
                          use_container_width=True,
-                         type=button_style): # ใช้ type ช่วยคุมสีเบื้องต้น
+                         type="primary" if is_active else "secondary"):
                 st.session_state.active_menu = option
                 st.rerun()
-# 3. ใช้ค่าจาก Session State มาคุม Logic หน้าเว็บ
+
+        # -------------------------------------------------------
+        # ส่วนที่ 2: Admin Panel - เห็นเฉพาะ Role = admin
+        # -------------------------------------------------------
+        if st.session_state.get('role') == 'admin':
+            st.divider()
+            st.markdown("### 🛠️ Admin Panel")
+            st.caption("Manage system settings")
+            
+            # ✅ เพิ่มเมนูให้ครบตามรูปภาพ
+            admin_menu_options = {
+                "📊 Dashboard": "dashboard",
+                "📈 Model Performance": "model_performance",
+                "📰 Manage News": "manage_news",
+                "💬 Review Feedback": "review_feedback",
+                "🔬 System Analytics": "analytics",
+                "👥 Manage Users": "manage_users"
+            }
+            
+            for label, key_suffix in admin_menu_options.items():
+                # ตรวจสอบสถานะว่าปุ่มไหนถูกเลือกอยู่ (Active)
+                is_active = st.session_state.get('active_menu') == label
+                
+                if st.button(
+                    label, 
+                    key=f"admin_nav_{key_suffix}", 
+                    use_container_width=True,
+                    type="primary" if is_active else "secondary"
+                ):
+                    st.session_state.active_menu = label
+                    st.rerun()
+
+    # ดึงค่าเมนูที่เลือกมาใช้งานต่อในส่วน Main Content
     menu = st.session_state.active_menu
 
-
-    # --- ส่วนเนื้อหาหลัก (เหมือนเดิม) ---
+    # =========================================================
+    #  PAGE: หน้าหลัก (Home)
+    # =========================================================
     if menu == "🏠 หน้าหลัก":
         st.title("🔍 ตรวจสอบความน่าเชื่อถือของข่าว")
 
+        # Demo Buttons
         with st.expander("📝 ลองใช้ข่าวตัวอย่าง (Demo News)", expanded=False):
             col_mock1, col_mock2 = st.columns(2)
             if col_mock1.button("👽 ข่าว Aliens (Fake)"):
@@ -279,12 +336,12 @@ else:
             if col_mock2.button("🏛️ ข่าวรัฐบาล (Real)"):
                 st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
 
+        # Text Input
         input_val = st.session_state.get('input_text', "")
         input_text = st.text_area("วางเนื้อหาข่าวที่นี่:", value=input_val, height=200)
         
-        # --- ส่วนตรวจสอบข่าว ---
+        # Action Button
         if st.button("🚀 Analyze News", type="primary", use_container_width=True):
-           
             clean_text = str(input_text).strip() if input_text else ""
             
             if not clean_text:
@@ -296,7 +353,7 @@ else:
                         result = ai.predict_news(clean_text)
                         
                         if result is not None:
-                            time.sleep(0.8)
+                            time.sleep(0.5) # ลดเวลาลงนิดหน่อยให้ไวขึ้น
                             
                             res_label = result.get('result', 'Error')
                             res_conf = result.get('confidence', 0.0)
@@ -331,10 +388,7 @@ else:
                     except Exception as e:
                         st.error(f"เกิดข้อผิดพลาด: {str(e)}")
 
-        # --- ส่วนแสดงผล (อยู่นอกเงื่อนไขปุ่มกด) ---
-        if 'current_result' in st.session_state:
-            # ดำเนินการแสดง UI ผลลัพธ์ต่อไป...
-            pass
+        # --- ส่วนแสดงผลผลลัพธ์ (Result Display) ---
         if 'current_result' in st.session_state:
             res = st.session_state['current_result']
             label = res['result']
@@ -368,6 +422,7 @@ else:
             
             st.progress(conf / 100)
 
+            # Feedback Section
             st.markdown("---")
             st.subheader("💡 Help Us Improve")
 
@@ -377,19 +432,22 @@ else:
                     if st.button("👍 Correct (แม่นยำ)"):
                         db.save_feedback(st.session_state['current_pred_id'], "Correct")
                         st.session_state['feedback_given'] = True
-                        st.success("ขอบคุณครับ! บันทึกข้อมูลแล้ว")
+                        st.toast("ขอบคุณครับ! บันทึกข้อมูลแล้ว") # ใช้ toast แทน success
                         time.sleep(1)
                         st.rerun()
                 with c2:
                     if st.button("👎 Incorrect (ผิดพลาด)"):
                         db.save_feedback(st.session_state['current_pred_id'], "Incorrect")
                         st.session_state['feedback_given'] = True
-                        st.error("ขอบคุณครับ! เราจะนำไปปรับปรุง")
+                        st.toast("ขอบคุณครับ! เราจะนำไปปรับปรุง") # ใช้ toast แทน error
                         time.sleep(1)
                         st.rerun()
             else:
                 st.info("✅ คุณได้ส่ง Feedback สำหรับข่าวนี้แล้ว")
 
+    # =========================================================
+    #  PAGE: ประวัติการตรวจสอบ (History)
+    # =========================================================
     elif menu == "📜 ประวัติการตรวจสอบ":
         st.title("📜 ประวัติการตรวจสอบข่าว")
         uid = st.session_state.get('user_id')
@@ -398,137 +456,183 @@ else:
             history_data = db.get_user_history(uid)
             
             if history_data:
-                # 1. สร้าง DataFrame และเตรียมข้อมูล
                 df = pd.DataFrame(history_data)
                 df.columns = [c.lower() for c in df.columns]
                 
-                # --- ส่วนของ FILTER (เพิ่มใหม่) ---
-                search_term = st.text_input("🔍 ค้นหาหัวข้อข่าวที่คุณเคยตรวจสอบ", placeholder="พิมพ์คำที่ต้องการค้นหาที่นี่...")
-                
-                # กรองข้อมูลตามคำค้นหา (ถ้ามีการพิมพ์คำค้นหา)
+                # Filter
+                search_term = st.text_input("🔍 ค้นหาหัวข้อข่าว", placeholder="พิมพ์คำค้นหา...")
                 if search_term:
-                    # ค้นหาคำในคอลัมน์ title โดยไม่สนตัวพิมพ์เล็ก-ใหญ่ (case=False)
                     df = df[df['title'].str.contains(search_term, case=False, na=False)]
-                # ------------------------------
 
                 if not df.empty:
-                    # 2. จัดการข้อมูลก่อนแสดงผล (เหมือนเดิม)
-                    df['content_display'] = df['title'].astype(str)
-                    
+                    # Prep Data
                     if 'timestamp' in df.columns:
                         df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%d/%m/%Y %H:%M')
 
-                    # 3. เลือกและเปลี่ยนชื่อคอลัมน์ให้เป็นภาษาไทย
                     display_mapping = {
-                        'content_display': 'หัวข้อข่าว',
+                        'title': 'หัวข้อข่าว',
                         'result': 'ผลการวิเคราะห์',
                         'confidence': 'ความเชื่อมั่น (%)', 
                         'timestamp': 'วันที่-เวลา'
                     }
                     
-                    present_cols = [c for c in display_mapping.keys() if c in df.columns]
-                    df_display = df[present_cols].copy()
+                    # เลือกเฉพาะคอลัมน์ที่มีอยู่จริงเพื่อป้องกัน KeyError
+                    valid_cols = [c for c in display_mapping.keys() if c in df.columns]
+                    df_display = df[valid_cols].copy()
                     df_display.rename(columns=display_mapping, inplace=True)
                     
-                    # รีเซ็ตเลข Index ให้เริ่มที่ 1
+                    # ✅ แก้ไขตรงนี้: แปลง range เป็น list
                     df_display.index = list(range(1, len(df_display) + 1))
 
-                    st.write(f"พบข้อมูลทั้งหมด {len(df_display)} รายการ")
+                    st.write(f"พบข้อมูล {len(df_display)} รายการ")
                     st.dataframe(df_display, use_container_width=True)
                 else:
                     st.warning(f"❌ ไม่พบหัวข้อข่าวที่มีคำว่า '{search_term}'")
-                
             else:
-                st.info("ℹ️ คุณยังไม่มีประวัติการตรวจสอบข่าวในระบบ")
-
-
-    elif menu == "📊 Admin Dashboard":
+                st.info("ℹ️ คุณยังไม่มีประวัติการตรวจสอบข่าว")
+                
+    # =========================================================
+    #  PAGE: Admin Dashboard
+    # =========================================================
+    elif menu == "📊 Dashboard": 
         if st.session_state.get('role') != 'admin':
-            st.error("⛔ Access Denied")
+            st.error("⛔ Access Denied: หน้านี้สำหรับ Admin เท่านั้น")
         else:
-            st.title("🛠 Admin Control Panel")
+            st.title("📊 Admin Dashboard")
+            st.caption("สรุปภาพรวมประสิทธิภาพของระบบ (Real-time Data)")
             
-            # ตัวเลือกโหมดหน้า Admin
-            adm_mode = st.radio(
-                "เลือกโหมด:", 
-                ["Overview Stats", "Accuracy Review", "System Logs"], 
-                horizontal=True
-            )
+            # --- 1. ดึงข้อมูลจริงจาก Database ---
+            # เรียกใช้ฟังก์ชันที่เราเพิ่งสร้าง
+            stats = db.get_dashboard_kpi()
+            
+            # (ป้องกัน Error กรณี stats เป็น None แม้จะกันไว้ใน db แล้วก็ตาม)
+            if not stats: 
+                stats = {"checks_today": 0, "active_users": 0, "accuracy": 0.0, "feedback_total": 0}
 
-            # --- โหมด 1: Overview ---
-            if adm_mode == "Overview Stats":
-                all_preds = db.read_all_predictions()
-                if all_preds:
-                    df = pd.DataFrame(all_preds, columns=['ID', 'User', 'Title', 'Text', 'Result', 'Conf', 'Timestamp'])
-                    
-                    total = len(df)
-                    fake_count = len(df[df['Result'] == 'Fake'])
-                    real_count = len(df[df['Result'] == 'Real'])
-                    avg_conf = df['Conf'].mean()
+            # --- 2. แสดงผล KPI Cards ---
+            st.markdown("### Key Performance Indicators")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.container(border=True)
+                st.metric(
+                    label="🔍 Total Checks Today", 
+                    value=f"{stats['checks_today']:,}", 
+                    delta="วันนี้",
+                    delta_color="off" 
+                )
+            
+            with col2:
+                st.container(border=True)
+                st.metric(
+                    label="👥 Active Users (24h)", 
+                    value=f"{stats['active_users']:,}", 
+                    help="จำนวนผู้ใช้งานที่ไม่ซ้ำกันใน 24 ชม. ล่าสุด"
+                )
 
-                    col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("Total Checks", total)
-                    col2.metric("Fake Found", fake_count, delta_color="inverse")
-                    col3.metric("Real Found", real_count)
-                    col4.metric("Avg Confidence", f"{avg_conf:.1f}%")
+            with col3:
+                st.container(border=True)
+                val_acc = stats['accuracy']
+                # เปลี่ยนสี Delta ถ้าต่ำกว่า 50%
+                st.metric(
+                    label="🎯 Model Accuracy", 
+                    value=f"{val_acc}%", 
+                    delta="จาก Feedback ผู้ใช้"
+                )
 
-                    st.subheader("📈 Usage Timeline")
-                    df['Date'] = pd.to_datetime(df['Timestamp']).dt.date
-                    usage_chart = df.groupby('Date').size()
-                    st.line_chart(usage_chart)
-                else:
-                    st.info("ยังไม่มีข้อมูลในระบบ")
+            with col4:
+                st.container(border=True)
+                st.metric(
+                    label="💬 Feedback Total", 
+                    value=f"{stats['feedback_total']:,}",
+                    help="จำนวนครั้งที่ผู้ใช้กด Correct/Incorrect"
+                )
 
-            # --- โหมด 2: Accuracy Review ---
-            elif adm_mode == "Accuracy Review":
-                st.markdown("### 🎯 ตรวจสอบความถูกต้อง")
-                recent_preds = db.read_all_predictions_limit(10)
-                
-                if recent_preds:
-                    for item in recent_preds:
-                        with st.expander(f"[{item[4]}] {item[2]} ({item[5]}%)"):
-                            st.write(f"**News:** {item[3]}")
-                            st.write(f"**AI Predicted:** {item[4]}")
-                            st.caption(f"User: {item[1]} | Time: {item[6]}")
-                            
-                            c1, c2 = st.columns(2)
-                            if c1.button("Mark as REAL", key=f"real_{item[0]}"):
-                                st.toast(f"Updated ID {item[0]} -> Real")
-                            if c2.button("Mark as FAKE", key=f"fake_{item[0]}"):
-                                st.toast(f"Updated ID {item[0]} -> Fake")
-                else:
-                    st.info("ไม่มีข้อมูลการวิเคราะห์ล่าสุด")
+            st.markdown("---")
+            
+            # --- 3. Recent Activity (ส่วนเดิมที่คุณมี) ---
+            st.subheader("⏱️ Recent Activity")
+            logs = db.get_system_logs(limit=10) 
+            
+            if logs:
+                for row in logs:
+                    ts, user, action, details, level = row
+                    with st.container(border=True):
+                        c_icon, c_info, c_time = st.columns([0.5, 6, 2])
+                        with c_icon:
+                            if "admin" in str(user).lower():
+                                st.write("🛡️")
+                            else:
+                                st.write("👤")
+                        with c_info:
+                            st.markdown(f"**{user}**")
+                            # ตัดข้อความถ้ายาวเกินไป
+                            short_detail = (details[:75] + '..') if len(details) > 75 else details
+                            st.caption(f"{action} • {short_detail}")
+                        with c_time:
+                            st.caption(time_ago(ts))
+            else:
+                st.info("ยังไม่มีประวัติการใช้งานในระบบ")
 
-            # --- โหมด 3: System Logs (ตรวจสอบว่าเยื้องเข้ามาตรงนี้!) ---
-            elif adm_mode == "System Logs":
-                st.subheader("🤖 บันทึกการทำงานของระบบ (System Logs)")
-                
-                if st.button("🔄 Refresh Logs"):
-                    st.rerun()
-                
-                # 1. ดึงข้อมูล
-                logs_data = db.get_system_logs(100) 
-                
-                # 2. ตรวจสอบว่ามีข้อมูลหรือไม่
-                if logs_data:
-                    # สร้าง df_log ภายในเงื่อนไขที่มีข้อมูลเท่านั้น
-                    df_log = pd.DataFrame(logs_data, columns=['เวลา', 'idผู้ใช้', 'กิจกรรม', 'รายละเอียด', 'ระดับ'])
-                    
-                    # 3. ฟังก์ชันใส่สี (นิยามไว้ใช้เฉพาะตอนมีข้อมูล)
-                    def style_rows(row):
-                        if row['ระดับ'] == 'ERROR':
-                            return ['background-color: #ff4b4b; color: white; font-weight: bold'] * len(row)
-                        elif row['ระดับ'] == 'INFO':
-                            return ['background-color: #f0fdf4; color: #166534'] * len(row)
-                        return [''] * len(row)
+    def show_model_performance():
+            st.title("📈 Model Performance")
+            st.caption("Monitor and analyze AI model metrics")
+    
+    # ✅ แก้ไขที่ 1: เรียกผ่าน db. และต้องย่อหน้าให้ตรงกันเพื่อให้โค้ดอยู่ภายในฟังก์ชัน
+            df = db.get_model_performance_data() 
+    
+            if df.empty:
+                st.warning("ไม่พบข้อมูลสำหรับการคำนวณ Performance")
+                return # ตอนนี้ return จะทำงานได้ปกติเพราะอยู่ในฟังก์ชันแล้ว
 
-                    # 4. แสดงผลตาราง (เรียกใช้ df_log ตรงนี้)
-                    st.dataframe(
-                        df_log.style.apply(style_rows, axis=1), 
-                        use_container_width=True, 
-                        height=500,
-                        hide_index=True
-                    )
-                else:
-                    # ถ้าไม่มีข้อมูล ให้แสดงข้อความแจ้งเตือนแทนการเรียกใช้ df_log
-                    st.info("ℹ️ ยังไม่มีข้อมูลบันทึกในระบบ")
+    # --- ส่วนการคำนวณ (Logic) ---
+    # (ตรวจสอบให้แน่ใจว่าโค้ดส่วนนี้ย่อหน้าเข้ามาทั้งหมด)
+            y_true = df['label'].astype(str).str.lower()
+            y_pred = df['prediction'].astype(str).str.lower()
+    
+            total = len(df)
+            correct = (y_true == y_pred).sum()
+    
+            accuracy = correct / total if total > 0 else 0
+    
+            # คำนวณ Precision/Recall
+            tp = ((y_true == 'fake') & (y_pred == 'fake')).sum()
+            fp = ((y_true == 'real') & (y_pred == 'fake')).sum()
+            fn = ((y_true == 'fake') & (y_pred == 'real')).sum()
+    
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    # --- 2. แสดงผลการ์ด Metric ---
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Overall Accuracy", f"{accuracy*100:.1f}%")
+                st.progress(accuracy)
+            with col2:
+                st.metric("Precision", f"{precision*100:.1f}%")
+                st.progress(precision)
+            with col3:
+                st.metric("Recall", f"{recall*100:.1f}%")
+                st.progress(recall)
+            with col4:
+                st.metric("F1 Score", f"{f1*100:.1f}%")
+                st.progress(f1)
+
+            # --- 3. กราฟแนวโน้ม ---
+            st.write("---")
+            st.subheader("Performance Trends")
+            df['date'] = pd.to_datetime(df['created_at']).dt.date
+            # ใช้กรุ๊ปข้อมูลเพื่อสร้างกราฟ
+            trend_df = df.groupby('date').apply(lambda x: (x['label'] == x['prediction']).mean()).reset_index()
+            trend_df.columns = ['Date', 'Accuracy']
+            st.line_chart(trend_df.set_index('Date'))
+
+            # --- 4. กราฟ Confidence Score ---
+            st.write("---")
+            st.subheader("Confidence Score Distribution")
+            conf_scores = df['confidence_score'].dropna()
+            bins = [0.6, 0.7, 0.8, 0.9, 1.0]
+            labels = ['60-70%', '70-80%', '80-90%', '90-100%']
+            dist_counts = pd.cut(conf_scores, bins=bins, labels=labels).value_counts().reindex(labels[::-1])
+            st.bar_chart(dist_counts)
