@@ -3,7 +3,8 @@ import pandas as pd
 import time
 import plotly.express as px
 from supabase_auth import datetime
-
+import altair as alt
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 # --- IMPORT MODULES ของเราเอง ---
 import database_ops as db
 import ai_engine as ai
@@ -34,118 +35,172 @@ st.markdown("""
 from datetime import datetime
 
 def show_model_performance():
-    df = db.get_model_performance_data()
+    st.title("📊 Model Analytics Dashboard")
 
-    # 🛠️ [DEBUG] ส่วนตรวจสอบข้อมูล (ลบออกเมื่อเสร็จแล้ว)
-    st.error("🕵️‍♂️ Debug Mode: ตรวจสอบการจับคู่ข้อมูล")
-    st.write(f"จำนวนแถวทั้งหมดที่ดึงมา: {len(df)}")
-    if not df.empty:
-        # โชว์เฉพาะคอลัมน์สำคัญ
-        cols = ['id', 'prediction', 'label', 'prediction_id'] 
-        # เลือกเฉพาะคอลัมน์ที่มีอยู่จริง
-        existing_cols = [c for c in cols if c in df.columns]
-        st.dataframe(df[existing_cols]) 
-    else:
-        st.write("ตารางว่างเปล่า!")
+    # ==========================================
+    # ส่วนที่ 1: Real-time Monitoring (ดึงจาก Predictions ทั้งหมด)
+    # ==========================================
+    # ดึงข้อมูลทั้งหมดมาดูก่อน (เอามาโชว์ Traffic รวม)
+    df_all = db.get_model_performance_data() 
     
-    if df.empty:
-        st.warning("⚠️ ยังไม่มีข้อมูลการทำนายในระบบ")
+    st.subheader("1. AI Activity Monitor (Real-time)")
+    
+    if df_all.empty:
+        st.warning("ยังไม่มีข้อมูลการทำนายเข้ามาในระบบ")
         return
 
-    # --- 1. เตรียมข้อมูล & จัดการเรื่องชื่อคอลัมน์เวลา ---
-    # ✅ กำหนดค่าให้ time_col ป้องกัน Error "time_col is not defined"
-    time_col = 'timestamp' if 'timestamp' in df.columns else 'created_at'
+    # คำนวณ Metric พื้นฐาน
+    total_scans = len(df_all)
     
-    # กรองเฉพาะข้อมูลที่มีการตอบ Feedback แล้ว (ไม่เป็น pending)
-    # ใช้ .str.lower() เพื่อให้รองรับทั้ง 'Real' และ 'real'
-    valid_labels = ['fake', 'real', 'Fake', 'Real']
-    df_evaluated = df[df['label'].astype(str).str.lower().isin(valid_labels)].copy()
+    # แปลง confidence เป็นตัวเลข
+    if 'confidence' in df_all.columns:
+        df_all['confidence'] = pd.to_numeric(df_all['confidence'], errors='coerce')
     
-    # if df_evaluated.empty:
-    #     st.info("💡 ข้อมูลที่มีอยู่ยังรอการตรวจสอบ (Pending) ลองไปแก้สถานะใน DB สัก 2-3 แถวครับ")
-    #     return
+    avg_conf = df_all['confidence'].mean()
+    fake_count = len(df_all[df_all['prediction'] == 'Fake'])
+    real_count = len(df_all[df_all['prediction'] == 'Real'])
 
-    # --- 2. ส่วนคำนวณ Metrics ---
-    y_true = df_evaluated['label'].astype(str).str.lower()
-    y_pred = df_evaluated['prediction'].astype(str).str.lower()
-    
-    total = len(df_evaluated)
-    
-    # ✅ ปรับการคำนวณให้ปลอดภัยจาก nan
-    if total > 0:
-        accuracy = (y_true == y_pred).mean()
-        
-        # คำนวณ TP, FP, FN
-        tp = ((y_true == 'fake') & (y_pred == 'fake')).sum()
-        fp = ((y_true == 'real') & (y_pred == 'fake')).sum()
-        fn = ((y_true == 'fake') & (y_pred == 'real')).sum()
-        
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-    else:
-        # กำหนดค่าเริ่มต้นเป็น 0.0 ทั้งหมดถ้าไม่มีข้อมูล
-        accuracy = precision = recall = f1 = 0.0
+    # แสดง Metric 4 ช่อง
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total News Scanned", f"{total_scans:,}", "All time")
+    m2.metric("Avg. Confidence", f"{avg_conf:.1f}%", "Model certainty")
+    m3.metric("Detected FAKE", f"{fake_count}", f"{(fake_count/total_scans*100):.1f}% rate", delta_color="inverse")
+    m4.metric("Detected REAL", f"{real_count}", f"{(real_count/total_scans*100):.1f}% rate")
 
-    # --- 3. แสดงผล Metric Cards ---
-    col1, col2, col3, col4 = st.columns(4)
-    
-    # ฟังก์ชันช่วยเช็คค่า nan ก่อนใส่ใน progress
-    def safe_progress(value):
-        import math
-        # ถ้าค่าเป็น nan หรือไม่ใช่ตัวเลข ให้ส่ง 0.0 ไปแทน
-        if math.isnan(value): return 0.0
-        return float(max(0.0, min(1.0, value))) # บังคับให้อยู่ระหว่าง 0.0 - 1.0
-
-    with col1:
-        st.metric("Overall Accuracy", f"{accuracy*100:.1f}%")
-        st.progress(safe_progress(accuracy))
-    
-    with col2:
-        st.metric("Precision", f"{precision*100:.1f}%")
-        st.progress(safe_progress(precision))
-    
-    with col3:
-        st.metric("Recall", f"{recall*100:.1f}%")
-        st.progress(safe_progress(recall))
-        
-    with col4:
-        st.metric("F1 Score", f"{f1*100:.1f}%")
-        st.progress(safe_progress(f1))
-
-    # --- 4. ส่วนกราฟแนวโน้ม (Performance Trends) ---
     st.write("---")
-    st.subheader("Performance Trends")
 
-    # 🚨 ดัก Error กราฟ: ถ้าไม่มีข้อมูลที่ "ถูกต้อง" (ไม่ใช่ pending) ห้ามวาดกราฟ
+    # ==========================================
+    # ส่วนที่ 2: Accuracy Evaluation (เฉพาะที่มีเฉลยแล้ว)
+    # ==========================================
+    st.subheader("2. Accuracy Evaluation (Verified Cases Only)")
+    
+    # 1. ดึงข้อมูล
+    df_evaluated = db.get_evaluated_data()
+
+    # ------------------------------------------------------------------
+    # ✅ (ส่วนที่เพิ่ม) Data Cleaning: กรองเอาเฉพาะที่เฉลยแล้วจริงๆ
+    # ------------------------------------------------------------------
+    if not df_evaluated.empty and 'status' in df_evaluated.columns:
+        # ลบช่องว่างหัวท้าย (ถ้ามี)
+        df_evaluated['status'] = df_evaluated['status'].astype(str).str.strip()
+        
+        # กรองเอาเฉพาะแถวที่ status เป็น 'Real' หรือ 'Fake' เท่านั้น
+        # (วิธีนี้จะตัด 'Pending', None, '', หรือ Padding ออกไปโดยอัตโนมัติ)
+        df_evaluated = df_evaluated[df_evaluated['status'].isin(['Real', 'Fake'])]
+
+    # ------------------------------------------------------------------
+
     if df_evaluated.empty:
-        st.info("📉 ยังไม่มีข้อมูลที่ตรวจสอบแล้ว (Status: Real/Fake) จึงยังไม่แสดงกราฟ")
+        st.info("ℹ️ ส่วนวัดผลความแม่นยำจะแสดงเมื่อ Admin ทำการ Review ข้อมูลในหน้า Feedback แล้วเท่านั้น")
+        st.caption("Waiting for verification... (Currently 0 verified cases)")
+        st.progress(0)
     else:
-        # เตรียมข้อมูลกราฟ
-        df_chart = df_evaluated.copy()
-        df_chart['date'] = pd.to_datetime(df_chart[time_col]).dt.date
-        df_chart['is_correct'] = (y_true == y_pred).astype(int)
+        # มีข้อมูลที่ตรวจแล้ว (แม้จะแค่ 1 แถวก็คำนวณได้)
+        st.success(f"📈 คำนวณจากข้อมูลที่เฉลยแล้วจำนวน: {len(df_evaluated)} รายการ")
         
-        # คำนวณ (เหมือนเดิม)
-        df_chart['is_tp'] = ((y_true == 'fake') & (y_pred == 'fake')).astype(int)
-        df_chart['is_fp'] = ((y_true == 'real') & (y_pred == 'fake')).astype(int)
-        df_chart['is_fn'] = ((y_true == 'fake') & (y_pred == 'real')).astype(int)
+        y_true = df_evaluated['status']
+        y_pred = df_evaluated['prediction']
         
-        daily_stats = df_chart.groupby('date')[['is_correct', 'is_tp', 'is_fp', 'is_fn']].sum()
-        daily_stats['count'] = df_chart.groupby('date').size()
+        # กำหนด label เป้าหมาย (ต้องตรงกับใน Database เป๊ะๆ case-sensitive)
+        target_pos = 'Fake' 
+
+        # คำนวณ Metrics
+        try:
+            acc = accuracy_score(y_true, y_pred)
+            
+            # ใช้ labels เพื่อบังคับให้ library รู้ว่ามีคลาสอะไรบ้าง แม้ข้อมูลจะมีแค่คลาสเดียว
+            prec = precision_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
+            rec = recall_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
+            f1 = f1_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
+
+            # ฟังก์ชันวาดหลอดพลัง
+            def safe_progress(val):
+                return float(max(0.0, min(1.0, val)))
+
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.metric("Overall Accuracy", f"{acc*100:.1f}%")
+                st.progress(safe_progress(acc))
+            with c2:
+                st.metric("Precision (Fake)", f"{prec*100:.1f}%")
+                st.progress(safe_progress(prec))
+            with c3:
+                st.metric("Recall (Fake)", f"{rec*100:.1f}%")
+                st.progress(safe_progress(rec))
+            with c4:
+                st.metric("F1 Score", f"{f1*100:.1f}%")
+                st.progress(safe_progress(f1))
+
+            # Show Table of verified data
+            with st.expander("ดูรายการที่ตรวจสอบแล้ว (Verified Logs)", expanded=True):
+                # เลือกโชว์เฉพาะคอลัมน์ที่จำเป็น
+                cols_to_show = ['prediction', 'status', 'confidence']
+                # ถ้ามี columns อื่นให้ใส่เพิ่มได้
+                available_cols = [c for c in cols_to_show if c in df_evaluated.columns]
+                st.dataframe(df_evaluated[available_cols], use_container_width=True)
+                
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการคำนวณ: {e}")
+
+def show_feedback_review():
+    st.title("🕵️‍♂️ Admin Review Center")
+    st.write("ตรวจสอบ Feedback จากผู้ใช้งาน และเฉลยคำตอบที่ถูกต้องเพื่อสอน AI")
+    
+    # 1. ดึงข้อมูลที่รอตรวจ
+    pending_items = db.get_pending_feedbacks()
+    
+    if not pending_items:
+        st.success("🎉 เยี่ยมมาก! ไม่มีงานค้าง ตรวจครบหมดแล้ว")
+        st.balloons()
+        return
+
+    st.info(f"📝 มีรายการรอตรวจสอบทั้งหมด: {len(pending_items)} รายการ")
+    
+    # 2. แสดงรายการ (Loop)
+    for item in pending_items:
+        # ส่วนหัว Card
+        card_title = f"📰 {item['title'][:50]}..." if item['title'] else "No Title"
         
-        daily_stats['Accuracy'] = (daily_stats['is_correct'] / daily_stats['count']) * 100
-        
-        den_prec = daily_stats['is_tp'] + daily_stats['is_fp']
-        daily_stats['Precision'] = (daily_stats['is_tp'] / den_prec).fillna(0) * 100
-        
-        den_rec = daily_stats['is_tp'] + daily_stats['is_fn']
-        daily_stats['Recall'] = (daily_stats['is_tp'] / den_rec).fillna(0) * 100
-        
-        trend_df = daily_stats[['Accuracy', 'Precision', 'Recall']].reset_index()
-        
-        # วาดกราฟ
-        st.line_chart(trend_df.set_index('date'))
+        with st.expander(f"{card_title} (AI: {item['ai_result']})", expanded=True):
+            
+            # แบ่งครึ่งซ้ายขวา
+            c1, c2 = st.columns([2, 1])
+            
+            with c1:
+                st.markdown("#### เนื้อหาข่าว")
+                st.write(item['text'])
+                st.caption(f"📅 User Feedback Time: {item['timestamp']}")
+            
+            with c2:
+                st.markdown("#### รายละเอียด")
+                st.info(f"🤖 **AI ทายว่า:** {item['ai_result']}")
+                st.write(f"📊 **ความมั่นใจ:** {item['ai_confidence']}%")
+                st.warning(f"💬 **User บอกว่า:** {item['user_comment']}")
+
+            st.write("---")
+            st.markdown("### 👨‍⚖️ Admin Decision (เฉลยความจริง)")
+            
+            # ปุ่ม Action (Real / Fake / Ignore)
+            b1, b2, b3 = st.columns(3)
+            
+            with b1:
+                if st.button("✅ ข่าวจริง (Real)", key=f"real_{item['feedback_id']}", type="primary"):
+                    if db.update_feedback_status(item['feedback_id'], 'Real'):
+                        st.success("บันทึกว่า 'Real' เรียบร้อย!")
+                        st.rerun() # รีเฟรชหน้าเพื่อเอารายการออก
+            
+            with b2:
+                if st.button("❌ ข่าวปลอม (Fake)", key=f"fake_{item['feedback_id']}", type="primary"):
+                    if db.update_feedback_status(item['feedback_id'], 'Fake'):
+                        st.error("บันทึกว่า 'Fake' เรียบร้อย!")
+                        st.rerun()
+            
+            with b3:
+                # ปุ่มข้าม หรือ ลบทิ้ง (ในกรณี Spam)
+                if st.button("🗑️ ลบ/ข้าม (Ignore)", key=f"del_{item['feedback_id']}"):
+                     if db.update_feedback_status(item['feedback_id'], 'Ignored'):
+                        st.warning("ลบรายการนี้แล้ว")
+                        st.rerun()
 
 def time_ago(timestamp_str):
     """แปลง Timestamp เป็นคำว่า 'X mins ago'"""
@@ -693,6 +748,16 @@ else:
         if st.session_state.get('role') != 'admin':
             st.error("⛔ Access Denied")
         else:
-            st.title("📈 Model Performance Analysis")
+            
             show_model_performance() 
 
+    elif menu == "💬 Review Feedback":
+        # ตรวจสอบสิทธิ์ Admin อีกครั้ง (Defensive Programming)
+        if st.session_state.get('role') != 'admin':
+            st.error("⛔ Access Denied: หน้านี้สำหรับ Admin เท่านั้น")
+        else:
+            
+            st.caption("ตรวจสอบความถูกต้องของ Model จาก Feedback ผู้ใช้งาน")
+            
+            # เรียกฟังก์ชันที่เราสร้างไว้ในขั้นตอนก่อนหน้า
+            show_feedback_review()

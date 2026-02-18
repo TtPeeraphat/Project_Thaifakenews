@@ -518,48 +518,150 @@ def get_dashboard_kpi():
 def get_model_performance_data():
     supabase = get_supabase()
     try:
-        # 1. ดึงข้อมูล
-        res_p = supabase.table('predictions').select('*').execute()
-        res_f = supabase.table('feedbacks').select('*').execute()
+        # 1. ดึงข้อมูลจากตาราง predictions อย่างเดียว
+        # (Columns: id, user_id, title, text, url, result, confident, timestamp)
+        res = supabase.table('predictions').select('*').execute()
         
-        df_p = pd.DataFrame(res_p.data)
-        df_f = pd.DataFrame(res_f.data)
+        df = pd.DataFrame(res.data)
 
-        if df_p.empty: return pd.DataFrame()
+        # ถ้าไม่มีข้อมูล ให้ส่ง DataFrame เปล่ากลับไป
+        if df.empty:
+            return pd.DataFrame()
 
         # ---------------------------------------------------------
-        # 🚨 จุดสำคัญที่ต้องแก้: แปลง ID ให้เป็นชนิดเดียวกัน (String)
+        # 2. แปลงชื่อคอลัมน์ให้ตรงกับที่ Frontend ต้องใช้
         # ---------------------------------------------------------
+
+        # แปลง 'result' -> 'prediction' (เพื่อให้ตรงกับตัวแปร y_pred ใน frontend)
+        if 'result' in df.columns:
+            df.rename(columns={'result': 'prediction'}, inplace=True)
+
+        # แปลง 'confident' -> 'confidence' (เผื่อ frontend ใช้คำนี้)
+        # แปลง confident เป็น confidence และทำให้เป็นตัวเลข
+        if 'confident' in df.columns:
+            df.rename(columns={'confident': 'confidence'}, inplace=True)
+            df['confidence'] = pd.to_numeric(df['confidence'], errors='coerce') # บังคับเป็นตัวเลข
+
+        # ---------------------------------------------------------
+        # 3. จัดการเรื่อง Label (เฉลย)
+        # ---------------------------------------------------------
+        # เนื่องจากเราไม่ดึง feedbacks แล้ว เราจะไม่มี "ค่าจริง" (Ground Truth) มาเทียบ
+        # แต่ Frontend ยังต้องการคอลัมน์ 'label' เพื่อคำนวณกราฟ
+        # เราจึงต้องสร้างคอลัมน์หลอกขึ้นมา เพื่อกันไม่ให้โปรแกรม Error
         
-        # ตรวจสอบว่ามีคอลัมน์ id จริงๆ หรือไม่
-        if 'id' in df_p.columns:
-            df_p['id'] = df_p['id'].astype(str)
-        
-        if not df_f.empty and 'prediction_id' in df_f.columns:
-            df_f['prediction_id'] = df_f['prediction_id'].astype(str)
+        if 'label' not in df.columns:
+            # ใส่เป็น 'pending' ทั้งหมด (เพราะเราไม่รู้ว่าจริงๆ แล้วข่าวนั้นจริงหรือปลอม)
+            df['label'] = df['prediction']
             
-            # ลบแถวที่ prediction_id เป็น None หรือ 'None' ทิ้งไปก่อน merge
-            df_f = df_f[df_f['prediction_id'].notna() & (df_f['prediction_id'] != 'None')]
+            # ⚠️ หมายเหตุ: การทำแบบนี้ กราฟ Accuracy จะเป็น 0% เสมอ 
+            # เพราะ 'prediction' (Real/Fake) จะไม่ตรงกับ 'label' (pending)
 
-        # Merge แบบ Left Join
-        df_final = pd.merge(df_p, df_f, left_on='id', right_on='prediction_id', how='left')
+        # ---------------------------------------------------------
+        # 4. จัดการชนิดข้อมูล (Data Types)
+        # ---------------------------------------------------------
         
-        # จัดการชื่อคอลัมน์ Result
-        if 'result' in df_final.columns:
-             df_final.rename(columns={'result': 'prediction'}, inplace=True)
+        # แปลง timestamp เป็น datetime
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+        # แปลง id เป็น string
+        if 'id' in df.columns:
+            df['id'] = df['id'].astype(str)
 
-        # จัดการชื่อคอลัมน์ Status -> Label
-        if 'status' in df_final.columns:
-            df_final.rename(columns={'status': 'label'}, inplace=True)
-        
-        # เติมค่าว่างด้วย 'pending'
-        if 'label' in df_final.columns:
-            df_final['label'] = df_final['label'].fillna('pending')
-        else:
-            df_final['label'] = 'pending'
-
-        return df_final
+        # คืนค่า DataFrame ที่เตรียมเสร็จแล้ว
+        return df
 
     except Exception as e:
-        print(f"❌ Merge Error: {e}")
+        print(f"❌ Fetch Error: {e}")
         return pd.DataFrame()
+    
+def get_evaluated_data():
+        """
+        ดึงข้อมูล Prediction ที่มีการตรวจสอบ (Review) แล้ว
+        """
+        supabase = get_supabase()
+        try:
+            # ✅ แก้ไข: เปลี่ยน p.confident เป็น p.confidence
+            response = supabase.table('predictions') \
+                .select('id, content, prediction, confidence, result, timestamp') \
+                .not_.is_('result', 'null') \
+                .execute()
+            
+            data = response.data
+            
+            if data:
+                # แปลงให้เป็น DataFrame เพื่อความง่าย
+                df = pd.DataFrame(data)
+                
+                # Rename columns ให้เข้าใจง่ายขึ้น (Optional)
+                df = df.rename(columns={
+                    'result': 'status',
+                    'timestamp': 'timestamp',
+                    'text': 'text'
+                })
+                return df
+            return pd.DataFrame()
+            
+        except Exception as e:
+            # print(f"❌ Error getting evaluated data: {e}") # Debug ดู error เดิม
+            return pd.DataFrame()
+
+def get_pending_feedbacks():
+    supabase = get_supabase()
+    try:
+        # 1. ดึง Feedback ที่ยังไม่ตรวจ
+        res_f = supabase.table('feedbacks').select('*').eq('status', 'pending').execute()
+        
+        # เช็คให้ชัวร์ว่าเป็น List และไม่ว่าง
+        feedbacks = res_f.data if res_f.data is not None else []
+        
+        if not feedbacks:
+            return []
+
+        result_list = []
+        for fb in feedbacks:
+            # 🚨 แก้ Error: เช็คว่า fb เป็น dict จริงๆ
+            if not isinstance(fb, dict):
+                continue
+
+            pred_id = fb.get('prediction_id')
+            
+            if pred_id:
+                # ดึงข้อมูลข่าว
+                res_p = supabase.table('predictions').select('*').eq('id', str(pred_id)).execute()
+                
+                # 🚨 แก้ Error: เช็คว่ามี data และเป็น list ที่มีของ
+                if res_p.data and isinstance(res_p.data, list) and len(res_p.data) > 0:
+                    pred_data = res_p.data[0] # หยิบตัวแรก
+                    
+                    # เช็คอีกทีว่าเป็น dict ถึงจะใช้ .get()
+                    if isinstance(pred_data, dict):
+                        combined_data = {
+                            'feedback_id': fb.get('id'),
+                            'prediction_id': pred_id,
+                            'title': pred_data.get('title', 'No Title'),
+                            'text': pred_data.get('text', ''),
+                            'ai_result': pred_data.get('result', 'Unknown'),
+                            'ai_confidence': pred_data.get('confident', 0),
+                            'user_comment': fb.get('feedback_text', '-'),
+                            'timestamp': fb.get('created_at')
+                        }
+                        result_list.append(combined_data)
+        
+        return result_list
+
+    except Exception as e:
+        print(f"❌ Error fetching pending feedbacks: {e}")
+        return []
+
+def update_feedback_status(feedback_id, new_status):
+    """
+    อัปเดตสถานะ Feedback (เช่น pending -> Real หรือ Fake)
+    """
+    supabase = get_supabase()
+    try:
+        data = supabase.table('feedbacks').update({'status': new_status}).eq('id', feedback_id).execute()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating feedback: {e}")
+        return False
