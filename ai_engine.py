@@ -71,7 +71,7 @@ def predict_news(text: str):
 
     try:
         # A. Preprocessing (BERT Embedding)
-        inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True, padding='max_length')
+        inputs = tokenizer(text, return_tensors="pt", max_length=400, truncation=True)
         input_ids = inputs['input_ids'].to(device)
         attention_mask = inputs['attention_mask'].to(device)
         

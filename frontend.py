@@ -1,3 +1,4 @@
+import sys
 import streamlit as st
 import pandas as pd
 import time
@@ -5,9 +6,17 @@ import plotly.express as px
 from supabase_auth import datetime
 import altair as alt
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import re
 # --- IMPORT MODULES ของเราเอง ---
 import database_ops as db
 import ai_engine as ai
+import asyncio
+from scraper_ops import get_content_from_url
+# --- เพิ่มบล็อกนี้เพื่อแก้ปัญหา Playwright บน Windows ---
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+# ----------------------------------------------------
+
 st.markdown("""
 <style>
     /* เลือกกลุ่มปุ่มทั้งหมด */
@@ -491,89 +500,136 @@ else:
     # ดึงค่าเมนูที่เลือกมาใช้งานต่อในส่วน Main Content
     menu = st.session_state.active_menu
 
-    # =========================================================
+# =========================================================
     #  PAGE: หน้าหลัก (Home)
     # =========================================================
     if menu == "🏠 หน้าหลัก":
         st.title("🔍 ตรวจสอบความน่าเชื่อถือของข่าว")
 
-        # Demo Buttons
-        with st.expander("📝 ลองใช้ข่าวตัวอย่าง (Demo News)", expanded=False):
-            col_mock1, col_mock2 = st.columns(2)
-            if col_mock1.button("👽 ข่าว Aliens (Fake)"):
-                st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
-            if col_mock2.button("🏛️ ข่าวรัฐบาล (Real)"):
-                st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
+        # --- 1. ส่วนเลือกโหมด ---
+        check_mode = st.radio(
+            "เลือกวิธีการนำเข้าข้อมูล:", 
+            ["📝 พิมพ์ข้อความ/วางเนื้อหา", "🔗 วางลิงก์ข่าว (URL)"], 
+            horizontal=True
+        )
 
-        # Text Input
-        input_val = st.session_state.get('input_text', "")
-        input_text = st.text_area("วางเนื้อหาข่าวที่นี่:", value=input_val, height=200)
-        
-        # Action Button
-        if st.button("🚀 Analyze News", type="primary", use_container_width=True):
-            clean_text = str(input_text).strip() if input_text else ""
+        input_url = None
+        input_text = ""
+
+        # แสดงกล่องรับข้อมูลตามโหมดที่เลือก
+        if check_mode == "🔗 วางลิงก์ข่าว (URL)":
+            input_url = st.text_input("วางลิงก์ข่าว (URL) ที่ต้องการตรวจสอบ:")
+        else:
+            # Demo Buttons สำหรับโหมดข้อความ
+            with st.expander("📝 ลองใช้ข่าวตัวอย่าง (Demo News)", expanded=False):
+                col_mock1, col_mock2 = st.columns(2)
+                if col_mock1.button("👽 ข่าว Aliens (Fake)"):
+                    st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
+                if col_mock2.button("🏛️ ข่าวรัฐบาล (Real)"):
+                    st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
             
-            if not clean_text:
-                st.warning("กรุณาใส่เนื้อหาข่าว")
-            else:
-                with st.spinner("AI กำลังวิเคราะห์..."):
-                    try:
-                        # 2. เรียก AI วิเคราะห์
-                        result = ai.predict_news(clean_text)
-                        
-                        if result is not None:
-                            time.sleep(0.5) # ลดเวลาลงนิดหน่อยให้ไวขึ้น
-                            
-                            res_label = result.get('result', 'Error')
-                            res_conf = result.get('confidence', 0.0)
-                            
-                            # บันทึก Log
-                            log_msg = f"Analyzed: {clean_text[:30]}... Result: {res_label}"
-                            db.log_system_event(
-                                st.session_state.get('user_id'), 
-                                "AI_PREDICT", 
-                                log_msg, 
-                                "INFO" if res_label != 'Error' else "ERROR"
-                            )
-                            
-                            # บันทึก Prediction ลง Database
-                            pred_id = db.create_prediction(
-                                st.session_state.get('user_id'), 
-                                clean_text[:50]+"...", 
-                                clean_text, 
-                                None, 
-                                res_label, 
-                                res_conf
-                            )
-                            
-                            # อัปเดต State
-                            st.session_state['current_result'] = result
-                            st.session_state['current_pred_id'] = pred_id
-                            st.session_state['feedback_given'] = False
-                            st.rerun()
-                        else:
-                            st.error("AI ไม่ตอบสนอง (None Result)")
-                            
-                    except Exception as e:
-                        st.error(f"เกิดข้อผิดพลาด: {str(e)}")
+            input_val = st.session_state.get('input_text', "")
+            input_text = st.text_area("เนื้อหาข่าวที่ต้องการวิเคราะห์:", value=input_val, height=200)
 
-        # --- ส่วนแสดงผลผลลัพธ์ (Result Display) ---
+        # --- 2. Action Button (ปุ่มเดียวจบการทำงาน) ---
+        if st.button("🚀 Analyze News (ตรวจสอบข่าว)", type="primary", use_container_width=True):
+            clean_text = ""
+            source_type = ""
+
+            # Step 2.1: เตรียมเนื้อหาก่อนส่งให้ AI
+            if check_mode == "🔗 วางลิงก์ข่าว (URL)":
+                if not input_url:
+                    st.warning("⚠️ กรุณาวางลิงก์ข่าว (URL) ก่อนทำการตรวจสอบ")
+                    st.stop() # หยุดการทำงานถ้าย้อนังไม่ได้ใส่ลิงก์
+                
+                with st.spinner("⏳ กำลังดึงข้อมูลข่าวจากลิงก์..."):
+                    # เรียกใช้ Scraper แบบ Sync (ไม่ต้องมี await หรือ asyncio.run)
+                    title, content = get_content_from_url(input_url)
+                    
+                    if title and not str(content).startswith("Error"):
+                        st.success(f"ดึงข้อมูลสำเร็จ: {title}")
+                        clean_text = f"{title}\n\n{content}"
+                        source_type = "URL"
+                    else:
+                        st.error(f"❌ ไม่สามารถดึงข้อมูลได้: {content}")
+                        st.stop() # หยุดการทำงานถ้าดึงข้อมูลไม่สำเร็จ
+            else:
+                clean_text = str(input_text).strip()
+                source_type = "Text"
+                if not clean_text:
+                    st.warning("⚠️ กรุณาใส่เนื้อหาข่าว")
+                    st.stop()
+
+            # Step 2.2: ส่งให้ AI วิเคราะห์ (ทำต่อทันทีถ้าได้ข้อความมาแล้ว)
+            # Step 2.2: ส่งให้ AI วิเคราะห์
+            with st.spinner("🧠 AI กำลังวิเคราะห์เนื้อหา..."):
+                try:
+                    # 🧹 ซักฟอกข้อความ: ยุบช่องว่าง/บรรทัดใหม่ที่ติดกันเยอะๆ ให้เหลือแค่สเปซเดียว
+                    sanitized_text = re.sub(r'\s+', ' ', clean_text).strip()
+                    
+                    # ส่งข้อความที่ซักฟอกแล้วให้ AI
+                    result = ai.predict_news(sanitized_text)
+                    
+                    if result is not None:
+                        import time
+                        time.sleep(0.5) 
+                        
+                        res_label = result.get('result', 'Error')
+                        res_conf = result.get('confidence', 0.0)
+                        
+                        log_msg = f"Analyzed: {clean_text[:30]}... Result: {res_label}"
+                        db.log_system_event(
+                            st.session_state.get('user_id'), 
+                            "AI_PREDICT", 
+                            log_msg, 
+                            "INFO" if res_label != 'Error' else "ERROR"
+                        )
+                        
+                        pred_id = db.create_prediction(
+                            st.session_state.get('user_id'), 
+                            clean_text[:50]+"...", 
+                            clean_text, 
+                            input_url if input_url else None,
+                            res_label, 
+                            res_conf
+                        )
+                        
+                        st.session_state['current_result'] = result
+                        st.session_state['current_pred_id'] = pred_id
+                        st.session_state['feedback_given'] = False
+                        st.rerun()
+                    else:
+                        st.error("AI ไม่ตอบสนอง (None Result)")
+                        
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาดในการวิเคราะห์: {str(e)}")
+
+        # --- 3. ส่วนแสดงผลผลลัพธ์ (3 Labels Logic) ---
         if 'current_result' in st.session_state:
             res = st.session_state['current_result']
             label = res['result']
             conf = res['confidence']
             
-            if label == "Fake":
+            if conf < 70.0:
+                bg_color = "#332900"
+                border_color = "#FFC107"
+                text_color = "#FFC107"
+                icon = "⚠️"
+                display_label = "UNVERIFIED"
+                desc = "ไม่สามารถยืนยันได้ (ข้อมูลไม่เพียงพอ หรือ AI ยังมีความลังเลสูง)"
+            elif label == "Fake":
                 bg_color = "#381E1E"
                 border_color = "#FF4B4B"
                 text_color = "#FF4B4B"
                 icon = "🚨"
+                display_label = "FAKE"
                 desc = "เนื้อหานี้มีลักษณะเป็น ข่าวปลอม หรือ บิดเบือน"
             else:
                 bg_color = "#1E3822"
                 border_color = "#56F066"
                 text_color = "#56F066"
                 icon = "✅"
+                display_label = "REAL"
                 desc = "เนื้อหานี้ดูสมเหตุสมผลและ น่าเชื่อถือ"
 
             st.markdown(f"""
@@ -584,31 +640,33 @@ else:
                 border-left: 8px solid {border_color};
                 margin-top: 20px;
                 margin-bottom: 20px;">
-                <h2 style="color: {text_color}; margin:0;">{icon} {label.upper()} ({conf:.1f}%)</h2>
+                <h2 style="color: {text_color}; margin:0;">{icon} {display_label} ({conf:.1f}%)</h2>
                 <p style="color: white; margin-top: 10px; font-size: 1.1em;">{desc}</p>
             </div>
             """, unsafe_allow_html=True)
             
             st.progress(conf / 100)
 
-            # Feedback Section
+            # --- Feedback Section ---
             st.markdown("---")
             st.subheader("💡 Help Us Improve")
 
             if not st.session_state.get('feedback_given', False):
                 c1, c2 = st.columns(2)
                 with c1:
-                    if st.button("👍 Correct (แม่นยำ)"):
+                    if st.button("👍 Correct (AI ทายถูก)"):
                         db.save_feedback(st.session_state['current_pred_id'], "Correct")
                         st.session_state['feedback_given'] = True
-                        st.toast("ขอบคุณครับ! บันทึกข้อมูลแล้ว") # ใช้ toast แทน success
+                        st.toast("ขอบคุณครับ! บันทึกข้อมูลแล้ว") 
+                        import time
                         time.sleep(1)
                         st.rerun()
                 with c2:
-                    if st.button("👎 Incorrect (ผิดพลาด)"):
+                    if st.button("👎 Incorrect (AI ทายผิด)"):
                         db.save_feedback(st.session_state['current_pred_id'], "Incorrect")
                         st.session_state['feedback_given'] = True
-                        st.toast("ขอบคุณครับ! เราจะนำไปปรับปรุง") # ใช้ toast แทน error
+                        st.toast("ขอบคุณครับ! เราจะนำไปปรับปรุง") 
+                        import time
                         time.sleep(1)
                         st.rerun()
             else:
