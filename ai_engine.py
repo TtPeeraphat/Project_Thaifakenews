@@ -91,7 +91,8 @@ def predict_news(text: str):
         # C. Prediction
         with torch.no_grad():
             out = model(data) # Shape: [1, 2]
-            probs = F.softmax(out, dim=1) # แปลงเป็น %
+            temperature = 2.0 
+            probs = F.softmax(out / temperature, dim=1)
             
             # ค่าความมั่นใจ
             confidence_fake = probs[0][0].item() * 100

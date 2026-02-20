@@ -1,19 +1,18 @@
 import hashlib
-from datetime import datetime, timedelta, timezone
-import smtplib
-from email.mime.text import MIMEText
 import random
 import string
-from supabase import create_client, Client
+import smtplib
+from email.mime.text import MIMEText
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Tuple, Union, cast
+
 import pandas as pd
 import psycopg2
 import streamlit as st
-from typing import List, Dict, Any  
-import supabase
-from postgrest.types import CountMethod
+from supabase import create_client, Client
+
 # ==========================================
-# 🔑 ใส่ค่า CONFIG ของคุณที่นี่
+# ⚙️ 0. CONFIGURATION & DATABASE INIT
 # ==========================================
 SUPABASE_URL = "https://orxtfxdernqmpkfmsijj.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yeHRmeGRlcm5xbXBrZm1zaWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMDQ5OTgsImV4cCI6MjA4Njc4MDk5OH0.6dDVQio5hQpTQj6jnnS6yZBqR2GBReqFwazza6TqolQ"
@@ -21,12 +20,22 @@ SENDER_EMAIL = "nantwtf00@gmail.com"
 SENDER_PASSWORD = "aiga bqgc jbrl rltl"
 
 def get_supabase() -> Client:
+    """เชื่อมต่อกับ Supabase API"""
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ==========================================
-# 1. Users
-# ==========================================
+def get_db_connection():
+    """เชื่อมต่อกับ PostgreSQL โดยตรง (สำหรับบาง Query ที่ซับซ้อน)"""
+    return psycopg2.connect(
+        host=st.secrets["supabase"]["host"],
+        database=st.secrets["supabase"]["dbname"],
+        user=st.secrets["supabase"]["user"],
+        password=st.secrets["supabase"]["password"],
+        port=st.secrets["supabase"]["port"]
+    )
 
+# ==========================================
+# 👤 1. USER MANAGEMENT
+# ==========================================
 def create_user(username, password, email, role='user') -> bool:
     supabase = get_supabase()
     pw_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -38,11 +47,9 @@ def create_user(username, password, email, role='user') -> bool:
         "role": role,
         "created_at": datetime.now().isoformat()
     }
-    
     try:
         response = supabase.table("users").insert(data_payload).execute()
-        # เช็คว่าเป็น List และไม่ว่าง
-        if response.data is not None and isinstance(response.data, list) and len(response.data) > 0:
+        if response.data and isinstance(response.data, list) and len(response.data) > 0:
             return True
         return False
     except Exception as e:
@@ -55,31 +62,24 @@ def authenticate_user(username, password) -> Optional[Tuple[int, str, str]]:
     
     try:
         response = supabase.table("users").select("id, username, role")\
-            .eq("username", username)\
-            .eq("password_hash", pw_hash)\
-            .execute()
+            .eq("username", username).eq("password_hash", pw_hash).execute()
             
         data = response.data
-        
-        if data is not None and isinstance(data, list) and len(data) > 0:
+        if data and isinstance(data, list) and len(data) > 0:
             user_data = data[0]
             if isinstance(user_data, dict):
-                # ✅ FIX: แปลงเป็น str ก่อน แล้วค่อย int เพื่อหลอก Pylance ว่าไม่ใช่ Dict
                 uid = int(str(user_data.get('id', 0)))
                 uname = str(user_data.get('username', ''))
                 urole = str(user_data.get('role', ''))
-                
                 return (uid, uname, urole)
-        
         return None
     except Exception as e:
         print(f"Auth Error: {e}")
         return None
 
 # ==========================================
-# 2. Predictions
+# 🤖 2. PREDICTIONS (AI SCAN)
 # ==========================================
-
 def create_prediction(user_id, title, text, url, result, confidence) -> Optional[int]:
     supabase = get_supabase()
     payload = {
@@ -91,58 +91,46 @@ def create_prediction(user_id, title, text, url, result, confidence) -> Optional
         "confidence": confidence,
         "timestamp": datetime.now().isoformat()
     }
-    
     try:
         response = supabase.table("predictions").insert(payload).execute()
         data = response.data
-        
-        if data is not None and isinstance(data, list) and len(data) > 0:
+        if data and isinstance(data, list) and len(data) > 0:
             item = data[0]
             if isinstance(item, dict):
-                # ✅ FIX: แปลงเป็น str ก่อน cast
                 return int(str(item.get('id', 0)))
         return None
     except Exception as e:
         print(f"Create Prediction Error: {e}")
         return None
 
-from typing import Optional
-
 def get_user_history(user_id: Any, limit: int = 50):
     supabase = get_supabase()
     try:
-        # 1. ตรวจสอบว่ามี user_id มาจริงไหม
         if user_id is None:
             return []
-            
-        # 2. Query ข้อมูล (ใช้ .eq แบบไม่ระบุ type เข้มงวด)
-        # ลองสลับจาก select("*") เป็นการระบุชื่อคอลัมน์ชัดๆ
         response = supabase.table("predictions")\
             .select("id, user_id, title, text, result, confidence, timestamp")\
             .eq("user_id", user_id)\
             .order("timestamp", desc=True)\
-            .limit(limit)\
-            .execute()
+            .limit(limit).execute()
             
-        # 3. เช็คว่ามีข้อมูลออกมาจาก API จริงหรือไม่
         if hasattr(response, 'data') and response.data is not None:
             return response.data
         return []
-        
     except Exception as e:
         print(f"❌ Database Error: {e}")
         return []
 
 # ==========================================
-# 3. Feedbacks
+# 📝 3. FEEDBACK & EVALUATION (แก้ไข Logic แล้ว!)
 # ==========================================
-
 def save_feedback(prediction_id, user_report, comment="") -> bool:
     supabase = get_supabase()
     payload = {
         "prediction_id": prediction_id,
-        "user_report": user_report,
+        "user_report": user_report,  # เช่น "Correct" หรือ "Incorrect"
         "comment": comment,
+        "status": "pending", # เริ่มต้นต้องรอ Admin ตรวจ
         "timestamp": datetime.now().isoformat()
     }
     try:
@@ -152,34 +140,68 @@ def save_feedback(prediction_id, user_report, comment="") -> bool:
         print(f"Feedback Error: {e}")
         return False
 
+def get_pending_feedbacks():
+    supabase = get_supabase()
+    try:
+        res_f = supabase.table('feedbacks').select('*').eq('status', 'pending').execute()
+        feedbacks = res_f.data if res_f.data else []
+        if not feedbacks: return []
+
+        result_list = []
+        for fb in feedbacks:
+            if not isinstance(fb, dict): continue
+            pred_id = fb.get('prediction_id')
+            
+            if pred_id:
+                res_p = supabase.table('predictions').select('*').eq('id', str(pred_id)).execute()
+                if res_p.data and isinstance(res_p.data, list) and len(res_p.data) > 0:
+                    pred_data = res_p.data[0]
+                    if isinstance(pred_data, dict):
+                        result_list.append({
+                            'feedback_id': fb.get('id'),
+                            'prediction_id': pred_id,
+                            'title': pred_data.get('title', 'No Title'),
+                            'text': pred_data.get('text', ''),
+                            'ai_result': pred_data.get('result', 'Unknown'),
+                            'ai_confidence': pred_data.get('confidence', 0), # แก้ไขคำว่า confident
+                            'user_comment': fb.get('comment', '-'),
+                            'user_report': fb.get('user_report', '-'),
+                            'timestamp': fb.get('timestamp')
+                        })
+        return result_list
+    except Exception as e:
+        print(f"❌ Error fetching pending feedbacks: {e}")
+        return []
+
+def update_feedback_status(feedback_id, new_status) -> bool:
+    """Admin ใช้เปลี่ยนสถานะจาก pending -> verified_real หรือ verified_fake"""
+    supabase = get_supabase()
+    try:
+        supabase.table('feedbacks').update({'status': new_status}).eq('id', feedback_id).execute()
+        return True
+    except Exception as e:
+        print(f"❌ Error updating feedback: {e}")
+        return False
+
 def read_all_feedbacks() -> List[Tuple[int, str, str, str, str]]:
     supabase = get_supabase()
     try:
-        # ดึง predictions(title) มาด้วย (Foreign Key)
         response = supabase.table("feedbacks")\
             .select("id, user_report, comment, status, timestamp, predictions(title)")\
-            .order("timestamp", desc=True)\
-            .execute()
+            .order("timestamp", desc=True).execute()
             
         rows = []
         data = response.data
-        
-        if data is not None and isinstance(data, list):
+        if data and isinstance(data, list):
             for item in data:
                 if isinstance(item, dict):
                     news_title = "Unknown"
-                    predictions = item.get('predictions')
-                    
-                    # ✅ FIX: Pylance ไม่รู้ว่า predictions เป็น Dict หรือ None
-                    # ต้องเช็ค isinstance อย่างละเอียดก่อนเรียก .get()
-                    if predictions is not None:
-                        if isinstance(predictions, dict):
-                            news_title = str(predictions.get('title', "Unknown"))
-                        elif isinstance(predictions, list) and len(predictions) > 0:
-                            # บางที Supabase ส่งมาเป็น List ถ้าเป็น Relation 1-Many
-                            first_pred = predictions[0]
-                            if isinstance(first_pred, dict):
-                                news_title = str(first_pred.get('title', "Unknown"))
+                    preds = item.get('predictions')
+                    if preds:
+                        if isinstance(preds, dict):
+                            news_title = str(preds.get('title', "Unknown"))
+                        elif isinstance(preds, list) and len(preds) > 0 and isinstance(preds[0], dict):
+                            news_title = str(preds[0].get('title', "Unknown"))
 
                     rows.append((
                         int(str(item.get('id', 0))), 
@@ -194,77 +216,235 @@ def read_all_feedbacks() -> List[Tuple[int, str, str, str, str]]:
         return []
 
 # ==========================================
-# 4. Trending News
+# 📊 4. ADMIN DASHBOARD & KPI 
+# ==========================================
+def get_dashboard_kpi():
+    supabase = get_supabase()
+    now_utc = datetime.now(timezone.utc)
+    last_24h_str = (now_utc - timedelta(hours=24)).isoformat()
+    stats = {"checks_today": 0, "active_users": 0, "accuracy": 0.0, "feedback_total": 0}
+
+    try:
+        # 1. Total Checks Today
+        res_checks = supabase.table('predictions').select('*', count='exact').gte('timestamp', last_24h_str).execute() # type: ignore
+        if hasattr(res_checks, 'count'): stats['checks_today'] = res_checks.count if res_checks.count else 0
+
+        # 2. Active Users (จาก system_logs)
+        res_users = supabase.table('system_logs').select('user_id').gte('timestamp', last_24h_str).execute()
+        logs_data = res_users.data if res_users.data else []
+        stats['active_users'] = len({str(row.get('user_id')) for row in logs_data if isinstance(row, dict) and row.get('user_id')})
+
+        # 3. Accuracy & Feedback (นับเฉพาะที่ Verified แล้วเท่านั้น!)
+        # สมมติว่า Admin กดอนุมัติแล้ว จะเปลี่ยน status เป็น 'verified_correct' หรือดึงจาก user_report
+        res_fb = supabase.table('feedbacks').select('status, user_report').neq('status', 'pending').execute()
+        fb_list: list = res_fb.data if res_fb.data else []
+        stats['feedback_total'] = len(fb_list)
+
+        if stats['feedback_total'] > 0:
+            correct_count = 0
+            for item in fb_list:
+                if isinstance(item, dict):
+                    # ถ้าระบบของคุณให้ Admin เช็คแล้วว่า AI ทายถูก
+                    report = str(item.get('user_report', '')).lower()
+                    status = str(item.get('status', '')).lower()
+                    # ตรวจสอบว่า Admin verify ว่าตรงกันไหม (ปรับได้ตามโครงสร้างที่คุณใช้ตอนอัปเดตสถานะ)
+                    if 'correct' in report or status == 'verified_correct':
+                        correct_count += 1
+            
+            stats['accuracy'] = round((correct_count / stats['feedback_total']) * 100, 1)
+            
+        return stats
+    except Exception as e:
+        print(f"❌ Error getting dashboard KPI: {e}")
+        return stats
+
+def get_evaluated_data():
+    """
+    ดึงข้อมูล AI Prediction พร้อมกับ 'สถานะที่ Admin ตรวจสอบแล้ว' (status)
+    """
+    supabase = get_supabase()
+    try:
+        # 1. ดึงข้อมูล Feedback ที่ถูก Review แล้ว (status ไม่ใช่ pending)
+        res_fb = supabase.table('feedbacks').select('prediction_id, status').neq('status', 'pending').execute()
+        
+        # คืนค่า DataFrame ว่าง ถ้ายังไม่มีข้อมูล
+        if not res_fb.data:
+            return pd.DataFrame()
+            
+        df_fb = pd.DataFrame(res_fb.data)
+        
+        # 2. ดึงข้อมูล Predictions
+        # 🚨 แก้ไขตรงนี้ครับ: เปลี่ยนจาก confident เป็น confidence
+        res_pred = supabase.table('predictions').select('id, result, confidence, timestamp').execute()
+        
+        if not res_pred.data:
+            return pd.DataFrame()
+            
+        df_pred = pd.DataFrame(res_pred.data)
+        
+        # 3. คลีนข้อมูลและเปลี่ยนชื่อคอลัมน์ให้ตรงใจ Frontend
+        # (เหลือแค่เปลี่ยน result เป็น prediction เพราะ confidence ชื่อตรงแล้ว)
+        df_pred.rename(columns={'result': 'prediction'}, inplace=True)
+        
+        # แปลง ID เป็น string ป้องกันปัญหาตอน Join
+        df_pred['id'] = df_pred['id'].astype(str)
+        df_fb['prediction_id'] = df_fb['prediction_id'].astype(str)
+        
+        # 4. Join 2 ตารางเข้าด้วยกัน
+        df_merged = pd.merge(df_pred, df_fb, left_on='id', right_on='prediction_id', how='inner')
+        return df_merged
+        
+    except Exception as e:
+        print(f"❌ Error getting evaluated data: {e}")
+        return pd.DataFrame()
+
+def get_model_performance_data():
+    """ดึงข้อมูลที่ *มีการ Verify แล้ว* มาประเมินกราฟและ Model Metrics"""
+    supabase = get_supabase()
+    try:
+        # 1. ดึง Predictions ทั้งหมดมาใส่ DataFrame
+        res_pred = supabase.table('predictions').select('id, result, confidence, timestamp').execute()
+        df_pred = pd.DataFrame(res_pred.data)
+        if df_pred.empty: return pd.DataFrame()
+
+        # 2. ดึง Feedback ที่ไม่ใช่ Pending (Admin ตรวจแล้ว) มาใส่ DataFrame
+        res_fb = supabase.table('feedbacks').select('prediction_id, user_report, status').neq('status', 'pending').execute()
+        df_fb = pd.DataFrame(res_fb.data)
+
+        # จัดการชื่อ Column ให้ตรงกับ Frontend (result -> prediction)
+        df_pred.rename(columns={'result': 'prediction'}, inplace=True)
+        df_pred['confidence'] = pd.to_numeric(df_pred['confidence'], errors='coerce')
+        df_pred['id'] = df_pred['id'].astype(str)
+
+        # 3. Merge ข้อมูล (ถ้าระบบยังไม่มี Verify ให้จำลองก่อนกัน Error แต่กราฟจะอิงความจริงเมื่อมีข้อมูล)
+        if not df_fb.empty:
+            df_fb['prediction_id'] = df_fb['prediction_id'].astype(str)
+            df = pd.merge(df_pred, df_fb, left_on='id', right_on='prediction_id', how='inner') # Inner Join เอาเฉพาะตัวที่ถูกตรวจแล้ว
+            
+            # แปลง Label จริง (ถ้า User บอก AI Correct -> Label คือค่าเดียวกับ Prediction)
+            # ถ้า User บอก AI Incorrect -> Label คือค่าตรงข้าม
+            def determine_true_label(row):
+                if str(row['user_report']).lower() == 'correct':
+                    return row['prediction']
+                else:
+                    return "Fake" if row['prediction'].lower() == "real" else "Real"
+
+            df['label'] = df.apply(determine_true_label, axis=1)
+        else:
+            # ไม่มีข้อมูล Verify เลย -> ส่ง DataFrame ปล่าวๆ ที่มีโครงสร้างถูกต้องให้ Frontend โชว์ 0
+            df = df_pred.iloc[0:0].copy() # Empty with columns
+            df['label'] = []
+
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+        return df
+    except Exception as e:
+        print(f"❌ Fetch Error: {e}")
+        return pd.DataFrame()
+
+def read_all_predictions_limit(limit_num: int) -> List[Tuple[int, str, str, str, str, float, str]]:
+    supabase = get_supabase()
+    try:
+        response = supabase.table("predictions").select("*, users(username)").order("timestamp", desc=True).limit(limit_num).execute()
+        rows = []
+        if response.data and isinstance(response.data, list):
+            for item in response.data:
+                if isinstance(item, dict):
+                    user_obj = item.get('users')
+                    username = "Unknown"
+                    if isinstance(user_obj, dict): username = str(user_obj.get('username', 'Unknown'))
+                    elif isinstance(user_obj, list) and len(user_obj) > 0 and isinstance(user_obj[0], dict): username = str(user_obj[0].get('username', 'Unknown'))
+
+                    rows.append((
+                        int(str(item.get('id', 0))), username, str(item.get('title', '')), 
+                        str(item.get('text', '')), str(item.get('result', '')), 
+                        float(str(item.get('confidence', 0.0))), str(item.get('timestamp', ''))
+                    ))
+        return rows
+    except Exception as e:
+        return []
+
+# ==========================================
+# 📈 5. TRENDING NEWS
+# ==========================================
+# ==========================================
+# 📈 TRENDING NEWS MANAGEMENT
 # ==========================================
 
+def get_all_trending():
+    """ดึงรายการข่าวที่เป็นกระแสทั้งหมด (คืนค่าเป็น DataFrame)"""
+    supabase = get_supabase()
+    try:
+        # 🚨 แก้ชื่อคอลัมน์เป็น updated_at
+        response = supabase.table("trending_news").select("*").order("updated_at", desc=True).execute()
+        
+        if response.data:
+            return pd.DataFrame(response.data)
+        return pd.DataFrame() 
+        
+    except Exception as e:
+        print(f"❌ Get Trending Error: {e}")
+        return pd.DataFrame()
+
 def create_trending(headline, content, label):
+    """เพิ่มข่าวที่เป็นกระแสใหม่"""
     supabase = get_supabase()
     payload = {
         "headline": headline, 
         "content": content, 
         "label": label, 
-        "updated_at": datetime.now().isoformat()
+        "updated_at": datetime.now().isoformat() # 🚨 แก้ชื่อคอลัมน์เป็น updated_at
     }
     try:
         supabase.table("trending_news").insert(payload).execute()
+        return True
     except Exception as e:
-        print(f"Create Trending Error: {e}")
-
-def get_all_trending() -> List[Tuple[int, str, str, str, str]]:
+        print(f"❌ Create Trending Error: {e}")
+        return False
+    
+def update_trending(news_id, headline, content, label):
+    """แก้ไขข่าวที่เป็นกระแส"""
     supabase = get_supabase()
+    payload = {
+        "headline": headline,
+        "content": content,
+        "label": label,
+        "updated_at": datetime.now().isoformat()
+    }
     try:
-        response = supabase.table("trending_news").select("*").order("updated_at", desc=True).execute()
-        rows = []
-        data = response.data
-        
-        if data is not None and isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict):
-                    rows.append((
-                        int(str(item.get('id', 0))), 
-                        str(item.get('headline', '')), 
-                        str(item.get('content', '')), 
-                        str(item.get('label', '')), 
-                        str(item.get('updated_at', ''))
-                    ))
-        return rows
+        supabase.table("trending_news").update(payload).eq("id", news_id).execute()
+        return True
     except Exception as e:
-        print(f"Get Trending Error: {e}")
-        return []
+        print(f"❌ Update Trending Error: {e}")
+        return False
 
 def delete_trending(news_id):
+    """ลบข่าวที่เป็นกระแส"""
     supabase = get_supabase()
     try:
         supabase.table("trending_news").delete().eq("id", news_id).execute()
+        return True
     except Exception as e:
-        print(f"Delete Trending Error: {e}")
+        print(f"❌ Delete Trending Error: {e}")
+        return False
 
 # ==========================================
-# 5. Password Reset System
+# 🔐 6. PASSWORD RESET OTP
 # ==========================================
-
 def send_otp_email(to_email) -> Tuple[bool, str]:
     supabase = get_supabase()
-    
     try:
         user_check = supabase.table("users").select("id").eq("email", to_email).execute()
-        if not (user_check.data is not None and isinstance(user_check.data, list) and len(user_check.data) > 0):
-            return False, "❌ ไม่พบอีเมลนี้ในระบบ"
-    except Exception as e:
-        return False, f"Check Email Error: {e}"
+        if not (user_check.data and isinstance(user_check.data, list) and len(user_check.data) > 0): return False, "❌ ไม่พบอีเมลนี้ในระบบ"
+    except Exception as e: return False, f"Check Email Error: {e}"
 
     otp = ''.join(random.choices(string.digits, k=6))
-    
-    try:
-        supabase.table("users").update({"reset_token": otp}).eq("email", to_email).execute()
-    except Exception as e:
-        return False, f"Database Error: {e}"
+    try: supabase.table("users").update({"reset_token": otp}).eq("email", to_email).execute()
+    except Exception as e: return False, f"Database Error: {e}"
 
-    subject = "🔑 รหัสยืนยันการเปลี่ยนรหัสผ่าน (Thai Fake News)"
-    body = f"รหัส OTP ของคุณคือ: {otp}\n\nกรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่"
-    
-    msg = MIMEText(body)
-    msg['Subject'] = subject
+    msg = MIMEText(f"รหัส OTP ของคุณคือ: {otp}\n\nกรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่")
+    msg['Subject'] = "🔑 รหัสยืนยันการเปลี่ยนรหัสผ่าน (Thai Fake News)"
     msg['From'] = SENDER_EMAIL
     msg['To'] = to_email
 
@@ -274,394 +454,162 @@ def send_otp_email(to_email) -> Tuple[bool, str]:
             server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
         return True, "✅ ส่งรหัส OTP ไปที่อีเมลแล้ว"
     except Exception as e:
-        print(f"Mail Error: {e}")
         return False, "❌ ส่งอีเมลไม่สำเร็จ (เช็ค App Password)"
 
 def verify_otp_and_reset(email, otp, new_password) -> Tuple[bool, str]:
     supabase = get_supabase()
-    
     try:
-        response = supabase.table("users").select("id")\
-            .eq("email", email)\
-            .eq("reset_token", otp)\
-            .execute()
-            
-        data = response.data
-        
-        if data is not None and isinstance(data, list) and len(data) > 0:
+        response = supabase.table("users").select("id").eq("email", email).eq("reset_token", otp).execute()
+        if response.data and isinstance(response.data, list) and len(response.data) > 0:
             new_pw_hash = hashlib.sha256(new_password.encode()).hexdigest()
-            
-            supabase.table("users").update({
-                "password_hash": new_pw_hash,
-                "reset_token": None 
-            }).eq("email", email).execute()
-            
+            supabase.table("users").update({"password_hash": new_pw_hash, "reset_token": None}).eq("email", email).execute()
             return True, "✅ เปลี่ยนรหัสผ่านสำเร็จ! กรุณาล็อกอินใหม่"
-        else:
-            return False, "❌ รหัส OTP ไม่ถูกต้อง หรือหมดอายุ"
+        return False, "❌ รหัส OTP ไม่ถูกต้อง หรือหมดอายุ"
     except Exception as e:
         return False, f"Reset Error: {e}"
+
 # ==========================================
-# ➕ ส่วนเสริมสำหรับ Admin Dashboard
+# 📝 7. SYSTEM LOGGING
 # ==========================================
-
-def read_all_predictions() -> List[Tuple[int, str, str, str, str, float, str]]:
-    """ดึงข้อมูลการทำนายทั้งหมด เพื่อนำไปคำนวณสถิติ"""
-    supabase = get_supabase()
-    try:
-        # join ตาราง users เพื่อเอา username มาแสดงด้วย
-        response = supabase.table("predictions")\
-            .select("*, users(username)")\
-            .order("timestamp", desc=True)\
-            .execute()
-            
-        rows = []
-        data = response.data
-        
-        if data is not None and isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict):
-                    # จัดการ user object ที่ join มา (อาจเป็น dict หรือ list)
-                    user_obj = item.get('users')
-                    username = "Unknown"
-                    
-                    if isinstance(user_obj, dict):
-                        username = str(user_obj.get('username', 'Unknown'))
-                    elif isinstance(user_obj, list) and len(user_obj) > 0:
-                        first_user = user_obj[0] # type: ignore
-                        if isinstance(first_user, dict):
-                            username = str(first_user.get('username', 'Unknown'))
-
-                    # เรียงลำดับให้ตรงกับที่ frontend.py ต้องการ:
-                    # columns=['ID', 'User', 'Title', 'Text', 'Result', 'Conf', 'Timestamp']
-                    rows.append((
-                        int(str(item.get('id', 0))), 
-                        username,
-                        str(item.get('title', '')), 
-                        str(item.get('text', '')), 
-                        str(item.get('result', '')), 
-                        float(str(item.get('confidence', 0.0))),
-                        str(item.get('timestamp', ''))
-                    ))
-        return rows
-    except Exception as e:
-        print(f"Read All Admin Error: {e}")
-        return []
-
-def read_all_predictions_limit(limit_num: int) -> List[Tuple[int, str, str, str, str, float, str]]:
-    """ดึงข้อมูลล่าสุด N รายการ สำหรับหน้า Review"""
-    supabase = get_supabase()
-    try:
-        response = supabase.table("predictions")\
-            .select("*, users(username)")\
-            .order("timestamp", desc=True)\
-            .limit(limit_num)\
-            .execute()
-            
-        rows = []
-        data = response.data
-        
-        if data is not None and isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict):
-                    # จัดการ user object
-                    user_obj = item.get('users')
-                    username = "Unknown"
-                    if isinstance(user_obj, dict):
-                        username = str(user_obj.get('username', 'Unknown'))
-                    elif isinstance(user_obj, list) and len(user_obj) > 0:
-                        first_user = user_obj[0] # type: ignore
-                        if isinstance(first_user, dict):
-                            username = str(first_user.get('username', 'Unknown'))
-
-                    rows.append((
-                        int(str(item.get('id', 0))), 
-                        username,
-                        str(item.get('title', '')), 
-                        str(item.get('text', '')), 
-                        str(item.get('result', '')), 
-                        float(str(item.get('confidence', 0.0))),
-                        str(item.get('timestamp', ''))
-                    ))
-        return rows
-    except Exception as e:
-        print(f"Read Limit Admin Error: {e}")
-        return []
-
-    
-# ==========================================
-# 6. SYSTEM LOGGING (แก้ไขใหม่ แก้ Pylance Error)
-# ==========================================
-
 def get_system_logs(limit: int = 50):
     supabase = get_supabase()
     try:
-        # ดึงข้อมูลแบบเรียบง่ายที่สุด (ไม่ Join) เพื่อให้มั่นใจว่าข้อมูลจะโผล่บนเว็บก่อน
-        response = supabase.table("system_logs")\
-            .select("timestamp, action, details, level, user_id")\
-            .order("timestamp", desc=True)\
-            .limit(limit)\
-            .execute()
-            
-        data = response.data
+        response = supabase.table("system_logs").select("timestamp, action, details, level, user_id").order("timestamp", desc=True).limit(limit).execute()
         rows = []
-
-        if isinstance(data, list):
-            for item in data:
-                # ตรวจสอบว่าเป็น dict แน่ๆ เพื่อปิดปาก Pylance
+        if isinstance(response.data, list):
+            for item in response.data:
                 if isinstance(item, dict):
-                    ts = str(item.get('timestamp', '-'))
-                    act = str(item.get('action', '-'))
-                    det = str(item.get('details', '-'))
-                    lvl = str(item.get('level', 'INFO'))
-                    uid = str(item.get('user_id', 'username'))
-                    
-                    rows.append((ts, uid, act, det, lvl))
-        
+                    rows.append((str(item.get('timestamp', '-')), str(item.get('user_id', 'username')), str(item.get('action', '-')), str(item.get('details', '-')), str(item.get('level', 'INFO'))))
         return rows
     except Exception as e:
-        print(f"❌ Error fetching logs: {e}")
         return []
     
 def log_system_event(user_id, action, details, level="INFO"):
     try:
         supabase = get_supabase()
-        payload = {
-            "user_id": user_id,
-            
-            "action": action,
-            "details": details,
-            "level": level,
-            "timestamp": datetime.now().isoformat()
-        }
+        payload = {"user_id": user_id, "action": action, "details": details, "level": level, "timestamp": datetime.now().isoformat()}
         supabase.table("system_logs").insert(payload).execute()
-    except Exception as e:
-        print(f"Log Error: {e}")
-# --- เพิ่มใน database_ops.py ---
+    except Exception as e: print(f"Log Error: {e}")
 
-# เพิ่มฟังก์ชันนี้เพื่อให้เชื่อมต่อ Supabase ได้
-def get_db_connection():
-    # ดึงค่าจาก st.secrets ที่เราตั้งไว้
-    # ตรวจสอบให้แน่ใจว่าใน secrets.toml ใช้ชื่อหัวข้อว่า [supabase] หรือ [postgres]
-    # แนะนำให้ใช้ Connection String ที่ได้จาก Supabase (Transaction Pooler หรือ Session Pooler)
-    
-    conn = psycopg2.connect(
-        host=st.secrets["supabase"]["host"],
-        database=st.secrets["supabase"]["dbname"],
-        user=st.secrets["supabase"]["user"],
-        password=st.secrets["supabase"]["password"],
-        port=st.secrets["supabase"]["port"]
-    )
-    return conn
 
-def get_dashboard_kpi():
-    supabase = get_supabase()
-    now_utc = datetime.now(timezone.utc)
-    last_24h_str = (now_utc - timedelta(hours=24)).isoformat()
-
-    stats = {"checks_today": 0, "active_users": 0, "accuracy": 0.0, "feedback_total": 0}
-
-    try:
-        # --- 1. Total Checks ---
-        # แก้ปัญหา 'exact' โดยการบอก Python ว่านี่คือประเภทที่ยอมรับได้
-        res_checks = supabase.table('predictions').select('*', count='exact').gte('timestamp', last_24h_str).execute() # type: ignore
-        
-        # ใช้การเช็ค hasattr เพื่อความปลอดภัย
-        if hasattr(res_checks, 'count'):
-            stats['checks_today'] = res_checks.count if res_checks.count is not None else 0
-
-        # --- 2. Active Users ---
-        res_users = supabase.table('system_logs').select('user_id').gte('timestamp', last_24h_str).execute()
-        
-        # แก้ปัญหา Error ".get() is unknown" และ "Unhashable"
-        # โดยการบังคับประเภท (Type Casting) ให้ชัดเจนว่าเป็น List ของ Dict
-        logs_data = res_users.data if res_users.data else []
-        active_users_set = set()
-        
-        for row in logs_data:
-            if isinstance(row, dict): # เช็คว่าเป็น dictionary จริงไหม
-                uid = row.get('user_id')
-                if uid is not None:
-                    active_users_set.add(str(uid)) # แปลงเป็น str เพื่อให้ hashable แน่นอน
-        
-        stats['active_users'] = len(active_users_set)
-
-       # --- 3. Accuracy & Feedback (ฉบับแก้ Pylance Error) ---
-        res_fb = supabase.table('feedbacks').select('status').execute()
-        fb_list: list = res_fb.data if res_fb.data else [] # ระบุว่าเป็น list
-        stats['feedback_total'] = len(fb_list)
-
-        if fb_list:
-            # แก้บรรทัด DEBUG ให้ปลอดภัยขึ้น
-            statuses = [str(item.get('status')) for item in fb_list if isinstance(item, dict)]
-            print(f"DEBUG: Status values in DB are: {set(statuses)}")
-
-        if stats['feedback_total'] > 0:
-            correct_count = 0
-            for item in fb_list:
-                # การเช็ค isinstance(item, dict) จะทำให้ Pylance รู้ว่า item มี .get()
-                if isinstance(item, dict):
-                    # ระบุชนิดตัวแปร d: dict = item เพื่อความชัวร์ 100%
-                    d: dict = item 
-                    status_val = str(d.get('status', '')).lower().strip()
-                    
-                    if status_val in ['correct', 'true', 'yes', '1', 'pending']:
-                        correct_count += 1
-            
-            stats['accuracy'] = round((correct_count / stats['feedback_total']) * 100, 1)
-        return stats
-
-    except Exception as e:
-        print(f"❌ Error getting dashboard KPI: {e}")
-        return stats
-    
-def get_model_performance_data():
+def get_system_analytics_data():
+    """ดึงข้อมูลดิบจาก Supabase เพื่อนำมาวิเคราะห์ในหน้า System Analytics"""
     supabase = get_supabase()
     try:
-        # 1. ดึงข้อมูลจากตาราง predictions อย่างเดียว
-        # (Columns: id, user_id, title, text, url, result, confident, timestamp)
-        res = supabase.table('predictions').select('*').execute()
+        # 1. นับจำนวน Users ทั้งหมด
+        res_users = supabase.table('users').select('id', count='exact').execute()
+        total_users = res_users.count if hasattr(res_users, 'count') and res_users.count else 0
         
-        df = pd.DataFrame(res.data)
-
-        # ถ้าไม่มีข้อมูล ให้ส่ง DataFrame เปล่ากลับไป
-        if df.empty:
+        # 2. ดึงข้อมูล Predictions ทั้งหมดเพื่อดูกราฟเวลาและสัดส่วน Fake/Real
+        res_preds = supabase.table('predictions').select('id, result, timestamp').execute()
+        df_preds = pd.DataFrame(res_preds.data) if res_preds.data else pd.DataFrame()
+        
+        # 3. ดึง System Logs (ย้อนหลัง 7 วัน) เพื่อดูจำนวน Active Users
+        seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
+        res_logs = supabase.table('system_logs').select('timestamp, user_id').gte('timestamp', seven_days_ago).execute()
+        df_logs = pd.DataFrame(res_logs.data) if res_logs.data else pd.DataFrame()
+        
+        return {
+            "total_users": total_users,
+            "df_preds": df_preds,
+            "df_logs": df_logs
+        }
+    except Exception as e:
+        print(f"❌ Error getting analytics data: {e}")
+        return {
+            "total_users": 0,
+            "df_preds": pd.DataFrame(),
+            "df_logs": pd.DataFrame()
+        }
+    
+#manage user 
+def get_user_management_data():
+    """ดึงข้อมูลผู้ใช้ทั้งหมด พร้อมสถิติการใช้งานแต่ละคน"""
+    supabase = get_supabase()
+    try:
+        # 1. ดึงข้อมูล User ทั้งหมด
+        res_users = supabase.table('users').select('id, username, email, role, created_at').execute()
+        df_users = pd.DataFrame(res_users.data) if res_users.data else pd.DataFrame()
+        
+        if df_users.empty:
             return pd.DataFrame()
-
-        # ---------------------------------------------------------
-        # 2. แปลงชื่อคอลัมน์ให้ตรงกับที่ Frontend ต้องใช้
-        # ---------------------------------------------------------
-
-        # แปลง 'result' -> 'prediction' (เพื่อให้ตรงกับตัวแปร y_pred ใน frontend)
-        if 'result' in df.columns:
-            df.rename(columns={'result': 'prediction'}, inplace=True)
-
-        # แปลง 'confident' -> 'confidence' (เผื่อ frontend ใช้คำนี้)
-        # แปลง confident เป็น confidence และทำให้เป็นตัวเลข
-        if 'confident' in df.columns:
-            df.rename(columns={'confident': 'confidence'}, inplace=True)
-            df['confidence'] = pd.to_numeric(df['confidence'], errors='coerce') # บังคับเป็นตัวเลข
-
-        # ---------------------------------------------------------
-        # 3. จัดการเรื่อง Label (เฉลย)
-        # ---------------------------------------------------------
-        # เนื่องจากเราไม่ดึง feedbacks แล้ว เราจะไม่มี "ค่าจริง" (Ground Truth) มาเทียบ
-        # แต่ Frontend ยังต้องการคอลัมน์ 'label' เพื่อคำนวณกราฟ
-        # เราจึงต้องสร้างคอลัมน์หลอกขึ้นมา เพื่อกันไม่ให้โปรแกรม Error
-        
-        if 'label' not in df.columns:
-            # ใส่เป็น 'pending' ทั้งหมด (เพราะเราไม่รู้ว่าจริงๆ แล้วข่าวนั้นจริงหรือปลอม)
-            df['label'] = df['prediction']
             
-            # ⚠️ หมายเหตุ: การทำแบบนี้ กราฟ Accuracy จะเป็น 0% เสมอ 
-            # เพราะ 'prediction' (Real/Fake) จะไม่ตรงกับ 'label' (pending)
+        # สมมติว่าใน DB ยังไม่มีคอลัมน์ status ให้ตั้งค่าเริ่มต้นเป็น active ไว้ก่อน
+        # (ถ้าใน DB คุณเพิ่มคอลัมน์ status แล้ว ให้ลบบรรทัดนี้ทิ้งและไปเพิ่มใน select() ด้านบนแทน)
+        if 'status' not in df_users.columns:
+            df_users['status'] = 'active'
 
-        # ---------------------------------------------------------
-        # 4. จัดการชนิดข้อมูล (Data Types)
-        # ---------------------------------------------------------
+        # 2. ดึงข้อมูล Predictions เพื่อนับจำนวน Checks ของแต่ละคน
+        res_preds = supabase.table('predictions').select('user_id').execute()
+        df_preds = pd.DataFrame(res_preds.data) if res_preds.data else pd.DataFrame()
         
-        # แปลง timestamp เป็น datetime
-        if 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            
-        # แปลง id เป็น string
-        if 'id' in df.columns:
-            df['id'] = df['id'].astype(str)
+        # 3. ดึงข้อมูล Logs เพื่อหาวันที่ Last Active
+        res_logs = supabase.table('system_logs').select('user_id, timestamp').execute()
+        df_logs = pd.DataFrame(res_logs.data) if res_logs.data else pd.DataFrame()
 
-        # คืนค่า DataFrame ที่เตรียมเสร็จแล้ว
-        return df
+        # --- รวมข้อมูล (Merge) ---
+        # นับจำนวน Checks
+        if not df_preds.empty and 'user_id' in df_preds.columns:
+            checks_count = df_preds.groupby('user_id').size().reset_index(name='checks')
+            df_users = pd.merge(df_users, checks_count, left_on='id', right_on='user_id', how='left')
+            df_users['checks'] = df_users['checks'].fillna(0).astype(int)
+        else:
+            df_users['checks'] = 0
 
+        # หาวันที่ Active ล่าสุด
+        if not df_logs.empty and 'user_id' in df_logs.columns:
+            # หา Timestamp ล่าสุด (max) ของแต่ละ user
+            last_active = df_logs.groupby('user_id')['timestamp'].max().reset_index(name='last_active')
+            df_users = pd.merge(df_users, last_active, left_on='id', right_on='user_id', how='left')
+        else:
+            df_users['last_active'] = None
+
+        return df_users
+        
     except Exception as e:
-        print(f"❌ Fetch Error: {e}")
+        print(f"❌ Error getting user management data: {e}")
         return pd.DataFrame()
-    
-def get_evaluated_data():
-        """
-        ดึงข้อมูล Prediction ที่มีการตรวจสอบ (Review) แล้ว
-        """
-        supabase = get_supabase()
-        try:
-            # ✅ แก้ไข: เปลี่ยน p.confident เป็น p.confidence
-            response = supabase.table('predictions') \
-                .select('id, content, prediction, confidence, result, timestamp') \
-                .not_.is_('result', 'null') \
-                .execute()
-            
-            data = response.data
-            
-            if data:
-                # แปลงให้เป็น DataFrame เพื่อความง่าย
-                df = pd.DataFrame(data)
-                
-                # Rename columns ให้เข้าใจง่ายขึ้น (Optional)
-                df = df.rename(columns={
-                    'result': 'status',
-                    'timestamp': 'timestamp',
-                    'text': 'text'
-                })
-                return df
-            return pd.DataFrame()
-            
-        except Exception as e:
-            # print(f"❌ Error getting evaluated data: {e}") # Debug ดู error เดิม
-            return pd.DataFrame()
 
-def get_pending_feedbacks():
+def update_user_role_status(target_user_id, new_role, new_status):
+    """อัปเดตสิทธิ์ (Role) และสถานะ (Status) ของผู้ใช้"""
     supabase = get_supabase()
     try:
-        # 1. ดึง Feedback ที่ยังไม่ตรวจ
-        res_f = supabase.table('feedbacks').select('*').eq('status', 'pending').execute()
+        payload = {"role": new_role}
+        payload["status"] = new_status 
         
-        # เช็คให้ชัวร์ว่าเป็น List และไม่ว่าง
-        feedbacks = res_f.data if res_f.data is not None else []
-        
-        if not feedbacks:
-            return []
-
-        result_list = []
-        for fb in feedbacks:
-            # 🚨 แก้ Error: เช็คว่า fb เป็น dict จริงๆ
-            if not isinstance(fb, dict):
-                continue
-
-            pred_id = fb.get('prediction_id')
-            
-            if pred_id:
-                # ดึงข้อมูลข่าว
-                res_p = supabase.table('predictions').select('*').eq('id', str(pred_id)).execute()
-                
-                # 🚨 แก้ Error: เช็คว่ามี data และเป็น list ที่มีของ
-                if res_p.data and isinstance(res_p.data, list) and len(res_p.data) > 0:
-                    pred_data = res_p.data[0] # หยิบตัวแรก
-                    
-                    # เช็คอีกทีว่าเป็น dict ถึงจะใช้ .get()
-                    if isinstance(pred_data, dict):
-                        combined_data = {
-                            'feedback_id': fb.get('id'),
-                            'prediction_id': pred_id,
-                            'title': pred_data.get('title', 'No Title'),
-                            'text': pred_data.get('text', ''),
-                            'ai_result': pred_data.get('result', 'Unknown'),
-                            'ai_confidence': pred_data.get('confident', 0),
-                            'user_comment': fb.get('feedback_text', '-'),
-                            'timestamp': fb.get('created_at')
-                        }
-                        result_list.append(combined_data)
-        
-        return result_list
-
-    except Exception as e:
-        print(f"❌ Error fetching pending feedbacks: {e}")
-        return []
-
-def update_feedback_status(feedback_id, new_status):
-    """
-    อัปเดตสถานะ Feedback (เช่น pending -> Real หรือ Fake)
-    """
-    supabase = get_supabase()
-    try:
-        data = supabase.table('feedbacks').update({'status': new_status}).eq('id', feedback_id).execute()
+        supabase.table('users').update(payload).eq('id', target_user_id).execute()
         return True
     except Exception as e:
-        print(f"❌ Error updating feedback: {e}")
+        print(f"❌ Error updating user: {e}")
         return False
+
+
+
+def get_approved_feedbacks():
+    """ดึง Feedback ที่แอดมินตรวจสอบแล้ว (Real หรือ Fake เท่านั้น) เพื่อนำไป Train โมเดล"""
+    supabase = get_supabase()
+    try:
+        # ดึงเฉพาะรายการที่ status เป็น Real หรือ Fake (ข้าม Ignored หรือ Pending)
+        # 🚨 อย่าลืมเช็คชื่อคอลัมน์ status และ text ให้ตรงกับในตาราง Supabase ของคุณนะครับ
+        response = supabase.table("user_feedbacks") \
+                           .select("text, status") \
+                           .in_("status", ["Real", "Fake"]) \
+                           .execute()
+                           
+        if response.data:
+            return pd.DataFrame(response.data)
+        return pd.DataFrame()
+        
+    except Exception as e:
+        print(f"❌ Get Approved Feedbacks Error: {e}")
+        return pd.DataFrame()
+    
+def get_all_system_logs():
+    supabase = get_supabase()
+    try:
+        # 🚨 เช็คว่าตรงนี้มี .limit(...) หรือเปล่า ถ้ามีให้แก้ให้ดึงเยอะขึ้น
+        res = supabase.table('system_logs').select('*').order('timestamp', desc=True).limit(200).execute()
+        return res.data
+    except Exception as e:
+        print(f"Error: {e}")
+        return []
