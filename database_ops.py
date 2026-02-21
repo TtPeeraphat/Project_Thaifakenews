@@ -484,12 +484,38 @@ def get_system_logs(limit: int = 50):
     except Exception as e:
         return []
     
+
+
 def log_system_event(user_id, action, details, level="INFO"):
+    """
+    บันทึกเหตุการณ์ลงตาราง system_logs
+    """
+    supabase = get_supabase()
+    
+    # 1. จัดการ User ID (ถ้าระบบทำเอง ให้ใช้ชื่อ "System")
+    if not user_id:
+        user_id = "System"
+        
+    # 2. จัดการเวลาปัจจุบัน (แบบ UTC เพื่อป้องกันปัญหา Timezone)
+    now_utc = datetime.now(timezone.utc).isoformat()
+    
+    # 3. เตรียมข้อมูลให้คีย์ตรงกับชื่อคอลัมน์ใน Database ของคุณเป๊ะๆ
+    log_data = {
+        "user_id": str(user_id),
+        "action": str(action).upper(),
+        "timestamp": now_utc,      # ส่งเวลาไปเก็บในคอลัมน์ timestamp
+        "details": str(details),    
+        "level": str(level).upper()
+    }
+    
     try:
-        supabase = get_supabase()
-        payload = {"user_id": user_id, "action": action, "details": details, "level": level, "timestamp": datetime.now().isoformat()}
-        supabase.table("system_logs").insert(payload).execute()
-    except Exception as e: print(f"Log Error: {e}")
+        # 4. Insert ข้อมูลลงตาราง
+        supabase.table("system_logs").insert(log_data).execute()
+        return True
+        
+    except Exception as e:
+        print(f"❌ ไม่สามารถบันทึก Log ได้ [{action}]: {e}")
+        return False
 
 
 def get_system_analytics_data():
@@ -613,3 +639,4 @@ def get_all_system_logs():
     except Exception as e:
         print(f"Error: {e}")
         return []
+

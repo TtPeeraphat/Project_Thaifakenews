@@ -1,3 +1,4 @@
+import email
 import sys
 import streamlit as st
 import pandas as pd
@@ -8,6 +9,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import re
 from datetime import datetime,timedelta
 import asyncio
+from streamlit_cookies_controller import CookieController
 
 # --- IMPORT MODULES ของเราเอง ---
 import database_ops as db
@@ -18,6 +20,74 @@ from scraper_ops import get_content_from_url
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 # ----------------------------------------------------
+# 1. สร้างตัวจัดการ Cookie
+cookie_controller = CookieController()
+
+# 2. ฟังก์ชันเช็คสถานะล็อกอินตอนเปิดเว็บ
+import time # อย่าลืม import time ไว้ด้านบนสุดของไฟล์ด้วยนะครับ
+
+def check_persistent_login():
+    all_cookies = cookie_controller.getAll()
+    
+    # 🚧 1. ป้องกันเบราว์เซอร์ส่งข้อมูลไม่ทัน (ถ่วงเวลาสูงสุด 3 รอบ)
+    if "cookie_wait" not in st.session_state:
+        st.session_state["cookie_wait"] = 0
+        
+    if all_cookies is None and st.session_state["cookie_wait"] < 3:
+        st.session_state["cookie_wait"] += 1
+        time.sleep(0.3) 
+        st.rerun()      
+        return          
+        
+    # ถ้าระบบอ่าน Cookie ได้สำเร็จแล้ว
+    if isinstance(all_cookies, dict):
+        
+        # --- 🚪 2. ดักจับการ Logout ---
+        if st.session_state.get('do_logout'):
+            # 1. สั่งลบคุกกี้
+            try: cookie_controller.remove('saved_user_id')
+            except KeyError: pass 
+                
+            try: cookie_controller.remove('saved_role')
+            except KeyError: pass 
+            
+            # 🌟 จุดสำคัญที่แก้: 
+            # ห้ามใช้ st.session_state.clear() และ ห้ามใช้ st.rerun() ตรงนี้เด็ดขาด!
+            
+            # เปลี่ยนสถานะให้เป็น "ยังไม่ได้ล็อกอิน" แทน
+            st.session_state['logged_in'] = False
+            st.session_state['do_logout'] = False # ปิดธง
+            
+            # ลบแค่ข้อมูลผู้ใช้ทิ้ง (ตัวแปรไหนที่คุณเก็บไว้ตอนล็อกอิน ให้เอามาใส่ในลิสต์นี้เพื่อลบทิ้งครับ)
+            for key in ['user_id', 'role', 'username', 'need_to_save_cookie']:
+                if key in st.session_state:
+                    del st.session_state[key]
+                    
+            # 🌟 return ออกไปเลย ปล่อยให้ระบบวาดหน้า Login ขึ้นมา 
+            # และปล่อยให้เบราว์เซอร์มีเวลาจัดการลบคุกกี้ให้เสร็จ
+            return
+
+        # --- 💾 3. ดักจับการ Save Cookie (หลังจากล็อกอิน) ---
+        if st.session_state.get('need_to_save_cookie'):
+            cookie_controller.set('saved_user_id', str(st.session_state['user_id']), max_age=86400)
+            cookie_controller.set('saved_role', str(st.session_state['role']), max_age=86400)
+            st.session_state['need_to_save_cookie'] = False 
+            
+        # --- 🔄 4. ดักจับการกู้คืน (กู้คืน Session ตอนกด F5) ---
+        saved_user_id = all_cookies.get('saved_user_id')
+        saved_role = all_cookies.get('saved_role')
+        
+        # ถ้ามีคุกกี้ แต่สถานะในเว็บคือ "ยังไม่ได้ล็อกอิน" ให้ทำการกู้คืน
+        if saved_user_id and not st.session_state.get('logged_in'):
+            st.session_state['user_id'] = saved_user_id
+            st.session_state['role'] = saved_role
+            st.session_state['logged_in'] = True
+            
+            st.session_state["cookie_wait"] = 0 
+            st.rerun()
+            
+# เรียกใช้ฟังก์ชันเช็คทันที
+check_persistent_login()
 
 st.markdown("""
 <style>
@@ -208,6 +278,12 @@ def show_feedback_review():
                         mime="text/csv",
                         use_container_width=True
                     )
+                    db.log_system_event(
+                            user_id=st.session_state.get('user_id'),
+                            action="EXPORT_DATA",
+                            details=f"ดาวน์โหลด Dataset ข่าว Trending News จำนวน {len(df_final)} รายการ",
+                            level="WARNING"
+                        )
                 else:
                     st.warning("⚠️ ยังไม่มีข้อมูลใหม่สำหรับเทรนโมเดล")
     st.markdown("---")
@@ -298,7 +374,12 @@ def manage_trending_news():
             if 'headline' in df_export_news.columns: cols.append('headline')
             if 'content' in df_export_news.columns: cols.append('content')
             if 'label' in df_export_news.columns: cols.append('label')
-            
+            db.log_system_event(
+                user_id=st.session_state.get('user_id'),
+                action="EXPORT_DATA",
+                details=f"ดาวน์โหลด Dataset ข่าว Trending News จำนวน {len(df_export_news)} รายการ",
+                level="WARNING"
+            )
             df_to_download = df_export_news[cols] if cols else df_export_news
             
             # 3. แปลงเป็น CSV
@@ -384,6 +465,12 @@ def manage_trending_news():
                             if st.button("🗑️ ลบ", key=f"del_{row['id']}"):
                                 if db.delete_trending(row['id']):
                                     st.success("✅ ลบข่าวเรียบร้อยแล้ว!")
+                                    db.log_system_event(
+                                        user_id=st.session_state.get('user_id'),
+                                        action="DELETE_DATA",
+                                        details=f"ลบข้อมูลข่าว Trending News ID: {row['id']} ออกจากระบบ",
+                                        level="WARNING" # เป็น Action ที่ทำลายข้อมูล
+                                    )
                                     time.sleep(1)
                                     st.rerun()
                                 else:
@@ -406,6 +493,12 @@ def manage_trending_news():
                         b1, b2, b3 = st.columns([1, 1, 4])
                         with b1:
                             if st.button("💾 บันทึก", key=f"save_{row['id']}", type="primary"):
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="UPDATE_TRENDING",
+                                    details=f"อัปเดตข้อมูลข่าว Trending News ID: {row['id']}",
+                                    level="INFO"
+                                )
                                 if not edit_headline.strip() or not edit_content.strip():
                                     st.warning("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน")
                                 else:
@@ -800,11 +893,12 @@ def manage_users_page():
                             if db.update_user_role_status(selected_id, new_role, new_status):
                                 # บันทึก Log
                                 db.log_system_event(
-                                    st.session_state.get('user_id'), 
-                                    "UPDATE_USER", 
-                                    f"Updated user ID {selected_id} to Role:{new_role}, Status:{new_status}", 
-                                    "WARNING" 
+                                    user_id=st.session_state.get('user_id'), # แอดมินที่เป็นคนกดเปลี่ยน
+                                    action="ROLE_UPDATE",
+                                    details=f"เปลี่ยนแปลงสิทธิ์ User ID: {selected_id} จาก '{user_data['role']}' เป็น '{new_role}'",
+                                    level="WARNING" # ใช้ Warning เพราะเป็นการเปลี่ยนสิทธิ์ระบบ
                                 )
+                                
                                 st.success(f"อัปเดตบัญชี {user_data['email']} สำเร็จ!")
                                 import time
                                 time.sleep(1)
@@ -912,6 +1006,12 @@ if st.session_state['reset_mode']:
                 if st.button("ยืนยันการเปลี่ยนรหัสผ่าน", use_container_width=True, type="primary"):
                     if new_pass != confirm_pass:
                         st.error("รหัสผ่านไม่ตรงกัน")
+                        db.log_system_event(
+                            user_id=st.session_state.get('user_id'),
+                            action="PASSWORD_RESET_FAILED",
+                            details="รีเซ็ตรหัสผ่านไม่สำเร็จ", # ระบุสาเหตุลงไปเลย
+                            level="WARNING"
+                        )
                     else:
                         success, message = db.verify_otp_and_reset(st.session_state['reset_email_temp'], otp_input, new_pass)
                         if success:
@@ -989,27 +1089,24 @@ elif not st.session_state['logged_in']:
             user_data = db.authenticate_user(user, pw)
             
             if user_data:
+    # 1. บันทึกลง Session State ให้เรียบร้อย (เว็บจะได้รู้ว่าล็อกอินแล้ว)
                 st.session_state['logged_in'] = True
                 st.session_state['user_id'] = user_data[0]
                 st.session_state['username'] = user_data[1]
                 st.session_state['role'] = user_data[2]
-                
-                db.log_system_event(
-                    user_id=user_data[0],
-                    action="USER_LOGIN",
-                    details=f"User '{user_data[1]}' logged in successfully",
-                    level="INFO"
-                )
-                
-                st.success(f"ยินดีต้อนรับ {user}!")
-                time.sleep(0.5)
-                st.rerun() 
+    
+    # 🌟 2. ติดธงสั่งให้ระบบเอาไปเซฟลง Cookie ตอนที่เบราว์เซอร์พร้อม
+                st.session_state['need_to_save_cookie'] = True
+    
+    # 3. สั่งโหลดหน้าจอใหม่ เพื่อเปลี่ยนไปหน้า Dashboard
+                st.rerun()
                 
             else:
+                
                 db.log_system_event(
-                    user_id=None,
+                    user_id=email,  # 👈 เปลี่ยนเป็นชื่อตัวแปรที่คุณใช้รับค่าอีเมลจริงๆ
                     action="LOGIN_FAILED",
-                    details=f"Failed login attempt for username: {user}",
+                    details="พยายามเข้าสู่ระบบแต่รหัสผ่านผิด หรือไม่มีบัญชีนี้ในระบบ",
                     level="WARNING"
                 )
                 st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
@@ -1037,7 +1134,9 @@ else:
     with st.sidebar:
         st.image("https://cdn-icons-png.flaticon.com/512/9322/9322127.png", width=80)
         st.markdown(f"### Hello, {st.session_state.get('username', 'User')}")
-        st.caption(f"Role: {st.session_state.get('role', 'user').upper()}")
+        # ถ้าดึงมาแล้วได้ None มันจะสลับไปใช้ 'USER' ทันที
+        current_role = st.session_state.get('role') or 'USER'
+        st.caption(f"Role: {str(current_role).upper()}")
         st.divider()
 
         st.markdown("### 📌 เมนูหลัก")
@@ -1132,6 +1231,12 @@ else:
                         source_type = "URL"
                     else:
                         st.error(f"❌ ไม่สามารถดึงข้อมูลได้: {content}")
+                        db.log_system_event(
+                            user_id=st.session_state.get('user_id'),
+                            action="API_ERROR",
+                            details=f"ระบบ Model API ไม่ตอบสนอง (Timeout) ระหว่างตรวจสอบข่าว: {str(input_url)}",
+                            level="ERROR" # ใช้ Error เพราะระบบทำงานผิดพลาด
+                        )
                         st.stop() 
             else:
                 clean_text = str(input_text).strip()
@@ -1153,10 +1258,10 @@ else:
                         
                         log_msg = f"Analyzed: {clean_text[:30]}... Result: {res_label}"
                         db.log_system_event(
-                            st.session_state.get('user_id'), 
-                            "AI_PREDICT", 
-                            log_msg, 
-                            "INFO" if res_label != 'Error' else "ERROR"
+                            user_id=st.session_state.get('user_id'),
+                            action="PREDICT",
+                            details=f"ทายข่าว: '{clean_text[:50]}...' -> ผลลัพธ์: {res_label} ({res_conf}%)",
+                            level="INFO"
                         )
                         
                         pred_id = db.create_prediction(
@@ -1174,6 +1279,12 @@ else:
                         st.rerun()
                     else:
                         st.error("AI ไม่ตอบสนอง (None Result)")
+                        db.log_system_event(
+                            user_id=st.session_state.get('user_id'),
+                            action="API_ERROR",
+                            details=f"ระบบ Model API ไม่ตอบสนอง (Timeout) ระหว่างตรวจสอบข่าว: {str(input_text)}",
+                            level="ERROR" # ใช้ Error เพราะระบบทำงานผิดพลาด
+                        )
                         
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดในการวิเคราะห์: {str(e)}")
@@ -1326,7 +1437,18 @@ else:
         st.title("👤 ข้อมูลส่วนตัว")
         st.info("หน้านี้อยู่ระหว่างการพัฒนา 🚧")
         if st.button("🚪 ออกจากระบบ (Logout)", type="primary"):
-            st.session_state.clear()
+            # 1. บันทึก Log ทันที (ก่อนที่ session จะโดนล้าง ไม่งั้นจะหา user_id ไม่เจอ)
+            # หมายเหตุ: เช็คคำว่า detail ให้ตรงกับ Database ของคุณนะครับ (บางทีไม่มี 's')
+            db.log_system_event(
+                user_id=st.session_state.get('user_id'),
+                action="USER_LOGOUT",
+                details=f"ผู้ใช้ {st.session_state.get('username')} ออกจากระบบ", 
+                level="INFO"
+            )
+            # 2. ติดธง (ส่งซิก) ไปบอกฟังก์ชันด้านบนสุดว่า "ผู้ใช้กดออกแล้วนะ ช่วยลบ Cookie ให้ที!"
+            st.session_state['do_logout'] = True
+            
+            # 3. สั่งรีเฟรช 1 รอบ เพื่อให้ระบบวิ่งกลับไปบรรทัดแรกสุดของไฟล์
             st.rerun()
 
     # ==========================================
