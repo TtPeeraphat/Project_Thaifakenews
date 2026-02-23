@@ -111,6 +111,45 @@ st.markdown("""
         background-color: rgba(255, 255, 255, 0.1) !important; /* สีพื้นหลังตอนเลือก */
         color: #ff4b4b !important; /* สีตัวอักษรตอนเลือก (ปรับตามธีมคุณ) */
     }
+            .profile-card {
+        background-color: #F8F6F4;
+        border-radius: 20px;
+        padding: 40px 20px;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    .profile-avatar {
+        font-size: 60px;
+        margin-bottom: 10px;
+    }
+    .profile-name {
+        font-size: 32px;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    .profile-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 30px;
+    }
+    .stat-container {
+        display: flex;
+        justify-content: center;
+        gap: 60px;
+    }
+    .stat-box {
+        text-align: center;
+    }
+    .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+    }
+    .stat-label {
+        font-size: 14px;
+        color: #666;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1432,29 +1471,136 @@ else:
                     st.caption(f"🕒 อัปเดตเมื่อ: {upload_time}")
                     st.markdown("---")
 
-    # 👤 ข้อมูลส่วนตัว 
     elif menu == "👤 ข้อมูลส่วนตัว":
-        st.title("👤 ข้อมูลส่วนตัว")
-        st.info("หน้านี้อยู่ระหว่างการพัฒนา 🚧")
+        st.title("ข้อมูลส่วนตัว")
+        uid = st.session_state.get('user_id')
+        
+        check_count = 0
+        if uid:
+            # --- ดึงประวัติการตรวจสอบเพื่อเอามานับจำนวน ---
+            history_data = db.get_user_history(uid)
+            if history_data:
+                df = pd.DataFrame(history_data)
+                df.columns = [c.lower() for c in df.columns]
+                display_mapping = {
+                    'title': 'หัวข้อข่าว', 'result': 'ผลการวิเคราะห์',
+                    'confidence': 'ความเชื่อมั่น (%)', 'timestamp': 'วันที่-เวลา'
+                }
+                valid_cols = [c for c in display_mapping.keys() if c in df.columns]
+                df_display = df[valid_cols].copy()
+                check_count = len(df_display)
+            
+            # 🌟 1. ดึงข้อมูล Email จาก Supabase มาแสดง 🌟
+            # ถ้าโหลดหน้ามาแล้วยังไม่มีอีเมลใน session ให้ไปดึงมาจาก db
+            if 'email' not in st.session_state or st.session_state.email == "":
+                st.session_state.email = db.get_user_email(uid)
+
+        # --- ตั้งค่าเริ่มต้น Session State ตัวอื่นๆ ---
+        if 'username' not in st.session_state:
+            st.session_state.username = "ผู้ใช้งานทั่วไป"
+        if 'email' not in st.session_state:
+            st.session_state.email = ""
+        if 'edit_email_mode' not in st.session_state:
+            st.session_state.edit_email_mode = False
+
+        # --- Profile Card HTML ---
+        profile_card_html = f"""
+        <div class="profile-card">
+        <div class="profile-avatar">👤</div>
+        <div class="profile-name">{st.session_state.username}</div>
+        <div class="profile-subtitle">Account & Settings</div>
+    
+        <div class="stat-container">
+        <div class="stat-box">
+            <div class="stat-value">{check_count} ข่าว</div>
+            <div class="stat-label">จำนวนข่าวทั้งหมดที่เคยตรวจสอบ</div>            
+        </div>
+        </div>
+        </div>
+        """
+        st.markdown(profile_card_html, unsafe_allow_html=True)
+
+        # --- ส่วนข้อมูลส่วนตัว ---
+        st.caption("Username (ชื่อผู้ใช้)")
+        col_user, _ = st.columns([4, 1])
+        with col_user:
+            st.markdown(f"**{st.session_state.username}**")
+        st.divider()
+
+        # --- ส่วนของ Email ---
+        st.caption("Email address (อีเมล)")
+        col_email, col_btn = st.columns([4, 1])
+
+        # 🌟 ประกาศตัวแปร new_email ไว้ตรงนี้เพื่อแก้ Error "unbound" 🌟
+        new_email = "" 
+
+        with col_email:
+            if st.session_state.edit_email_mode:
+                # โหมดแก้ไข: แสดงช่องกรอกข้อมูล
+                new_email = st.text_input("กรอกอีเมลใหม่", value=st.session_state.email, label_visibility="collapsed", placeholder="example@gmail.com")
+            else:
+                # โหมดแสดงผล: โชว์อีเมลที่ดึงมาจาก Database
+                if st.session_state.email:
+                    st.markdown(f"**{st.session_state.email}**")
+                else:
+                    st.markdown("*ยังไม่ได้ระบุอีเมล*")
+
+        with col_btn:
+            if st.session_state.edit_email_mode:
+                # 1. ปุ่มบันทึก
+                if st.button("Save", key="save_email", use_container_width=True):
+                    if new_email.strip() == "":
+                        st.warning("กรุณากรอกอีเมลก่อนบันทึก")
+                    else:
+                        # 🌟 เรียกฟังก์ชันอัปเดตลง Supabase 🌟
+                        is_success = db.update_user_email(uid, new_email)
+                        
+                        if is_success:
+                            # ถ้าสำเร็จ ให้อัปเดตค่าใน session เพื่อโชว์บนหน้าเว็บทันที
+                            st.session_state.email = new_email
+                            st.session_state.edit_email_mode = False # เปลี่ยนกลับเป็น False ปกติ
+                            st.rerun()
+                        else:
+                            st.error("ไม่สามารถบันทึกได้ ลองใหม่นะ")
+
+                # 2. ปุ่มยกเลิก (ย้ายออกมาให้อยู่แนวเดียวกับปุ่ม Save)
+                if st.button("Cancel", key="cancel_email", use_container_width=True):
+                    st.session_state.edit_email_mode = False # ออกจากโหมดแก้ไข
+                    st.rerun()    
+            else:
+                # 3. ปุ่ม Add / Edit (โหมดปกติ)
+                button_label = "Edit" if st.session_state.email else "Add"
+                if st.button(button_label, key="edit_email", use_container_width=True):
+                    st.session_state.edit_email_mode = True
+                    st.rerun()
+                    
+            st.divider()
+        
+        # --- ส่วนปุ่ม Logout (โค้ดเดิมของคุณ) ---
         if st.button("🚪 ออกจากระบบ (Logout)", type="primary"):
-            # 1. บันทึก Log ทันที (ก่อนที่ session จะโดนล้าง ไม่งั้นจะหา user_id ไม่เจอ)
-            # หมายเหตุ: เช็คคำว่า detail ให้ตรงกับ Database ของคุณนะครับ (บางทีไม่มี 's')
             db.log_system_event(
                 user_id=st.session_state.get('user_id'),
                 action="USER_LOGOUT",
                 details=f"ผู้ใช้ {st.session_state.get('username')} ออกจากระบบ", 
                 level="INFO"
             )
-            # 2. ติดธง (ส่งซิก) ไปบอกฟังก์ชันด้านบนสุดว่า "ผู้ใช้กดออกแล้วนะ ช่วยลบ Cookie ให้ที!"
             st.session_state['do_logout'] = True
-            
-            # 3. สั่งรีเฟรช 1 รอบ เพื่อให้ระบบวิ่งกลับไปบรรทัดแรกสุดของไฟล์
             st.rerun()
 
     # ==========================================
     # ADMIN PAGES ROUTING (รวมการเช็คสิทธิ์ไว้ที่เดียว)
     # ==========================================
-    elif menu in admin_menu_options.keys():
+    # Define admin_menu_options for reference
+    admin_menu_options = {
+        "📊 Dashboard": "dashboard",
+        "📈 Model Performance": "model_performance",
+        "📰 Manage News": "manage_news",
+        "💬 Review Feedback": "review_feedback",
+        "🔬 System Analytics": "analytics",
+        "👥 Manage Users": "manage_users"
+    }
+    
+    if menu in admin_menu_options.keys():
         
         # 1. เช็คสิทธิ์ Admin
         if st.session_state.get('role') != 'admin':

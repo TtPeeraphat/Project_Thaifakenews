@@ -639,4 +639,27 @@ def get_all_system_logs():
     except Exception as e:
         print(f"Error: {e}")
         return []
+def get_user_email(user_id):
+    """ฟังก์ชันดึงอีเมลจาก Supabase"""
+    supabase = get_supabase()
+    try:
+        # ค้นหาอีเมลจากตาราง users โดยเทียบกับ id (หรือ user_id ของคุณ)
+        response = supabase.table('users').select('email').eq('id', user_id).execute()
+        
+        if response.data and len(response.data) > 0:
+            # ถ้ามีอีเมลให้ส่งค่ากลับไป ถ้าไม่มี(เป็น null) ให้ส่งเป็นค่าว่าง ""
+            return response.data[0].get('email') or ""
+        return ""
+    except Exception as e:
+        print(f"Error fetching email: {e}")
+        return ""
 
+def update_user_email(user_id, new_email):
+    """ฟังก์ชันอัปเดตอีเมลลง Supabase"""
+    try:
+        # สั่งอัปเดตช่อง email ให้เป็นค่าใหม่ โดยเทียบกับ id
+        response = supabase.table('users').update({'email': new_email}).eq('id', user_id).execute()
+        return True # ส่งกลับ True เพื่อบอกว่าบันทึกสำเร็จ
+    except Exception as e:
+        print(f"Error updating email: {e}")
+        return False
