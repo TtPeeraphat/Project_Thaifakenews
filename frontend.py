@@ -195,95 +195,95 @@ def show_model_performance():
     
     if df_all.empty:
         st.warning("ยังไม่มีข้อมูลการทำนายเข้ามาในระบบ")
-        return
+    else:
 
     # คำนวณ Metric พื้นฐาน
-    total_scans = len(df_all)
+        total_scans = len(df_all)
     
     # แปลง confidence เป็นตัวเลข
-    if 'confidence' in df_all.columns:
-        df_all['confidence'] = pd.to_numeric(df_all['confidence'], errors='coerce')
+        if 'confidence' in df_all.columns:
+            df_all['confidence'] = pd.to_numeric(df_all['confidence'], errors='coerce')
     
-    avg_conf = df_all['confidence'].mean()
-    fake_count = len(df_all[df_all['prediction'] == 'Fake'])
-    real_count = len(df_all[df_all['prediction'] == 'Real'])
+        avg_conf = df_all['confidence'].mean()
+        fake_count = len(df_all[df_all['prediction'] == 'Fake'])
+        real_count = len(df_all[df_all['prediction'] == 'Real'])
 
     # แสดง Metric 4 ช่อง
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total News Scanned", f"{total_scans:,}", "All time")
-    m2.metric("Avg. Confidence", f"{avg_conf:.1f}%", "Model certainty")
-    m3.metric("Detected FAKE", f"{fake_count}", f"{(fake_count/total_scans*100):.1f}% rate", delta_color="inverse")
-    m4.metric("Detected REAL", f"{real_count}", f"{(real_count/total_scans*100):.1f}% rate")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total News Scanned", f"{total_scans:,}", "All time")
+        m2.metric("Avg. Confidence", f"{avg_conf:.1f}%", "Model certainty")
+        m3.metric("Detected FAKE", f"{fake_count}", f"{(fake_count/total_scans*100):.1f}% rate", delta_color="inverse")
+        m4.metric("Detected REAL", f"{real_count}", f"{(real_count/total_scans*100):.1f}% rate")
 
-    st.write("---")
+        st.write("---")
     
     # ==========================================
     # ส่วนที่ 2: Accuracy Evaluation (เฉพาะที่มีเฉลยแล้ว)
     # ==========================================
-    st.subheader("2. Accuracy Evaluation (Verified Cases Only)")
+        st.subheader("2. Accuracy Evaluation (Verified Cases Only)")
     
     # 1. ดึงข้อมูล
-    df_evaluated = db.get_evaluated_data()
+        df_evaluated = db.get_evaluated_data()
 
-    has_valid_data = False
+        has_valid_data = False
 
-    if not df_evaluated.empty and 'status' in df_evaluated.columns and 'prediction' in df_evaluated.columns:
-        # ลบช่องว่างหัวท้าย (ถ้ามี)
-        df_evaluated['status'] = df_evaluated['status'].astype(str).str.strip()
+        if not df_evaluated.empty and 'status' in df_evaluated.columns and 'prediction' in df_evaluated.columns:
+            # ลบช่องว่างหัวท้าย (ถ้ามี)
+            df_evaluated['status'] = df_evaluated['status'].astype(str).str.strip()
         
         # กรองเอาเฉพาะแถวที่ status เป็น 'Real' หรือ 'Fake' เท่านั้น
-        df_evaluated = df_evaluated[df_evaluated['status'].isin(['Real', 'Fake'])]
+            df_evaluated = df_evaluated[df_evaluated['status'].isin(['Real', 'Fake'])]
         
-        # ถ้ากรองแล้วยังมีข้อมูลเหลืออยู่ ถือว่าพร้อมนำไปคำนวณ
-        if not df_evaluated.empty:
-            has_valid_data = True
+            # ถ้ากรองแล้วยังมีข้อมูลเหลืออยู่ ถือว่าพร้อมนำไปคำนวณ
+            if not df_evaluated.empty:
+                has_valid_data = True
 
-    if not has_valid_data:
-        st.info("ℹ️ ส่วนวัดผลความแม่นยำจะแสดงเมื่อ Admin ทำการ Review ข้อมูลในหน้า Feedback แล้วเท่านั้น")
-        st.caption("Waiting for verification... (Currently 0 verified cases or missing required data)")
-        st.progress(0)
-    else:
-        st.success(f"📈 คำนวณจากข้อมูลที่เฉลยแล้วจำนวน: {len(df_evaluated)} รายการ")
+        if not has_valid_data:
+            st.info("ℹ️ ส่วนวัดผลความแม่นยำจะแสดงเมื่อ Admin ทำการ Review ข้อมูลในหน้า Feedback แล้วเท่านั้น")
+            st.caption("Waiting for verification... (Currently 0 verified cases or missing required data)")
+            st.progress(0)
+        else:
+            st.success(f"📈 คำนวณจากข้อมูลที่เฉลยแล้วจำนวน: {len(df_evaluated)} รายการ")
         
-        y_true = df_evaluated['status']
-        y_pred = df_evaluated['prediction'] 
+            y_true = df_evaluated['status']
+            y_pred = df_evaluated['prediction'] 
         
         # กำหนด label เป้าหมาย 
-        target_pos = 'Fake' 
+            target_pos = 'Fake' 
 
         # คำนวณ Metrics
-        try:
-            acc = accuracy_score(y_true, y_pred)
-            prec = precision_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
-            rec = recall_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
-            f1 = f1_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
+            try:
+                acc = accuracy_score(y_true, y_pred)
+                prec = precision_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
+                rec = recall_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
+                f1 = f1_score(y_true, y_pred, pos_label=target_pos, zero_division=0)
 
             # ฟังก์ชันวาดหลอดพลัง
-            def safe_progress(val):
-                return float(max(0.0, min(1.0, val)))
+                def safe_progress(val):
+                    return float(max(0.0, min(1.0, val)))
 
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                st.metric("Overall Accuracy", f"{acc*100:.1f}%")
-                st.progress(safe_progress(acc))
-            with c2:
-                st.metric("Precision (Fake)", f"{prec*100:.1f}%")
-                st.progress(safe_progress(prec))
-            with c3:
-                st.metric("Recall (Fake)", f"{rec*100:.1f}%")
-                st.progress(safe_progress(rec))
-            with c4:
-                st.metric("F1 Score", f"{f1*100:.1f}%")
-                st.progress(safe_progress(f1))
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    st.metric("Overall Accuracy", f"{acc*100:.1f}%")
+                    st.progress(safe_progress(acc))
+                with c2:
+                    st.metric("Precision (Fake)", f"{prec*100:.1f}%")
+                    st.progress(safe_progress(prec))
+                with c3:
+                    st.metric("Recall (Fake)", f"{rec*100:.1f}%")
+                    st.progress(safe_progress(rec))
+                with c4:
+                    st.metric("F1 Score", f"{f1*100:.1f}%")
+                    st.progress(safe_progress(f1))
 
             # Show Table of verified data
-            with st.expander("ดูรายการที่ตรวจสอบแล้ว (Verified Logs)", expanded=True):
-                cols_to_show = ['prediction', 'status', 'confidence']
-                available_cols = [c for c in cols_to_show if c in df_evaluated.columns]
-                st.dataframe(df_evaluated[available_cols], use_container_width=True)
+                with st.expander("ดูรายการที่ตรวจสอบแล้ว (Verified Logs)", expanded=True):
+                    cols_to_show = ['prediction', 'status', 'confidence']
+                    available_cols = [c for c in cols_to_show if c in df_evaluated.columns]
+                    st.dataframe(df_evaluated[available_cols], use_container_width=True)
                 
-        except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดในการคำนวณ: {e}")
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาดในการคำนวณ: {e}")
 
 def show_profile_page():
     st.markdown("""

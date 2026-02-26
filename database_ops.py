@@ -15,9 +15,10 @@ from supabase import create_client, Client
 # ⚙️ 0. CONFIGURATION & DATABASE INIT
 # ==========================================
 
-SUPABASE_URL = st.secrets["supabase"]["url"]
-SUPABASE_KEY = st.secrets["supabase"]["key"]
-SENDER_PASSWORD = st.secrets["email"]["password"]
+SUPABASE_URL = "https://orxtfxdernqmpkfmsijj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yeHRmeGRlcm5xbXBrZm1zaWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMDQ5OTgsImV4cCI6MjA4Njc4MDk5OH0.6dDVQio5hQpTQj6jnnS6yZBqR2GBReqFwazza6TqolQ"
+SENDER_EMAIL = "nantwtf00@gmail.com"
+SENDER_PASSWORD = "aiga bqgc jbrl rltl"
 
 def get_supabase() -> Client:
     """เชื่อมต่อกับ Supabase API"""
@@ -298,11 +299,11 @@ def get_evaluated_data():
 def get_model_performance_data():
     supabase = get_supabase()
     try:
-        # ดึงข้อมูล Join ระหว่าง Predictions และ Feedbacks ที่ถูกตรวจแล้ว
+        # ✅ จุดที่แก้ไข: เติม !fk_prediction หลังคำว่า predictions เพื่อระบุ Foreign Key ให้ชัดเจน
         res = supabase.table('feedbacks').select('''
             user_report, 
             status, 
-            predictions(result, confidence, timestamp)
+            predictions!fk_prediction(result, confidence, timestamp)
         ''').neq('status', 'pending').execute()
         
         if not res.data:
@@ -310,6 +311,7 @@ def get_model_performance_data():
 
         processed_data = []
         for item in res.data:
+            # Supabase มักจะคืนค่า key เป็นชื่อตารางเหมือนเดิม
             pred = item.get('predictions')
             if not pred: continue
             
@@ -334,10 +336,10 @@ def get_model_performance_data():
         if not df.empty:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
         return df
+        
     except Exception as e:
         print(f"Performance Data Error: {e}")
         return pd.DataFrame()
-    
 
 def read_all_predictions_limit(limit_num: int) -> List[Tuple[int, str, str, str, str, float, str]]:
     supabase = get_supabase()
