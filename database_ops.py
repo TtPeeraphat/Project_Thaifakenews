@@ -15,14 +15,14 @@ from supabase import create_client, Client
 # ⚙️ 0. CONFIGURATION & DATABASE INIT
 # ==========================================
 
-SUPABASE_URL = "https://orxtfxdernqmpkfmsijj.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yeHRmeGRlcm5xbXBrZm1zaWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMDQ5OTgsImV4cCI6MjA4Njc4MDk5OH0.6dDVQio5hQpTQj6jnnS6yZBqR2GBReqFwazza6TqolQ"
-SENDER_EMAIL = "nantwtf00@gmail.com"
-SENDER_PASSWORD = "aiga bqgc jbrl rltl"
+URL = st.secrets["SUPABASE_URL"]
+KEY = st.secrets["SUPABASE_KEY"]
+EMAIL = st.secrets["SENDER_EMAIL"]
+PASSWORD = st.secrets["SENDER_PASSWORD"]
 
 def get_supabase() -> Client:
     """เชื่อมต่อกับ Supabase API"""
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    return create_client(URL, KEY)
 
 def get_db_connection():
     """เชื่อมต่อกับ PostgreSQL โดยตรง (สำหรับบาง Query ที่ซับซ้อน)"""
@@ -443,13 +443,13 @@ def send_otp_email(to_email) -> Tuple[bool, str]:
 
     msg = MIMEText(f"รหัส OTP ของคุณคือ: {otp}\n\nกรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่")
     msg['Subject'] = "🔑 รหัสยืนยันการเปลี่ยนรหัสผ่าน (Thai Fake News)"
-    msg['From'] = SENDER_EMAIL
+    msg['From'] = EMAIL
     msg['To'] = to_email
 
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
-            server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
+            server.login(EMAIL, PASSWORD)
+            server.sendmail(EMAIL, to_email, msg.as_string())
         return True, "✅ ส่งรหัส OTP ไปที่อีเมลแล้ว"
     except Exception as e:
         return False, "❌ ส่งอีเมลไม่สำเร็จ (เช็ค App Password)"
