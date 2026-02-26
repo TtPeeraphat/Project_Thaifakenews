@@ -14,10 +14,10 @@ from supabase import create_client, Client
 # ==========================================
 # ⚙️ 0. CONFIGURATION & DATABASE INIT
 # ==========================================
-SUPABASE_URL = "https://orxtfxdernqmpkfmsijj.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yeHRmeGRlcm5xbXBrZm1zaWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMDQ5OTgsImV4cCI6MjA4Njc4MDk5OH0.6dDVQio5hQpTQj6jnnS6yZBqR2GBReqFwazza6TqolQ"
-SENDER_EMAIL = "nantwtf00@gmail.com"
-SENDER_PASSWORD = "aiga bqgc jbrl rltl"
+
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["key"]
+SENDER_PASSWORD = st.secrets["email"]["password"]
 
 def get_supabase() -> Client:
     """เชื่อมต่อกับ Supabase API"""
@@ -218,44 +218,41 @@ def read_all_feedbacks() -> List[Tuple[int, str, str, str, str]]:
 # ==========================================
 # 📊 4. ADMIN DASHBOARD & KPI 
 # ==========================================
+
 def get_dashboard_kpi():
     supabase = get_supabase()
+    # ใช้ UTC เพื่อให้ตรงกับมาตรฐานของ Supabase
     now_utc = datetime.now(timezone.utc)
     last_24h_str = (now_utc - timedelta(hours=24)).isoformat()
+    
     stats = {"checks_today": 0, "active_users": 0, "accuracy": 0.0, "feedback_total": 0}
 
     try:
         # 1. Total Checks Today
-        res_checks = supabase.table('predictions').select('*', count='exact').gte('timestamp', last_24h_str).execute() # type: ignore
-        if hasattr(res_checks, 'count'): stats['checks_today'] = res_checks.count if res_checks.count else 0
+        res_checks = supabase.table('predictions').select('id', count='exact').gte('timestamp', last_24h_str).execute()
+        stats['checks_today'] = res_checks.count if res_checks.count else 0
 
         # 2. Active Users (จาก system_logs)
         res_users = supabase.table('system_logs').select('user_id').gte('timestamp', last_24h_str).execute()
-        logs_data = res_users.data if res_users.data else []
-        stats['active_users'] = len({str(row.get('user_id')) for row in logs_data if isinstance(row, dict) and row.get('user_id')})
+        logs_data = res_users.data or []
+        stats['active_users'] = len({str(row.get('user_id')) for row in logs_data if row.get('user_id')})
 
-        # 3. Accuracy & Feedback (นับเฉพาะที่ Verified แล้วเท่านั้น!)
-        # สมมติว่า Admin กดอนุมัติแล้ว จะเปลี่ยน status เป็น 'verified_correct' หรือดึงจาก user_report
-        res_fb = supabase.table('feedbacks').select('status, user_report').neq('status', 'pending').execute()
-        fb_list: list = res_fb.data if res_fb.data else []
+        # 3. Accuracy Calculation (นับจาก Feedback ที่ Verify แล้ว)
+        # ดึง user_report และ ai_result (ผ่านการ Join ตาราง predictions)
+        res_fb = supabase.table('feedbacks').select('user_report, status, predictions(result)').neq('status', 'pending').execute()
+        fb_list = res_fb.data or []
         stats['feedback_total'] = len(fb_list)
 
         if stats['feedback_total'] > 0:
-            correct_count = 0
-            for item in fb_list:
-                if isinstance(item, dict):
-                    # ถ้าระบบของคุณให้ Admin เช็คแล้วว่า AI ทายถูก
-                    report = str(item.get('user_report', '')).lower()
-                    status = str(item.get('status', '')).lower()
-                    # ตรวจสอบว่า Admin verify ว่าตรงกันไหม (ปรับได้ตามโครงสร้างที่คุณใช้ตอนอัปเดตสถานะ)
-                    if 'correct' in report or status == 'verified_correct':
-                        correct_count += 1
-            
+            # AI ทายถูก = (User บอกว่า Correct) หรือ (Status คือ verified_correct)
+            correct_count = sum(1 for item in fb_list if 
+                                str(item.get('user_report', '')).lower() == 'correct' or 
+                                str(item.get('status', '')).lower() == 'verified_correct')
             stats['accuracy'] = round((correct_count / stats['feedback_total']) * 100, 1)
             
         return stats
     except Exception as e:
-        print(f"❌ Error getting dashboard KPI: {e}")
+        print(f"KPI Error: {e}")
         return stats
 
 def get_evaluated_data():
@@ -299,49 +296,48 @@ def get_evaluated_data():
         return pd.DataFrame()
 
 def get_model_performance_data():
-    """ดึงข้อมูลที่ *มีการ Verify แล้ว* มาประเมินกราฟและ Model Metrics"""
     supabase = get_supabase()
     try:
-        # 1. ดึง Predictions ทั้งหมดมาใส่ DataFrame
-        res_pred = supabase.table('predictions').select('id, result, confidence, timestamp').execute()
-        df_pred = pd.DataFrame(res_pred.data)
-        if df_pred.empty: return pd.DataFrame()
+        # ดึงข้อมูล Join ระหว่าง Predictions และ Feedbacks ที่ถูกตรวจแล้ว
+        res = supabase.table('feedbacks').select('''
+            user_report, 
+            status, 
+            predictions(result, confidence, timestamp)
+        ''').neq('status', 'pending').execute()
+        
+        if not res.data:
+            return pd.DataFrame()
 
-        # 2. ดึง Feedback ที่ไม่ใช่ Pending (Admin ตรวจแล้ว) มาใส่ DataFrame
-        res_fb = supabase.table('feedbacks').select('prediction_id, user_report, status').neq('status', 'pending').execute()
-        df_fb = pd.DataFrame(res_fb.data)
-
-        # จัดการชื่อ Column ให้ตรงกับ Frontend (result -> prediction)
-        df_pred.rename(columns={'result': 'prediction'}, inplace=True)
-        df_pred['confidence'] = pd.to_numeric(df_pred['confidence'], errors='coerce')
-        df_pred['id'] = df_pred['id'].astype(str)
-
-        # 3. Merge ข้อมูล (ถ้าระบบยังไม่มี Verify ให้จำลองก่อนกัน Error แต่กราฟจะอิงความจริงเมื่อมีข้อมูล)
-        if not df_fb.empty:
-            df_fb['prediction_id'] = df_fb['prediction_id'].astype(str)
-            df = pd.merge(df_pred, df_fb, left_on='id', right_on='prediction_id', how='inner') # Inner Join เอาเฉพาะตัวที่ถูกตรวจแล้ว
+        processed_data = []
+        for item in res.data:
+            pred = item.get('predictions')
+            if not pred: continue
             
-            # แปลง Label จริง (ถ้า User บอก AI Correct -> Label คือค่าเดียวกับ Prediction)
-            # ถ้า User บอก AI Incorrect -> Label คือค่าตรงข้าม
-            def determine_true_label(row):
-                if str(row['user_report']).lower() == 'correct':
-                    return row['prediction']
-                else:
-                    return "Fake" if row['prediction'].lower() == "real" else "Real"
+            ai_pred = str(pred.get('result')).capitalize() # Real / Fake
+            user_rep = str(item.get('user_report')).lower()
+            
+            # หาค่าจริง (Ground Truth)
+            if user_rep == 'correct':
+                true_label = ai_pred
+            else:
+                true_label = "Fake" if ai_pred == "Real" else "Real"
+                
+            processed_data.append({
+                "timestamp": pred.get('timestamp'),
+                "prediction": ai_pred,
+                "confidence": pred.get('confidence'),
+                "label": true_label,
+                "is_correct": user_rep == 'correct'
+            })
 
-            df['label'] = df.apply(determine_true_label, axis=1)
-        else:
-            # ไม่มีข้อมูล Verify เลย -> ส่ง DataFrame ปล่าวๆ ที่มีโครงสร้างถูกต้องให้ Frontend โชว์ 0
-            df = df_pred.iloc[0:0].copy() # Empty with columns
-            df['label'] = []
-
-        if 'timestamp' in df.columns:
+        df = pd.DataFrame(processed_data)
+        if not df.empty:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
-            
         return df
     except Exception as e:
-        print(f"❌ Fetch Error: {e}")
+        print(f"Performance Data Error: {e}")
         return pd.DataFrame()
+    
 
 def read_all_predictions_limit(limit_num: int) -> List[Tuple[int, str, str, str, str, float, str]]:
     supabase = get_supabase()
@@ -655,6 +651,7 @@ def get_user_email(user_id):
         return ""
 
 def update_user_email(user_id, new_email):
+    supabase = get_supabase()
     """ฟังก์ชันอัปเดตอีเมลลง Supabase"""
     try:
         # สั่งอัปเดตช่อง email ให้เป็นค่าใหม่ โดยเทียบกับ id

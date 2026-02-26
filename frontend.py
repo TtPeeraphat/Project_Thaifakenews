@@ -157,6 +157,33 @@ st.markdown("""
 # ==========================================
 # 📊 ฟังก์ชัน Admin: Model Analytics Dashboard
 # ==========================================
+import plotly.express as px
+
+def show_admin_dashboard_enhanced():
+    stats = db.get_dashboard_kpi()
+    df_perf = db.get_model_performance_data()
+    
+    # --- Row 1: Metrics ---
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Accuracy (Verified)", f"{stats['accuracy']}%", delta=f"{stats['feedback_total']} samples")
+    col2.metric("Checks Today", f"{stats['checks_today']}")
+    col3.metric("Active Users", f"{stats['active_users']}")
+
+    # --- Row 2: Charts ---
+    st.write("### 📈 ประสิทธิภาพโมเดลย้อนหลัง")
+    if not df_perf.empty:
+        # กราฟความแม่นยำสะสมตามเวลา
+        df_perf = df_perf.sort_values('timestamp')
+        df_perf['cumulative_accuracy'] = df_perf['is_correct'].expanding().mean() * 100
+        
+        fig = px.line(df_perf, x='timestamp', y='cumulative_accuracy', 
+                      title='Cumulative Model Accuracy (%)',
+                      line_shape='spline', render_mode='svg')
+        fig.update_layout(yaxis_range=[0, 100])
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("ยังไม่มีข้อมูลที่ผ่านการตรวจสอบ (Verified) เพื่อนำมาพล็อตกราฟ")
+
 def show_model_performance():
 
     # ==========================================
@@ -258,8 +285,32 @@ def show_model_performance():
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการคำนวณ: {e}")
 
-import pandas as pd
-import streamlit as st
+def show_profile_page():
+    st.markdown("""
+    <style>
+    .profile-card {
+        background: linear-gradient(135deg, #1e1e24 0%, #2d2d35 100%);
+        padding: 30px;
+        border-radius: 20px;
+        border: 1px solid #3d3d45;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .profile-avatar { font-size: 60px; margin-bottom: 15px; }
+    .profile-name { font-size: 26px; font-weight: 700; color: #ffffff; margin-bottom: 5px; }
+    .profile-subtitle { color: #a1a1aa; font-size: 14px; margin-bottom: 20px; }
+    .stat-container { display: flex; justify-content: center; gap: 15px; }
+    .stat-box {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 15px;
+        border-radius: 12px;
+        min-width: 200px;
+    }
+    .stat-value { font-size: 22px; font-weight: 800; color: #10b981; }
+    .stat-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # ==========================================
 # 💬 ฟังก์ชัน Admin: Review Feedback
@@ -1701,6 +1752,7 @@ else:
         
         elif menu == "🔬 System Analytics":
             st.title("🔬 System Analytics")
+            show_admin_dashboard_enhanced()
             show_system_analytics()
         
         elif menu == "👥 Manage Users":
