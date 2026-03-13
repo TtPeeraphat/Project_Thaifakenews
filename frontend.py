@@ -504,7 +504,7 @@ def show_admin_dashboard_enhanced():
                           font_color='#334155', margin=dict(l=0,r=0,t=10,b=0),
                           xaxis_title="", yaxis_title="Accuracy (%)")
         fig.update_traces(line=dict(width=2.5))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.info("ยังไม่มีข้อมูลที่ผ่านการตรวจสอบ")
 
@@ -558,7 +558,7 @@ def show_model_performance():
                 st.metric(lbl, f"{val*100:.1f}%"); st.progress(sp(val))
         with st.expander("ดูรายการที่ตรวจสอบแล้ว"):
             cols = [c for c in ['prediction','status','confidence'] if c in df_ev.columns]
-            st.dataframe(df_ev[cols], use_container_width=True)
+            st.dataframe(df_ev[cols], width="stretch")
     except Exception as e:
         st.error(f"คำนวณไม่ได้: {e}")
 
@@ -582,7 +582,7 @@ def show_feedback_review():
 
     col_btn, _ = st.columns([1,2])
     with col_btn:
-        if st.button("📥 ดาวน์โหลด Dataset", type="primary", use_container_width=True):
+        if st.button("📥 ดาวน์โหลด Dataset", type="primary", width="stretch"):
             with st.spinner("กำลังรวบรวมข้อมูล..."):
                 df_t = db.get_all_trending(); df_f = db.get_approved_feedbacks()
                 frames = []
@@ -592,7 +592,7 @@ def show_feedback_review():
                     df_final = pd.concat(frames,ignore_index=True).dropna(subset=['content','label']).drop_duplicates(subset=['content'])
                     csv = df_final.to_csv(index=False).encode('utf-8')
                     st.success(f"✅ {len(df_final)} รายการพร้อมดาวน์โหลด")
-                    st.download_button("⬇️ บันทึกไฟล์ CSV", data=csv, file_name="retrain_dataset.csv", mime="text/csv", use_container_width=True)
+                    st.download_button("⬇️ บันทึกไฟล์ CSV", data=csv, file_name="retrain_dataset.csv", mime="text/csv", width="stretch")
                     db.log_system_event(user_id=st.session_state.get('user_id'), action="EXPORT_DATA", details=f"Exported {len(df_final)} rows", level="WARNING")
                 else: st.warning("ยังไม่มีข้อมูล")
 
@@ -643,13 +643,13 @@ def show_feedback_review():
             st.markdown("<div style='margin:14px 0 8px;font-weight:700;font-size:0.88rem;color:#1E293B;'>👨‍⚖️ Admin Decision</div>", unsafe_allow_html=True)
             b1,b2,b3 = st.columns(3)
             with b1:
-                if st.button("✅ Real", key=f"real_{item['feedback_id']}", type="primary", use_container_width=True):
+                if st.button("✅ Real", key=f"real_{item['feedback_id']}", type="primary", width="stretch"):
                     db.update_feedback_status(item['feedback_id'],'Real'); st.rerun()
             with b2:
-                if st.button("❌ Fake", key=f"fake_{item['feedback_id']}", type="primary", use_container_width=True):
+                if st.button("❌ Fake", key=f"fake_{item['feedback_id']}", type="primary", width="stretch"):
                     db.update_feedback_status(item['feedback_id'],'Fake'); st.rerun()
             with b3:
-                if st.button("🗑️ Ignore", key=f"del_{item['feedback_id']}", use_container_width=True):
+                if st.button("🗑️ Ignore", key=f"del_{item['feedback_id']}", width="stretch"):
                     db.update_feedback_status(item['feedback_id'],'Ignored'); st.rerun()
 
 
@@ -668,8 +668,8 @@ def manage_trending_news():
             db.log_system_event(user_id=st.session_state.get('user_id'),action="EXPORT_DATA",details=f"Export {len(df_exp)} rows",level="WARNING")
             st.download_button("⬇️ Export CSV", data=df_exp[cols].to_csv(index=False).encode('utf-8'),
                                file_name="trending_dataset.csv", mime="text/csv",
-                               use_container_width=True, type="primary")
-        else: st.button("ไม่มีข้อมูล", disabled=True, use_container_width=True)
+                               width="stretch", type="primary")
+        else: st.button("ไม่มีข้อมูล", disabled=True, width="stretch")
 
     st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
     tab1, tab2 = st.tabs(["📋  รายการข่าวปัจจุบัน","➕  เพิ่มข่าวใหม่"])
@@ -680,9 +680,9 @@ def manage_trending_news():
             st.info("ยังไม่มีข่าวในระบบ")
         else:
             sc, fc = st.columns([3,1])
-            with sc: q   = st.text_input("🔍 ค้นหา", placeholder="พิมพ์คำค้นหา...", label_visibility="collapsed")
+            with sc: q = st.text_input("🔍 ค้นหา", placeholder="พิมพ์คำค้นหา...", label_visibility="collapsed")
             with fc: flt = st.selectbox("สถานะ", ["All","Real","Fake","Unverified"], label_visibility="collapsed")
-            if q:   df=df[df['headline'].str.contains(q,case=False,na=False)|df['content'].str.contains(q,case=False,na=False)]
+            if q: df = df[df['headline'].str.contains(q,case=False,na=False)|df['content'].str.contains(q,case=False,na=False)]
             if flt!="All": df=df[df['label']==flt]
             st.caption(f"พบ {len(df)} รายการ")
 
@@ -726,7 +726,7 @@ def manage_trending_news():
             nh=st.text_input("หัวข้อข่าว",placeholder="พิมพ์พาดหัวข่าว...")
             nc=st.text_area("เนื้อหา",placeholder="รายละเอียดข่าวโดยย่อ...",height=120)
             nl=st.selectbox("สถานะ",["Fake","Real","Unverified"])
-            if st.form_submit_button("💾 บันทึกข่าว",type="primary",use_container_width=True):
+            if st.form_submit_button("💾 บันทึกข่าว",type="primary",width="stretch"):
                 if nh.strip() and nc.strip():
                     if db.create_trending(nh,nc,nl): st.success("✅ เพิ่มข่าวเรียบร้อย"); time.sleep(0.7); st.rerun()
                     else: st.error("เกิดข้อผิดพลาด")
@@ -782,7 +782,7 @@ def show_system_analytics():
         fig1.update_layout(margin=dict(l=0,r=0,t=0,b=0),plot_bgcolor='white',paper_bgcolor='white',
                            font_color='#334155',legend=dict(orientation="h",y=-0.25,x=0.5,xanchor="center"),
                            legend_title_text='')
-        st.plotly_chart(fig1,use_container_width=True,key="trend_chart")
+        st.plotly_chart(fig1,width="stretch",key="trend_chart")
         st.markdown("</div>",unsafe_allow_html=True)
 
     with row1b:
@@ -801,7 +801,7 @@ def show_system_analytics():
             fig2.update_traces(textposition='outside',textinfo='percent+label',textfont_size=10)
             fig2.update_layout(margin=dict(l=10,r=10,t=10,b=10),showlegend=False,
                                paper_bgcolor='white',font_color='#334155')
-            st.plotly_chart(fig2,use_container_width=True,key="pie_chart")
+            st.plotly_chart(fig2,width="stretch",key="pie_chart")
         else: st.info("ยังไม่มีข้อมูลเพียงพอ")
         st.markdown("</div>",unsafe_allow_html=True)
 
@@ -819,7 +819,7 @@ def show_system_analytics():
     fig3.update_layout(margin=dict(l=0,r=0,t=0,b=0),xaxis_title="",yaxis_title="",
                        plot_bgcolor='white',paper_bgcolor='white',font_color='#334155',bargap=0.35)
     fig3.update_traces(marker_line_width=0)
-    st.plotly_chart(fig3,use_container_width=True,key="hour_chart")
+    st.plotly_chart(fig3,width="stretch",key="hour_chart")
     st.markdown("</div>",unsafe_allow_html=True)
 
     # System logs
@@ -882,7 +882,7 @@ def manage_users_page():
     if rf!="All": dfd=dfd[dfd['role']==rf]
 
     dcols={k:v for k,v in {'id':'ID','email':'Email','role':'Role','status':'Status','checks':'Checks','created_at':'Joined','last_active':'Last Active'}.items() if k in dfd.columns}
-    st.dataframe(dfd[list(dcols)].rename(columns=dcols),use_container_width=True,hide_index=True,
+    st.dataframe(dfd[list(dcols)].rename(columns=dcols),width="stretch",hide_index=True,
                  column_config={"ID":st.column_config.TextColumn("ID",width="small"),
                                 "Checks":st.column_config.NumberColumn("Checks",format="%d"),
                                 "Role":st.column_config.TextColumn("Role",width="small")})
@@ -940,14 +940,14 @@ if st.session_state['reset_mode']:
             ei=st.text_input("📧 Email",placeholder="your@email.com")
             c1,c2=st.columns(2)
             with c1:
-                if st.button("ส่ง OTP",type="primary",use_container_width=True):
+                if st.button("ส่ง OTP",type="primary",width="stretch"):
                     if ei:
                         with st.spinner("กำลังส่ง..."): ok,msg=db.send_otp_email(ei)
                         if ok: st.success(msg); st.session_state.update({'otp_sent':True,'reset_email_temp':ei})
                         else: st.error(msg)
                     else: st.warning("กรุณากรอกอีเมล")
             with c2:
-                if st.button("← กลับ",use_container_width=True):
+                if st.button("← กลับ",width="stretch"):
                     st.session_state['reset_mode']=False; st.rerun()
         else:
             st.success(f"ส่ง OTP ไปที่ {st.session_state['reset_email_temp']}")
@@ -956,7 +956,7 @@ if st.session_state['reset_mode']:
             cp=st.text_input("ยืนยันรหัสผ่านใหม่",type="password")
             c1,c2=st.columns(2)
             with c1:
-                if st.button("ยืนยัน",type="primary",use_container_width=True):
+                if st.button("ยืนยัน",type="primary",width="stretch"):
                     if np!=cp: st.error("รหัสผ่านไม่ตรงกัน")
                     else:
                         ok,msg=db.verify_otp_and_reset(st.session_state['reset_email_temp'],oi,np)
@@ -965,7 +965,7 @@ if st.session_state['reset_mode']:
                             st.session_state.update({'reset_mode':False,'otp_sent':False}); st.rerun()
                         else: st.error(msg)
             with c2:
-                if st.button("← ย้อนกลับ",use_container_width=True):
+                if st.button("← ย้อนกลับ",width="stretch"):
                     st.session_state['otp_sent']=False; st.rerun()
 
 
@@ -990,7 +990,7 @@ elif st.session_state['register_mode']:
         st.write("")
         b1,b2=st.columns(2)
         with b1:
-            if st.button("✅ สมัครสมาชิก",type="primary",use_container_width=True):
+            if st.button("✅ สมัครสมาชิก",type="primary",width="stretch"):
                 if not all([nu,np,ne]): st.warning("กรุณากรอกข้อมูลให้ครบ")
                 elif np!=cp: st.error("รหัสผ่านไม่ตรงกัน")
                 elif db.create_user(nu,np,ne):
@@ -998,7 +998,7 @@ elif st.session_state['register_mode']:
                     st.session_state['register_mode']=False; st.rerun()
                 else: st.error("Username หรือ Email นี้มีผู้ใช้งานแล้ว")
         with b2:
-            if st.button("← กลับ Login",use_container_width=True):
+            if st.button("← กลับ Login",width="stretch"):
                 st.session_state['register_mode']=False; st.rerun()
 
 
@@ -1060,7 +1060,7 @@ elif not st.session_state['logged_in']:
         p_in=st.text_input("Password",type="password",placeholder="กรอก Password",label_visibility="visible")
         st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
 
-        if st.button("เข้าสู่ระบบ  →",type="primary",use_container_width=True):
+        if st.button("เข้าสู่ระบบ  →",type="primary",width="stretch"):
             udata=db.authenticate_user(u_in,p_in)
             if udata:
                 st.session_state.update({'logged_in':True,'user_id':udata[0],'username':udata[1],
@@ -1072,10 +1072,10 @@ elif not st.session_state['logged_in']:
         st.markdown("<div style='height:8px;'></div>",unsafe_allow_html=True)
         ca,_,cb=st.columns([1,0.1,1])
         with ca:
-            if st.button("🔑 ลืมรหัสผ่าน?",use_container_width=True):
+            if st.button("🔑 ลืมรหัสผ่าน?",width="stretch"):
                 st.session_state['reset_mode']=True; st.rerun()
         with cb:
-            if st.button("✨ สมัครสมาชิก",use_container_width=True):
+            if st.button("✨ สมัครสมาชิก",width="stretch"):
                 st.session_state['register_mode']=True; st.rerun()
 
         st.markdown("""
@@ -1139,7 +1139,7 @@ else:
 
         for key,label in nav:
             active=st.session_state.active_menu==key
-            if st.button(label,key=f"nav_{key}",use_container_width=True,
+            if st.button(label,key=f"nav_{key}",width="stretch",
                          type="primary" if active else "secondary"):
                 st.session_state.active_menu=key; st.rerun()
 
@@ -1153,12 +1153,12 @@ else:
                        ("👥 Manage Users","👥  Manage Users")]
             for key,label in admin_nav:
                 active=st.session_state.active_menu==key
-                if st.button(label,key=f"adm_{key}",use_container_width=True,
+                if st.button(label,key=f"adm_{key}",width="stretch",
                              type="primary" if active else "secondary"):
                     st.session_state.active_menu=key; st.rerun()
 
         st.markdown("<hr style='margin:14px 0;'>",unsafe_allow_html=True)
-        if st.button("  🚪  ออกจากระบบ",key="logout_btn",use_container_width=True):
+        if st.button("  🚪  ออกจากระบบ",key="logout_btn",width="stretch"):
             db.log_system_event(user_id=st.session_state.get('user_id'),action="USER_LOGOUT",
                                 details=f"{uname} logged out",level="INFO")
             st.session_state['do_logout']=True; st.rerun()
@@ -1192,7 +1192,7 @@ else:
 
         st.markdown("<div style='height:8px;'></div>",unsafe_allow_html=True)
 
-        if st.button("🚀  วิเคราะห์ข่าวนี้",type="primary",use_container_width=True):
+        if st.button("🚀  วิเคราะห์ข่าวนี้",type="primary",width="stretch"):
             clean=""
             if check_mode=="🔗  URL ลิงก์ข่าว":
                 if not input_url: st.warning("กรุณาวาง URL ก่อนกด"); st.stop()
@@ -1288,11 +1288,11 @@ else:
             if not st.session_state.get('feedback_given'):
                 fc1,fc2=st.columns(2)
                 with fc1:
-                    if st.button("👍  ถูกต้อง — AI ทายถูก",type="primary",use_container_width=True):
+                    if st.button("👍  ถูกต้อง — AI ทายถูก",type="primary",width="stretch"):
                         db.save_feedback(st.session_state['current_pred_id'],"Correct")
                         st.session_state['feedback_given']=True; st.toast("ขอบคุณ!"); time.sleep(0.7); st.rerun()
                 with fc2:
-                    if st.button("👎  ไม่ถูกต้อง — AI ทายผิด",use_container_width=True):
+                    if st.button("👎  ไม่ถูกต้อง — AI ทายผิด",width="stretch"):
                         db.save_feedback(st.session_state['current_pred_id'],"Incorrect")
                         st.session_state['feedback_given']=True; st.toast("ขอบคุณ! เราจะนำไปปรับปรุง"); time.sleep(0.7); st.rerun()
             else:
@@ -1317,7 +1317,7 @@ else:
                     vc=[c for c in rmap if c in df.columns]
                     dfd=df[vc].rename(columns=rmap); dfd.index=range(1,len(dfd)+1)
                     st.caption(f"พบ {len(dfd)} รายการ")
-                    st.dataframe(dfd,use_container_width=True)
+                    st.dataframe(dfd,width="stretch")
                 else:
                     st.warning(f"ไม่พบผลลัพธ์สำหรับ '{sq}'")
             else:
@@ -1444,16 +1444,16 @@ else:
                 st.markdown(f"<div style='font-size:0.92rem;font-weight:600;color:{co};padding:10px 0;'>{v}</div>",unsafe_allow_html=True)
         with eb:
             if st.session_state.edit_email_mode:
-                if st.button("Save",key="save_email",type="primary",use_container_width=True):
+                if st.button("Save",key="save_email",type="primary",width="stretch"):
                     if not new_email.strip(): st.warning("กรุณากรอกอีเมล")
                     elif db.update_user_email(uid,new_email):
                         st.session_state.email=new_email; st.session_state.edit_email_mode=False; st.rerun()
                     else: st.error("บันทึกไม่ได้")
-                if st.button("✕",key="cancel_email",use_container_width=True):
+                if st.button("✕",key="cancel_email",width="stretch"):
                     st.session_state.edit_email_mode=False; st.rerun()
             else:
                 lbl="✏️ แก้ไข" if st.session_state.email else "➕ เพิ่ม"
-                if st.button(lbl,key="edit_email",use_container_width=True):
+                if st.button(lbl,key="edit_email",width="stretch"):
                     st.session_state.edit_email_mode=True; st.rerun()
 
         st.markdown("</div>",unsafe_allow_html=True)
