@@ -194,6 +194,20 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
 /* ══════════════════════════════
    SIDEBAR
 ══════════════════════════════ */
+            /* ── Hide sidebar collapse / expand toggle ── */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"] {
+  display: none !important;
+}
+/* ── Hide Streamlit chrome ── */
+#MainMenu, footer, header { visibility:hidden !important; }
+[data-testid="stDecoration"]        { display:none !important; }
+[data-testid="stToolbar"]           { display:none !important; }
+
+/* ── Hide sidebar collapse / expand toggle ── */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"]    { display:none !important; }
+                        
 [data-testid="stSidebar"] {
   background: #0A1929 !important;
   border-right: 1px solid rgba(255,255,255,0.05) !important;
