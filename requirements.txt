@@ -7,6 +7,7 @@ pandas
 supabase
 plotly
 streamlit-cookies-controller
+psycopg2-binary
 
 # --- AI & Deep Learning ---
 torch
