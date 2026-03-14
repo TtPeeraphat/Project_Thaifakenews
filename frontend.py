@@ -1112,14 +1112,23 @@ elif not st.session_state['logged_in']:
         p_in=st.text_input("Password",type="password",placeholder="กรอก Password",label_visibility="visible")
         st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
 
-        if st.button("เข้าสู่ระบบ  →",type="primary",width="stretch"):
-            udata=db.authenticate_user(u_in,p_in)
+        if st.button("เข้าสู่ระบบ  →", type="primary", width="stretch"):
+            udata = db.authenticate_user(u_in, p_in)
             if udata:
-                st.session_state.update({'logged_in':True,'user_id':udata[0],'username':udata[1],
-                                          'role':udata[2],'need_to_save_cookie':True}); st.rerun()
+                st.session_state.update({
+                    'logged_in': True,
+                    'user_id': udata[0],
+                    'username': udata[1],
+                    'role': udata[2],
+                    'need_to_save_cookie': True
+                })
+                st.rerun()
             else:
-                db.log_system_event(user_id=u_in,action="LOGIN_FAILED",details="Invalid credentials",level="WARNING")
-                st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+                try:
+                    db.get_supabase()
+                    st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+                except Exception:
+                    st.error("⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูลได้ — กรุณาตรวจสอบอินเทอร์เน็ต")
 
         st.markdown("<div style='height:8px;'></div>",unsafe_allow_html=True)
         ca,_,cb=st.columns([1,0.1,1])
