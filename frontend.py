@@ -1229,11 +1229,11 @@ else:
 # ← Clear button lives OUTSIDE the expander, above the text area
         _ta_row, _clr_col = st.columns([5, 1])
         with _clr_col:
-            st.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text,
-              use_container_width=True)
+                st.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text,
+                        use_container_width=True)
             
             # เพิ่มกล่องพิมพ์ข้อความ (ใช้ key="input_text" เพื่อให้เชื่อมกับปุ่มล้างและปุ่ม Demo)
-            st.text_area(
+        st.text_area(
                 label="กรอกเนื้อหาข่าว",
                 height=180,
                 placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
@@ -1241,7 +1241,7 @@ else:
                 key="input_text" 
             )
             # ดึงข้อความจากหน้าเว็บมาเก็บในตัวแปร เพื่อเตรียมส่งให้ AI ตรวจสอบ
-            input_text = st.session_state['input_text']
+        input_text = st.session_state['input_text']
 
         st.markdown("<div style='height:8px;'></div>",unsafe_allow_html=True)
         if st.button("🚀  วิเคราะห์ข่าวนี้",type="primary",width="stretch"):
