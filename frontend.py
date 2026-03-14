@@ -82,7 +82,35 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
-
+/* ══════════════════════════════
+   FORCE LIGHT MODE
+══════════════════════════════ */
+html {
+  color-scheme: light only !important;
+}
+html, body,
+[data-testid="stAppViewContainer"],
+[data-testid="stMainBlockContainer"],
+[data-testid="stMain"],
+section.main,
+.main,
+.block-container,
+[class*="css"] {
+  background-color: #EEF2F8 !important;
+  color: #1E293B !important;
+  color-scheme: light !important;
+}
+/* Neutralise any dark-mode media query Streamlit injects */
+@media (prefers-color-scheme: dark) {
+  html { color-scheme: light only !important; }
+  html, body,
+  [data-testid="stAppViewContainer"],
+  [data-testid="stMainBlockContainer"],
+  .main, .block-container, [class*="css"] {
+    background-color: #EEF2F8 !important;
+    color: #1E293B !important;
+  }
+}
 :root {
   --blue-800:  #0D47A1;
   --blue-700:  #1148A8;
