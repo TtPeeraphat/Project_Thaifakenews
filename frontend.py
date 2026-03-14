@@ -19,8 +19,13 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 cookie_controller = CookieController()
-# ฟังก์ชันสำหรับรีเซ็ตค่าใน session_state ให้เป็นค่าว่าง
+
+# 1. ฟังก์ชันล้างข้อความ (เอาไว้ด้านบนสุด หรือก่อนถึง if menu...)
 def clear_text():
+    st.session_state['input_text'] = ""
+
+# 2. เช็คว่ามีค่าในระบบความจำหรือยัง ป้องกัน Error ตอนเปิดแอปครั้งแรก
+if 'input_text' not in st.session_state:
     st.session_state['input_text'] = ""
 
 # ─────────────────────────────────────────────
@@ -1171,30 +1176,52 @@ else:
     # ══════════════════════════════════════
     # 🏠 HOME
     # ══════════════════════════════════════
-    if menu=="🏠 หน้าหลัก":
-        page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI — ได้ผลลัพธ์ภายใน 3 วินาที")
+    # --- เริ่มส่วน UI ---
+    if menu == "🏠 หน้าหลัก":
+            page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI — ได้ผลลัพธ์ภายใน 3 วินาที")
 
-        check_mode=st.radio("",["📝  พิมพ์ / วางเนื้อหา","🔗  URL ลิงก์ข่าว"],
-                             horizontal=True,label_visibility="collapsed")
-        st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
+    # แก้ Warning: ใส่ข้อความลงใน label แต่สั่งซ่อนไว้
+    check_mode = st.radio(
+        label="เลือกโหมดการตรวจสอบ", 
+        options=["📝  พิมพ์ / วางเนื้อหา", "🔗  URL ลิงก์ข่าว"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+    st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
 
-        input_url=""; input_text=""
-        if check_mode=="🔗  URL ลิงก์ข่าว":
-            input_url=st.text_input("🔗 URL ของข่าว",placeholder="https://www.example.com/news/...",
-                                     label_visibility="collapsed")
-        else:
-            with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
-    # ปรับเป็น 3 คอลัมน์ (กำหนดสัดส่วนความกว้างให้ปุ่มล้างข้อความเล็กกว่าเพื่อนหน่อย)
-                m1, m2, m3 = st.columns([2, 2, 1]) 
+    input_url = ""
+    input_text = ""
+
+    if check_mode == "🔗  URL ลิงก์ข่าว":
+        input_url = st.text_input(
+            label="🔗 URL ของข่าว",
+            placeholder="https://www.example.com/news/...",
+            label_visibility="collapsed"
+        )
+    else:
+        with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
+            # ปรับเป็น 3 คอลัมน์ 
+            m1, m2, m3 = st.columns([2, 2, 1]) 
+
+            if m1.button("👽 Fake Example — Aliens"):
+                st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
     
-                if m1.button("👽 Fake Example — Aliens"):
-                    st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
+            if m2.button("🏛️ Real Example — Government"):
+                st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
+    
+            # ปุ่มล้างข้อความ
+            m3.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text)
         
-                if m2.button("🏛️ Real Example — Government"):
-                    st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
-        
-                # เพิ่มปุ่มล้างข้อความ และสั่งให้เรียกฟังก์ชัน clear_text เมื่อถูกกด (on_click)
-                m3.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text)
+        # เพิ่มกล่องพิมพ์ข้อความ (ใช้ key="input_text" เพื่อให้เชื่อมกับปุ่มล้างและปุ่ม Demo)
+        st.text_area(
+            label="กรอกเนื้อหาข่าว",
+            height=180,
+            placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
+            label_visibility="collapsed",
+            key="input_text" 
+        )
+        # ดึงข้อความจากหน้าเว็บมาเก็บในตัวแปร เพื่อเตรียมส่งให้ AI ตรวจสอบ
+        input_text = st.session_state['input_text']
 
 # --- ช่องกรอกข้อความ (โค้ดเดิมที่แก้ไข Label แล้ว) ---
         input_text = st.text_area(
