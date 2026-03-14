@@ -23,10 +23,11 @@ class DatabaseConfig:
     """Database configuration (from environment variables)."""
     
     # ✅ FIXED Issue 6.1: Moved from database_ops.py
+    # แก้ในไฟล์ config.py ตรงบรรทัด supabase_url ให้ออกมาหน้าตาแบบนี้ครับ
     supabase_url: str = os.getenv(
         "SUPABASE_URL",
-        "https://orxtfxdernqmpkfmsijj.supabase.co"  # Placeholder
-    )
+        "https://orxtfxdernqmpkfmsijj.supabase.co"
+    ).strip().strip('"').strip("'")  # ✅ เพิ่ม .strip() เพื่อล้างช่องว่างและเครื่องหมายคำพูดทิ้ง
     supabase_key: str = os.getenv("SUPABASE_KEY", "")  # Must be set in .env
     
     # These are fallback values (Streamlit secrets are preferred)
