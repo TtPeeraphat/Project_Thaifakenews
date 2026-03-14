@@ -8,9 +8,16 @@ from typing import List, Dict, Any, Optional, Tuple, Union, cast
 
 import pandas as pd
 import psycopg2
-import streamlit as st
-from supabase import create_client, Client
 from config import config
+
+# Optional import for Streamlit (only needed when running as Streamlit app)
+try:
+    import streamlit as st
+except ImportError:
+    st = None  # Will be None if not running in Streamlit context
+
+
+from supabase import create_client, Client
 
 # ==========================================
 # ⚙️ 0. CONFIGURATION & DATABASE INIT
@@ -24,18 +31,39 @@ SENDER_EMAIL = config.email.sender_email
 SENDER_PASSWORD = config.email.sender_password
 
 def get_supabase() -> Client:
-    """เชื่อมต่อกับ Supabase API"""
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    """เชื่อมต่อกับ Supabase API
+    
+    Raises: OSError if cannot connect to Supabase
+    """
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise ValueError(
+            "Missing Supabase credentials in .env file. "
+            "Ensure SUPABASE_URL and SUPABASE_KEY are set."
+        )
+    
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        print(f"❌ Failed to create Supabase client: {e}")
+        raise
 
 def get_db_connection():
-    """เชื่อมต่อกับ PostgreSQL โดยตรง (สำหรับบาง Query ที่ซับซ้อน)"""
-    return psycopg2.connect(
-        host=st.secrets["supabase"]["host"],
-        database=st.secrets["supabase"]["dbname"],
-        user=st.secrets["supabase"]["user"],
-        password=st.secrets["supabase"]["password"],
-        port=st.secrets["supabase"]["port"]
-    )
+    """Connect to PostgreSQL directly (for complex queries)
+    
+    Note: Uses config (.env) instead of st.secrets for compatibility
+    """
+    try:
+        # Use config from .env file  
+        return psycopg2.connect(
+            host=config.database.db_host or "db.orxtfxdernqmpkfmsijj.supabase.co",
+            database=config.database.db_name or "postgres",
+            user=config.database.db_user or "postgres",
+            password=config.database.db_password or "",
+            port=config.database.db_port or 5432
+        )
+    except Exception as e:
+        print(f"❌ Failed to connect to PostgreSQL: {e}")
+        raise
 
 # ==========================================
 # 👤 1. USER MANAGEMENT
@@ -61,10 +89,20 @@ def create_user(username, password, email, role='user') -> bool:
         return False
 
 def authenticate_user(username, password) -> Optional[Tuple[int, str, str]]:
-    supabase = get_supabase()
+    """Authenticate user with username and password.
+    
+    Returns: (user_id, username, role) tuple or None if authentication fails
+    
+    Common errors:
+    - OSError 11001: getaddrinfo failed → Network/DNS issue with Supabase
+    - Invalid credentials → Wrong username or password
+    """
     pw_hash = hashlib.sha256(password.encode()).hexdigest()
     
     try:
+        supabase = get_supabase()
+        
+        # Attempt authentication
         response = supabase.table("users").select("id, username, role")\
             .eq("username", username).eq("password_hash", pw_hash).execute()
             
@@ -75,10 +113,34 @@ def authenticate_user(username, password) -> Optional[Tuple[int, str, str]]:
                 uid = int(str(user_data.get('id', 0)))
                 uname = str(user_data.get('username', ''))
                 urole = str(user_data.get('role', ''))
+                print(f"✅ User '{username}' authenticated successfully")
                 return (uid, uname, urole)
+        
+        # No user found with those credentials
+        print(f"❌ Authentication failed for user '{username}': Invalid credentials")
+        return None
+        
+    except OSError as e:
+        if "11001" in str(e) or "getaddrinfo" in str(e):
+            print(f"❌ [NETWORK ERROR] Cannot reach Supabase: {e}")
+            print(f"   - Check internet connection")
+            print(f"   - Verify SUPABASE_URL in .env is correct")
+            print(f"   - Supabase project may be down")
+        else:
+            print(f"❌ [OS ERROR] {e}")
         return None
     except Exception as e:
-        print(f"Auth Error: {e}")
+        # Catch all other exceptions
+        error_type = type(e).__name__
+        error_msg = str(e)
+        print(f"❌ [AUTH ERROR] {error_type}: {error_msg}")
+        
+        # Log more details for debugging
+        if "connection" in error_msg.lower():
+            print(f"   → Connection issue. Check network and Supabase URL")
+        elif "credentials" in error_msg.lower():
+            print(f"   → Invalid credentials in .env file")
+        
         return None
 
 # ==========================================

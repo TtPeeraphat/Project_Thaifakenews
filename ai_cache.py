@@ -3,6 +3,7 @@
 # This file fixes Issue 2.1 (No Model Caching) and Issue 2.2 (Thread Safety)
 
 import torch
+import numpy as np
 import pickle
 import streamlit as st
 from transformers import AutoTokenizer, AutoModel
@@ -246,8 +247,13 @@ def predict_news(text: str, pipeline: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ============================================================================
-# 5. MISSING IMPORT
+# 5. GPU CLEANUP (Optional)
 # ============================================================================
-import numpy as np
-
-# (Add this at the top of the file after other imports)
+def cleanup_gpu():
+    """
+    Clear GPU memory if using CUDA.
+    Safe to call even if not using GPU.
+    """
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        logger.info("✅ GPU memory cleared")

@@ -27,7 +27,7 @@ Example usage in frontend.py:
 # ==========================================
 # ✅ OPTIMIZED: Using ai_cache.py for model caching
 # ==========================================
-from ai_cache import get_pipeline, predict_news, cleanup_gpu
+from ai_cache import get_pipeline, predict_news
 
 print("✅ AI Engine initialized with caching enabled!")
 
