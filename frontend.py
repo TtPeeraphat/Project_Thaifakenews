@@ -346,18 +346,36 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
 .stTabs [data-baseweb="tab-panel"] { padding-top: 20px !important; }
 
 /* Expander */
-.streamlit-expanderHeader {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
+.streamlit-expanderHeader,
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] > details > summary {
+  background: #1E293B !important;
+  border: 1px solid #334155 !important;
   border-radius: var(--r-sm) !important;
-  color: var(--grey-800) !important;
-  font-weight: 600 !important; font-size: 0.9rem !important;
+  color: #F1F5F9 !important;
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
 }
-.streamlit-expanderContent {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
+/* Kill Streamlit's red/colored focus ring on expander */
+[data-testid="stExpander"] summary:focus,
+[data-testid="stExpander"] > details > summary:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(30,136,229,0.35) !important;
+  border-color: #3B82F6 !important;
+}
+.streamlit-expanderContent,
+[data-testid="stExpander"] > details > div {
+  background: #1E293B !important;
+  border: 1px solid #334155 !important;
   border-top: none !important;
   border-radius: 0 0 var(--r-sm) var(--r-sm) !important;
+  color: #E2E8F0 !important;
+}
+/* All text inside expander content readable on dark bg */
+[data-testid="stExpander"] p,
+[data-testid="stExpander"] label,
+[data-testid="stExpander"] span {
+  color: #CBD5E1 !important;
 }
 
 /* Alerts */
@@ -1200,17 +1218,19 @@ else:
             )
         else:
             with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
-                # ปรับเป็น 3 คอลัมน์ 
-                m1, m2, m3 = st.columns([2, 2, 1]) 
+             m1, m2 = st.columns(2)   # ← 2 columns only, no clear button here
 
-                if m1.button("👽 Fake Example — Aliens"):
-                    st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
-        
-                if m2.button("🏛️ Real Example — Government"):
-                    st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
-        
-                # ปุ่มล้างข้อความ
-                m3.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text)
+            if m1.button("👽 Fake Example — Aliens", use_container_width=True):
+                st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
+
+            if m2.button("🏛️ Real Example — Government", use_container_width=True):
+                st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
+
+# ← Clear button lives OUTSIDE the expander, above the text area
+        _ta_row, _clr_col = st.columns([5, 1])
+        with _clr_col:
+            st.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text,
+              use_container_width=True)
             
             # เพิ่มกล่องพิมพ์ข้อความ (ใช้ key="input_text" เพื่อให้เชื่อมกับปุ่มล้างและปุ่ม Demo)
             st.text_area(
