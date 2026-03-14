@@ -311,7 +311,7 @@ def get_dashboard_kpi():
         # ดึง user_report และ ai_result (ผ่านการ Join ตาราง predictions)
         res_fb = supabase.table('feedbacks').select('user_report, status, predictions!fk_prediction(result)').neq('status', 'pending').execute()
 
-        fb_list = res_fb.data or []stat
+        fb_list = res_fb.data or []
         stats['feedback_total'] = len(fb_list)
 
         if stats['feedback_total'] > 0:

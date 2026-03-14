@@ -4,7 +4,7 @@ import time
 
 from text_preprocessor import TextPreprocessor
 from validators import InputValidator
-from ai_cache import get_pipeline, predict_news
+from ai_engine import get_pipeline, predict_news
 import database_ops as db
 
 logger = logging.getLogger(__name__)

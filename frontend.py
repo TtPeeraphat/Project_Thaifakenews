@@ -15,6 +15,7 @@ import database_ops as db
 import ai_engine as ai
 from scraper_ops import get_content_from_url
 
+
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
@@ -92,6 +93,7 @@ st.markdown("""
 html {
   color-scheme: light only !important;
 }
+            
 html, body,
 [data-testid="stAppViewContainer"],
 [data-testid="stMainBlockContainer"],
@@ -684,7 +686,7 @@ def show_feedback_review():
         <div style="font-size:0.81rem;color:#3B82F6;">กรุณาให้เฉลยเพื่อช่วยสอน AI</div>
       </div>
     </div>""", unsafe_allow_html=True)
-
+    import html
     for item in pending:
         ttl = (item['title'][:55]+"…") if item['title'] and len(item['title'])>55 else (item['title'] or "No Title")
         with st.expander(f"📰 {ttl}", expanded=True):
@@ -692,25 +694,29 @@ def show_feedback_review():
             with c1:
                 st.markdown("**เนื้อหาข่าว**")
                 st.markdown(f"""<div style="background:#F8FAFC;border:1px solid #E2E8F0;
-                                border-radius:8px;padding:13px 15px;font-size:0.9rem;
-                                line-height:1.6;color:#334155;max-height:160px;
-                                overflow-y:auto;">{item['text']}</div>""", unsafe_allow_html=True)
+                    border-radius:8px;padding:13px 15px;font-size:0.9rem;
+                    line-height:1.6;color:#334155;max-height:300px;
+                    overflow-y:auto;-webkit-text-fill-color:#334155;">{html.escape(str(item['text']))}</div>""", unsafe_allow_html=True)
                 st.caption(f"📅 {item['timestamp']}")
             with c2:
-                ai_b = status_badge(item['ai_result']) if item['ai_result'] in ('Real','Fake','Unverified') else f"<span style='font-size:0.82rem;font-weight:600;'>{item['ai_result']}</span>"
-                st.markdown(f"""
-                <div style="display:flex;flex-direction:column;gap:9px;margin-top:2px;">
-                  <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:11px 13px;">
-                    <div style="font-size:0.72rem;color:#64748B;font-weight:700;
-                                text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">AI PREDICTION</div>
-                    {ai_b} &nbsp;<span style="font-size:0.83rem;color:#64748B;">{item['ai_confidence']}%</span>
-                  </div>
-                  <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:11px 13px;">
-                    <div style="font-size:0.72rem;color:#92400E;font-weight:700;
-                                text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">💬 USER SAYS</div>
-                    <div style="font-size:0.88rem;color:#78350F;">{item['user_comment'] or '—'}</div>
-                  </div>
-                </div>""", unsafe_allow_html=True)
+                    ai_b = status_badge(item['ai_result']) if item['ai_result'] in ('Real','Fake','Unverified') else f"<span style='font-size:0.82rem;font-weight:600;'>{item['ai_result']}</span>"
+            st.markdown(f"""
+            <div style="display:flex;flex-direction:column;gap:9px;margin-top:2px;">
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:11px 13px;
+                  -webkit-text-fill-color:#1E293B;">
+        <div style="font-size:0.72rem;color:#64748B !important;font-weight:700;
+                    -webkit-text-fill-color:#64748B;
+                    text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">AI PREDICTION</div>
+        {ai_b} &nbsp;<span style="font-size:0.83rem;color:#64748B;-webkit-text-fill-color:#64748B;">{item['ai_confidence']}%</span>
+      </div>
+      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:11px 13px;
+                  -webkit-text-fill-color:#78350F;">
+        <div style="font-size:0.72rem;color:#92400E !important;font-weight:700;
+                    -webkit-text-fill-color:#92400E;
+                    text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">💬 USER SAYS</div>
+        <div style="font-size:0.88rem;color:#78350F;-webkit-text-fill-color:#78350F;">{item['user_comment'] or '—'}</div>
+      </div>
+    </div>""", unsafe_allow_html=True)
 
             st.markdown("<div style='margin:14px 0 8px;font-weight:700;font-size:0.88rem;color:#1E293B;'>👨‍⚖️ Admin Decision</div>", unsafe_allow_html=True)
             b1,b2,b3 = st.columns(3)
@@ -733,15 +739,32 @@ def manage_trending_news():
 
     df_exp = db.get_all_trending()
     ca, cb = st.columns([3,1])
-    with ca: st.caption("ส่งออกรายการข่าวทั้งหมดเป็นไฟล์ .csv สำหรับเทรน AI")
+    with ca:
+        st.caption("ส่งออกรายการข่าวทั้งหมดเป็นไฟล์ .csv สำหรับเทรน AI")
     with cb:
         if not df_exp.empty:
             cols = [c for c in ['headline','content','label'] if c in df_exp.columns]
-            db.log_system_event(user_id=st.session_state.get('user_id'),action="EXPORT_DATA",details=f"Export {len(df_exp)} rows",level="WARNING")
-            st.download_button("⬇️ Export CSV", data=df_exp[cols].to_csv(index=False).encode('utf-8'),
-                               file_name="trending_dataset.csv", mime="text/csv",
-                               width="stretch", type="primary")
-        else: st.button("ไม่มีข้อมูล", disabled=True, width="stretch")
+            csv_data = df_exp[cols].to_csv(index=False).encode('utf-8')
+
+            def on_export_click():
+                db.log_system_event(
+                    user_id=st.session_state.get('user_id'),
+                    action="EXPORT_DATA",
+                    details=f"Export {len(df_exp)} rows",
+                    level="WARNING"
+                )
+
+            st.download_button(
+                "⬇️ Export CSV",
+                data=csv_data,
+                file_name="trending_dataset.csv",
+                mime="text/csv",
+                width="stretch",
+                type="primary",
+                on_click=on_export_click
+            )
+        else:
+            st.button("ไม่มีข้อมูล", disabled=True, width="stretch")
 
     st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
     tab1, tab2 = st.tabs(["📋  รายการข่าวปัจจุบัน","➕  เพิ่มข่าวใหม่"])
@@ -1231,7 +1254,7 @@ else:
     # ══════════════════════════════════════
     # --- เริ่มส่วน UI ---
     if menu == "🏠 หน้าหลัก":
-        page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI — ได้ผลลัพธ์ภายใน 3 วินาที")
+        page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI ")
 
         # แก้ Warning: ใส่ข้อความลงใน label แต่สั่งซ่อนไว้
         check_mode = st.radio(
@@ -1308,21 +1331,25 @@ else:
 
             with st.spinner("🧠 AI กำลังวิเคราะห์..."):
                 try:
-                    result=ai.predict_news(re.sub(r'\s+',' ',clean).strip())
+        # ✅ โหลด pipeline ก่อน แล้วส่งเข้าไปด้วย
+                    pipeline = ai.get_pipeline()
+                    result = ai.predict_news(re.sub(r'\s+',' ', clean).strip(), pipeline)
+        
                     if result:
                         time.sleep(0.35)
-                        rl,rc=result.get('result'),result.get('confidence')
-                        db.log_system_event(user_id=st.session_state.get('user_id'),action="PREDICT",
-                                            details=f"'{clean[:50]}' → {rl} ({rc}%)",level="INFO")
-                        pid=db.create_prediction(st.session_state.get('user_id'),clean[:50]+"…",
-                                                   clean,input_url or None,rl,rc)
-                        st.session_state.update({'current_result':result,'current_pred_id':pid,'feedback_given':False})
+                        rl, rc = result.get('result'), result.get('confidence')
+                        db.log_system_event(user_id=st.session_state.get('user_id'), action="PREDICT",
+                                            details=f"'{clean[:50]}' → {rl} ({rc}%)", level="INFO")
+                        pid = db.create_prediction(st.session_state.get('user_id'), clean[:50]+"…",
+                                                clean, input_url or None, rl, rc)
+                        st.session_state.update({'current_result': result, 'current_pred_id': pid, 'feedback_given': False})
                         st.rerun()
                     else:
                         st.error("AI ไม่ตอบสนอง")
-                        db.log_system_event(user_id=st.session_state.get('user_id'),action="API_ERROR",
-                                            details="None result",level="ERROR")
-                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+                        db.log_system_event(user_id=st.session_state.get('user_id'), action="API_ERROR",
+                                details="None result", level="ERROR")
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาด: {e}")
 
         # Result
         if 'current_result' in st.session_state:
