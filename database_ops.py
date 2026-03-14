@@ -10,15 +10,18 @@ import pandas as pd
 import psycopg2
 import streamlit as st
 from supabase import create_client, Client
+from config import config
 
 # ==========================================
 # ⚙️ 0. CONFIGURATION & DATABASE INIT
 # ==========================================
+# ✅ FIX #3: Credentials now loaded from .env file via config.py
+# This prevents hardcoded credentials in source code
 
-SUPABASE_URL = "https://orxtfxdernqmpkfmsijj.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yeHRmeGRlcm5xbXBrZm1zaWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMDQ5OTgsImV4cCI6MjA4Njc4MDk5OH0.6dDVQio5hQpTQj6jnnS6yZBqR2GBReqFwazza6TqolQ"
-SENDER_EMAIL = "nantwtf00@gmail.com"
-SENDER_PASSWORD = "aiga bqgc jbrl rltl"
+SUPABASE_URL = config.database.supabase_url
+SUPABASE_KEY = config.database.supabase_key
+SENDER_EMAIL = config.email.sender_email
+SENDER_PASSWORD = config.email.sender_password
 
 def get_supabase() -> Client:
     """เชื่อมต่อกับ Supabase API"""
