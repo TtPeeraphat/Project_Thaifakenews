@@ -19,6 +19,9 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 cookie_controller = CookieController()
+# ฟังก์ชันสำหรับรีเซ็ตค่าใน session_state ให้เป็นค่าว่าง
+def clear_text():
+    st.session_state['input_text'] = ""
 
 # ─────────────────────────────────────────────
 # Cookie / session helpers
@@ -1181,14 +1184,26 @@ else:
                                      label_visibility="collapsed")
         else:
             with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
-                m1,m2=st.columns(2)
+    # ปรับเป็น 3 คอลัมน์ (กำหนดสัดส่วนความกว้างให้ปุ่มล้างข้อความเล็กกว่าเพื่อนหน่อย)
+                m1, m2, m3 = st.columns([2, 2, 1]) 
+    
                 if m1.button("👽 Fake Example — Aliens"):
-                    st.session_state['input_text']="ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
+                    st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
+        
                 if m2.button("🏛️ Real Example — Government"):
-                    st.session_state['input_text']="รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
-            input_text=st.text_area("",value=st.session_state.get('input_text',""),height=180,
-                                     placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
-                                     label_visibility="collapsed")
+                    st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
+        
+                # เพิ่มปุ่มล้างข้อความ และสั่งให้เรียกฟังก์ชัน clear_text เมื่อถูกกด (on_click)
+                m3.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text)
+
+# --- ช่องกรอกข้อความ (โค้ดเดิมที่แก้ไข Label แล้ว) ---
+        input_text = st.text_area(
+    label="กรอกเนื้อหาข่าวที่ต้องการตรวจสอบ",
+    value=st.session_state.get('input_text', ""),
+    height=180,
+    placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
+    label_visibility="collapsed"
+)
 
         st.markdown("<div style='height:8px;'></div>",unsafe_allow_html=True)
 
