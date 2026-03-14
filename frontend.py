@@ -1218,34 +1218,34 @@ else:
             )
         else:
             with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
-             m1, m2 = st.columns(2)   # ← 2 columns only, no clear button here
+                m1, m2 = st.columns(2)
 
-            if m1.button("👽 Fake Example — Aliens", use_container_width=True):
-                st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
+                if m1.button("👽 Fake Example — Aliens", use_container_width=True):
+                    st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
 
-            if m2.button("🏛️ Real Example — Government", use_container_width=True):
-                st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
+                if m2.button("🏛️ Real Example — Government", use_container_width=True):
+                    st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
 
-# ← Clear button lives OUTSIDE the expander, above the text area
-        _ta_row, _clr_col = st.columns([5, 1])
-        with _clr_col:
+            # ปุ่มล้างข้อความ อยู่นอก expander
+            _, _clr_col = st.columns([5, 1])
+            with _clr_col:
                 st.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text,
-                        use_container_width=True)
-            
-            # เพิ่มกล่องพิมพ์ข้อความ (ใช้ key="input_text" เพื่อให้เชื่อมกับปุ่มล้างและปุ่ม Demo)
-        st.text_area(
+                          use_container_width=True)
+
+            # เพิ่มกล่องพิมพ์ข้อความ
+            st.text_area(
                 label="กรอกเนื้อหาข่าว",
                 height=180,
                 placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
                 label_visibility="collapsed",
-                key="input_text" 
+                key="input_text"
             )
             # ดึงข้อความจากหน้าเว็บมาเก็บในตัวแปร เพื่อเตรียมส่งให้ AI ตรวจสอบ
-        input_text = st.session_state['input_text']
+            input_text = st.session_state['input_text']
 
-        st.markdown("<div style='height:8px;'></div>",unsafe_allow_html=True)
-        if st.button("🚀  วิเคราะห์ข่าวนี้",type="primary",width="stretch"):
-            clean=""
+        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+        if st.button("🚀  วิเคราะห์ข่าวนี้", type="primary", width="stretch"):
+            clean = ""
             if check_mode=="🔗  URL ลิงก์ข่าว":
                 if not input_url: st.warning("กรุณาวาง URL ก่อนกด"); st.stop()
                 with st.spinner("กำลังดึงข้อมูลจากลิงก์..."):
