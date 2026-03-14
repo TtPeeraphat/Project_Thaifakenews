@@ -3,6 +3,9 @@ fastapi
 uvicorn
 streamlit
 requests
+pandas
+supabase
+plotly
 
 # --- AI & Deep Learning ---
 torch
