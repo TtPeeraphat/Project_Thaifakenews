@@ -7,7 +7,10 @@ os.system("playwright install chromium")
 def get_content_from_url(url):
     # ใช้โหมด Sync เพื่อไม่ให้ตีกับ Streamlit บน Windows
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+    headless=True, 
+    args=['--no-sandbox', '--disable-dev-shm-usage']
+)
         page = browser.new_page()
         
         try:
