@@ -1372,6 +1372,8 @@ else:
     # 👤 PROFILE
     # ══════════════════════════════════════
     elif menu=="👤 ข้อมูลส่วนตัว":
+        for k,v in [('username',"ผู้ใช้งานทั่วไป"),('email',""),('edit_email_mode',False)]:
+            if k not in st.session_state: st.session_state[k]=v
         page_header("👤","ข้อมูลส่วนตัว","จัดการบัญชีและการตั้งค่า")
         uid=st.session_state.get('user_id'); check_count=0
         if uid:
@@ -1380,8 +1382,7 @@ else:
                 df=pd.DataFrame(h); df.columns=[c.lower() for c in df.columns]; check_count=len(df)
             if 'email' not in st.session_state or not st.session_state.email:
                 st.session_state.email=db.get_user_email(uid)
-        for k,v in [('username',"ผู้ใช้งานทั่วไป"),('email',""),('edit_email_mode',False)]:
-            if k not in st.session_state: st.session_state[k]=v
+        
 
         # Profile banner
         st.markdown(f"""

@@ -1,5 +1,8 @@
 # scraper_ops.py
+import os
 from playwright.sync_api import sync_playwright
+
+os.system("playwright install chromium")
 
 def get_content_from_url(url):
     # ใช้โหมด Sync เพื่อไม่ให้ตีกับ Streamlit บน Windows
