@@ -1081,26 +1081,6 @@ elif not st.session_state['logged_in']:
         <p style="color:rgba(255,255,255,0.80);font-size:1rem;margin:0 0 32px;line-height:1.5;">
           ตรวจสอบความน่าเชื่อถือของข่าวด้วย AI<br>รวดเร็ว แม่นยำ โปร่งใส
         </p>
-        # <div style="display:inline-flex;gap:0;background:rgba(255,255,255,0.10);
-        #             border-radius:99px;padding:5px 6px;">
-        #   <div style="padding:8px 22px;text-align:center;">
-        #     <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.25rem;
-        #                 font-weight:800;color:#fff;">99%</div>
-        #     <div style="font-size:0.72rem;color:rgba(255,255,255,0.60);">Uptime</div>
-        #   </div>
-        #   <div style="width:1px;background:rgba(255,255,255,0.18);margin:6px 0;"></div>
-        #   <div style="padding:8px 22px;text-align:center;">
-        #     <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.25rem;
-        #                 font-weight:800;color:#fff;">&lt;3s</div>
-        #     <div style="font-size:0.72rem;color:rgba(255,255,255,0.60);">Analysis</div>
-        #   </div>
-        #   <div style="width:1px;background:rgba(255,255,255,0.18);margin:6px 0;"></div>
-        #   <div style="padding:8px 22px;text-align:center;">
-        #     <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.25rem;
-        #                 font-weight:800;color:#fff;">AI</div>
-        #     <div style="font-size:0.72rem;color:rgba(255,255,255,0.60);">Powered</div>
-        #   </div>
-        </div>
       </div>
     </div>""", unsafe_allow_html=True)
 
