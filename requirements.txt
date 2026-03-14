@@ -6,6 +6,7 @@ requests
 pandas
 supabase
 plotly
+streamlit-cookies-controller
 
 # --- AI & Deep Learning ---
 torch
