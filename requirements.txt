@@ -8,6 +8,7 @@ supabase
 plotly
 streamlit-cookies-controller
 psycopg2-binary
+playwright
 
 # --- AI & Deep Learning ---
 torch
