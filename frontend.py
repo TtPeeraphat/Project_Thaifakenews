@@ -1178,62 +1178,52 @@ else:
     # ══════════════════════════════════════
     # --- เริ่มส่วน UI ---
     if menu == "🏠 หน้าหลัก":
-            page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI — ได้ผลลัพธ์ภายใน 3 วินาที")
+        page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI — ได้ผลลัพธ์ภายใน 3 วินาที")
 
-    # แก้ Warning: ใส่ข้อความลงใน label แต่สั่งซ่อนไว้
-    check_mode = st.radio(
-        label="เลือกโหมดการตรวจสอบ", 
-        options=["📝  พิมพ์ / วางเนื้อหา", "🔗  URL ลิงก์ข่าว"],
-        horizontal=True,
-        label_visibility="collapsed"
-    )
-    st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
-
-    input_url = ""
-    input_text = ""
-
-    if check_mode == "🔗  URL ลิงก์ข่าว":
-        input_url = st.text_input(
-            label="🔗 URL ของข่าว",
-            placeholder="https://www.example.com/news/...",
+        # แก้ Warning: ใส่ข้อความลงใน label แต่สั่งซ่อนไว้
+        check_mode = st.radio(
+            label="เลือกโหมดการตรวจสอบ", 
+            options=["📝  พิมพ์ / วางเนื้อหา", "🔗  URL ลิงก์ข่าว"],
+            horizontal=True,
             label_visibility="collapsed"
         )
-    else:
-        with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
-            # ปรับเป็น 3 คอลัมน์ 
-            m1, m2, m3 = st.columns([2, 2, 1]) 
+        st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
 
-            if m1.button("👽 Fake Example — Aliens"):
-                st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
-    
-            if m2.button("🏛️ Real Example — Government"):
-                st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
-    
-            # ปุ่มล้างข้อความ
-            m3.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text)
+        input_url = ""
+        input_text = ""
+
+        if check_mode == "🔗  URL ลิงก์ข่าว":
+            input_url = st.text_input(
+                label="🔗 URL ของข่าว",
+                placeholder="https://www.example.com/news/...",
+                label_visibility="collapsed"
+            )
+        else:
+            with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
+                # ปรับเป็น 3 คอลัมน์ 
+                m1, m2, m3 = st.columns([2, 2, 1]) 
+
+                if m1.button("👽 Fake Example — Aliens"):
+                    st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
         
-        # เพิ่มกล่องพิมพ์ข้อความ (ใช้ key="input_text" เพื่อให้เชื่อมกับปุ่มล้างและปุ่ม Demo)
-        st.text_area(
-            label="กรอกเนื้อหาข่าว",
-            height=180,
-            placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
-            label_visibility="collapsed",
-            key="input_text" 
-        )
-        # ดึงข้อความจากหน้าเว็บมาเก็บในตัวแปร เพื่อเตรียมส่งให้ AI ตรวจสอบ
-        input_text = st.session_state['input_text']
-
-# --- ช่องกรอกข้อความ (โค้ดเดิมที่แก้ไข Label แล้ว) ---
-        input_text = st.text_area(
-    label="กรอกเนื้อหาข่าวที่ต้องการตรวจสอบ",
-    value=st.session_state.get('input_text', ""),
-    height=180,
-    placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
-    label_visibility="collapsed"
-)
+                if m2.button("🏛️ Real Example — Government"):
+                    st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
+        
+                # ปุ่มล้างข้อความ
+                m3.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text)
+            
+            # เพิ่มกล่องพิมพ์ข้อความ (ใช้ key="input_text" เพื่อให้เชื่อมกับปุ่มล้างและปุ่ม Demo)
+            st.text_area(
+                label="กรอกเนื้อหาข่าว",
+                height=180,
+                placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
+                label_visibility="collapsed",
+                key="input_text" 
+            )
+            # ดึงข้อความจากหน้าเว็บมาเก็บในตัวแปร เพื่อเตรียมส่งให้ AI ตรวจสอบ
+            input_text = st.session_state['input_text']
 
         st.markdown("<div style='height:8px;'></div>",unsafe_allow_html=True)
-
         if st.button("🚀  วิเคราะห์ข่าวนี้",type="primary",width="stretch"):
             clean=""
             if check_mode=="🔗  URL ลิงก์ข่าว":
@@ -1357,9 +1347,10 @@ else:
                         df['timestamp']=pd.to_datetime(df['timestamp']).dt.strftime('%d %b %Y, %H:%M')
                     rmap={'title':'หัวข้อข่าว','result':'ผลลัพธ์','confidence':'ความมั่นใจ (%)','timestamp':'วันที่-เวลา'}
                     vc=[c for c in rmap if c in df.columns]
-                    dfd=df[vc].rename(columns=rmap); dfd.index=range(1,len(dfd)+1)
+                    dfd = df[vc].rename(columns=rmap)
+                    dfd.index = pd.RangeIndex(1, len(dfd) + 1)
                     st.caption(f"พบ {len(dfd)} รายการ")
-                    st.dataframe(dfd,width="stretch")
+                    st.dataframe(dfd, width="stretch")
                 else:
                     st.warning(f"ไม่พบผลลัพธ์สำหรับ '{sq}'")
             else:
@@ -1377,20 +1368,20 @@ else:
     # ══════════════════════════════════════
     # 🔥 TRENDING
     # ══════════════════════════════════════
-    elif menu=="🔥 ข่าวที่เป็นกระแส":
-        page_header("🔥","ข่าวที่เป็นกระแส","ข่าวสารที่ถูกพูดถึงและผ่านการตรวจสอบโดยทีมงาน")
-        df=db.get_all_trending()
+    elif menu == "🔥 ข่าวที่เป็นกระแส":
+        page_header("🔥", "ข่าวที่เป็นกระแส", "ข่าวสารที่ถูกพูดถึงและผ่านการตรวจสอบโดยทีมงาน")
+        df = db.get_all_trending()
         if df.empty:
             st.info("ℹ️ ยังไม่มีข่าวที่เป็นกระแสในขณะนี้")
         else:
-            lcfg={
+            lcfg = {
                 "Fake":       ("#FEE2E2","#991B1B","#EF4444","🚨"),
                 "Real":       ("#DCFCE7","#166534","#22C55E","✅"),
                 "Unverified": ("#FEF3C7","#92400E","#F59E0B","⚠️"),
             }
-            for _,row in df.iterrows():
-                lc=lcfg.get(row['label'],("#F1F5F9","#475569","#CBD5E1","📰"))
-                ts=str(row.get('updated_at','-')).replace("T"," ")[:16]
+            for _, row in df.iterrows():
+                lc = lcfg.get(row['label'], ("#F1F5F9","#475569","#CBD5E1","📰"))
+                ts = str(row.get('updated_at', '-')).replace("T", " ")[:16]
                 st.markdown(f"""
                 <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
                             padding:20px 24px;margin-bottom:12px;
@@ -1413,11 +1404,13 @@ else:
     # ══════════════════════════════════════
     # 👤 PROFILE
     # ══════════════════════════════════════
-    elif menu=="👤 ข้อมูลส่วนตัว":
-        for k,v in [('username',"ผู้ใช้งานทั่วไป"),('email',""),('edit_email_mode',False)]:
-            if k not in st.session_state: st.session_state[k]=v
-        page_header("👤","ข้อมูลส่วนตัว","จัดการบัญชีและการตั้งค่า")
-        uid=st.session_state.get('user_id'); check_count=0
+    elif menu == "👤 ข้อมูลส่วนตัว":
+        for k, v in [('username', "ผู้ใช้งานทั่วไป"), ('email', ""), ('edit_email_mode', False)]:
+            if k not in st.session_state:
+                st.session_state[k] = v
+        page_header("👤", "ข้อมูลส่วนตัว", "จัดการบัญชีและการตั้งค่า")
+        uid = st.session_state.get('user_id')
+        check_count = 0
         if uid:
             h=db.get_user_history(uid)
             if h:
