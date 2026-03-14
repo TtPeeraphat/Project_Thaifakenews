@@ -28,6 +28,10 @@ def clear_text():
 if 'input_text' not in st.session_state:
     st.session_state['input_text'] = ""
 
+def clear_url():
+    st.session_state['input_url'] = ""
+if 'input_url' not in st.session_state:
+    st.session_state['input_url'] = ""
 # ─────────────────────────────────────────────
 # Cookie / session helpers
 # ─────────────────────────────────────────────
@@ -1239,11 +1243,22 @@ else:
         input_text = ""
 
         if check_mode == "🔗  URL ลิงก์ข่าว":
-            input_url = st.text_input(
-                label="🔗 URL ของข่าว",
-                placeholder="https://www.example.com/news/...",
-                label_visibility="collapsed"
-            )
+            # initialise session state key for URL
+            if 'input_url' not in st.session_state:
+                st.session_state['input_url'] = ""
+
+            _url_col, _clr_url_col = st.columns([5, 1])
+            with _url_col:
+                st.text_input(
+                    label="🔗 URL ของข่าว",
+                    placeholder="https://www.example.com/news/...",
+                    label_visibility="collapsed",
+                    key="input_url"
+                )
+            with _clr_url_col:
+                st.button("🗑️ ล้าง", type="secondary",
+                          on_click=clear_url, use_container_width=True)
+            input_url = st.session_state['input_url']
         else:
             with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
                 m1, m2 = st.columns(2)
