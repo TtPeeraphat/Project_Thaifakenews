@@ -1,15 +1,25 @@
-# ✅ REFACTORED: Input Validation
-# Location: validators.py
-# This file fixes Issue 5.1 (No Input Validation)
+"""
+validators.py
+Production-ready input validation for Fake News Detection system
+
+Fixes:
+- Issue 5.1: No input validation
+- Issue 6.2: Log injection risk
+"""
 
 import re
-from dataclasses import dataclass
-from typing import Tuple, Optional
-from urllib.parse import urlparse
+import html
 import logging
+from dataclasses import dataclass
+from typing import Any
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
+
+# =========================================================
+# VALIDATION RESULT
+# =========================================================
 
 @dataclass
 class ValidationResult:
@@ -17,404 +27,364 @@ class ValidationResult:
     is_valid: bool
     error_message: str = ""
     warning_message: str = ""
-    
+
     def __bool__(self):
         return self.is_valid
 
 
+# =========================================================
+# INPUT VALIDATOR
+# =========================================================
+
 class InputValidator:
     """
-    Comprehensive input validation for fake news detection.
-    
-    ✅ FIXES:
-    - Issue 5.1: No input validation
-    - Prevents DoS attacks, injection, and invalid input
+    Comprehensive input validation for fake news detection
     """
-    
-    # Configuration
+
+    # -------------------------
+    # CONFIG
+    # -------------------------
+
     MIN_TEXT_LENGTH = 10
-    MAX_TEXT_LENGTH = 5000
-    MAX_WORDS = 800
+    MAX_TEXT_LENGTH = 2000     # suitable for BERT
+    MAX_WORDS = 600
     MAX_URL_LENGTH = 2048
-    
-    # Thai Unicode range
-    THAI_CHAR_MIN = '\u0E00'
-    THAI_CHAR_MAX = '\u0E7F'
-    
-    # Suspicious domains (high spam rate)
+
+    THAI_CHAR_MIN = "\u0E00"
+    THAI_CHAR_MAX = "\u0E7F"
+
+    # Suspicious domains
     SUSPICIOUS_TLDS = {
-        '.tk', '.ml', '.ga', '.cf',  # Free hosting, high spam
-        '.xyz', '.work', '.webcam',  # High abuse rate
-        '.download', '.review'
+        ".tk",
+        ".ml",
+        ".ga",
+        ".cf",
+        ".xyz",
+        ".work",
+        ".webcam",
+        ".download",
+        ".review"
     }
-    
-    # SQL injection patterns (for logged content)
+
+    # -------------------------
+    # REGEX (Compiled for speed)
+    # -------------------------
+
     SQL_INJECTION_PATTERNS = [
-        r\"(union|select|insert|update|delete|drop|create)\s+(select|from|into|values|table|database)\",
-        r\"(;|--|\\/\\*|\\*\\/)\",  # SQL comment syntax
-        r\"xp_\",  # SQL Server extended procedures
-        r\"exec\\s*\\(\",  # EXEC
+        re.compile(r"(union|select|insert|update|delete|drop|create)\s+(select|from|into|values|table|database)", re.I),
+        re.compile(r"(;|--|\/\*|\*\/)", re.I),
+        re.compile(r"xp_", re.I),
+        re.compile(r"exec\s*\(", re.I),
     ]
-    
+
+    SUSPICIOUS_PATTERNS = [
+        (re.compile(r'(https?://[^\s]+){5,}'), "Too many URLs"),
+        (re.compile(r'(.{1,10})\1{10,}'), "High repetition pattern"),
+        (re.compile(r'[^\w\s\u0E00-\u0E7F]{30,}'), "Too many special characters"),
+        (re.compile(r'(!!!+|\?\?\?+|\.\.\.)\s*(!!!+|\?\?\?+|\.\.\.)+'), "Excessive punctuation"),
+    ]
+
+    URL_REGEX = re.compile(r'https?://[^\s]+')
+
+    # =========================================================
+    # TEXT VALIDATION
+    # =========================================================
+
     @staticmethod
     def validate_text(
         text: str,
-        min_length: int = MIN_TEXT_LENGTH,
-        max_length: int = MAX_TEXT_LENGTH,
-        max_words: int = MAX_WORDS,
-        require_thai: bool = True,
-        check_spam: bool = True
+        require_thai: bool = True
     ) -> ValidationResult:
-        \"\"\"
-        Comprehensive text validation.
-        
-        ✅ FIXES Issue 5.1
-        
-        Args:
-            text: Input text to validate
-            min_length: Minimum character length
-            max_length: Maximum character length
-            max_words: Maximum word count
-            require_thai: Must be mostly Thai
-            check_spam: Check for spam patterns
-        
-        Returns:
-            ValidationResult with detailed error/warning info
-        \"\"\"
-        
-        # 1. Type and null check
+
         if not text or not isinstance(text, str):
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"Invalid text input (empty or not string)\"
-            )
-        
+            return ValidationResult(False, "Invalid text input")
+
         text = text.strip()
-        
-        # 2. Length checks
-        if len(text) < min_length:
+
+        # Length check
+        if len(text) < InputValidator.MIN_TEXT_LENGTH:
             return ValidationResult(
-                is_valid=False,
-                error_message=f\"Text too short ({len(text)} chars < {min_length} minimum)\"
+                False,
+                f"Text too short ({len(text)} chars)"
             )
-        
-        if len(text) > max_length:
+
+        if len(text) > InputValidator.MAX_TEXT_LENGTH:
             return ValidationResult(
-                is_valid=False,
-                error_message=f\"Text too long ({len(text)} chars > {max_length} maximum)\"
+                False,
+                f"Text too long ({len(text)} chars)"
             )
-        
-        # 3. Word count validation
+
+        # Word count
         word_count = len(text.split())
+
         if word_count < 3:
             return ValidationResult(
-                is_valid=False,
-                error_message=\"Text must contain at least 3 words\"
+                False,
+                "Text must contain at least 3 words"
             )
-        
-        if word_count > max_words:
+
+        if word_count > InputValidator.MAX_WORDS:
             return ValidationResult(
-                is_valid=False,
-                error_message=f\"Too many words ({word_count} > {max_words})\"
+                False,
+                f"Too many words ({word_count})"
             )
-        
-        warning = \"\"
-        
-        # 4. Language detection (Thai content)
+
+        warning = ""
+
+        # -------------------------
+        # Thai language check
+        # -------------------------
+
         if require_thai:
+
             thai_chars = sum(
                 1 for c in text
                 if InputValidator.THAI_CHAR_MIN <= c <= InputValidator.THAI_CHAR_MAX
             )
-            thai_ratio = thai_chars / len(text) if text else 0
-            
+
+            thai_ratio = thai_chars / len(text)
+
             if thai_ratio < 0.2:
                 return ValidationResult(
-                    is_valid=False,
-                    error_message=\"Text must be mostly Thai language (at least 20% Thai characters)\"
+                    False,
+                    "Text must contain Thai language"
                 )
-            
+
             if thai_ratio < 0.4:
-                warning += \"Warning: Text contains many non-Thai characters. \\n\"
-        
-        # 5. Character repetition check (spam indicator)
+                warning += "Text contains many non-Thai characters. "
+
+        # -------------------------
+        # Character repetition
+        # -------------------------
+
         for char in set(text):
-            char_count = text.count(char)
-            repetition_ratio = char_count / len(text)
-            
-            if repetition_ratio > 0.5 and len(char) == 1 and char not in \" \\n\\t\"-:,.
+
+            count = text.count(char)
+            ratio = count / len(text)
+
+            if ratio > 0.5 and char not in " \n\t-:,.":
                 return ValidationResult(
-                    is_valid=False,
-                    error_message=f\"Text contains excessive repeated character: '{char}' ({int(repetition_ratio*100)}%)\"
+                    False,
+                    f"Excessive repeated character '{char}'"
                 )
-        
-        # 6. Suspicious pattern detection
-        suspicious_patterns = [
-            (r'(https?://[^\\s]+){5,}', \"Too many URLs (more than 5)\"),
-            (r'(.{1,10})\\1{10,}', \"Very high character/pattern repetition\"),
-            (r'[^\\w\\s\\u0E00-\\u0E7F]{30,}', \"Too many consecutive special characters\"),
-            (r'(!!!+|\\?\\?\\?+|\\.\\.\\.)\\s*(!!!+|\\?\\?\\?+|\\.\\.\\.)+', \"Excessive punctuation\"),
-        ]
-        
-        for pattern, reason in suspicious_patterns:
-            if re.search(pattern, text):
+
+        # -------------------------
+        # Suspicious patterns
+        # -------------------------
+
+        for pattern, reason in InputValidator.SUSPICIOUS_PATTERNS:
+            if pattern.search(text):
+                return ValidationResult(False, f"Suspicious pattern: {reason}")
+
+        # -------------------------
+        # SQL Injection
+        # -------------------------
+
+        for pattern in InputValidator.SQL_INJECTION_PATTERNS:
+            if pattern.search(text):
                 return ValidationResult(
-                    is_valid=False,
-                    error_message=f\"Suspicious pattern detected: {reason}\"
+                    False,
+                    "SQL-like pattern detected"
                 )
-        
-        # 7. SQL injection patterns (for safety even though using parameterized queries)
-        for sql_pattern in InputValidator.SQL_INJECTION_PATTERNS:
-            if re.search(sql_pattern, text, re.IGNORECASE):
-                return ValidationResult(
-                    is_valid=False,
-                    error_message=\"Text contains suspicious SQL-like patterns\"
-                )
-        
-        # 8. URL extraction and validation
-        urls = re.findall(r'https?://[^\\s]+', text)
+
+        # -------------------------
+        # URL validation
+        # -------------------------
+
+        urls = InputValidator.URL_REGEX.findall(text)
+
         if len(urls) > 3:
-            warning += f\"Text contains {len(urls)} URLs. \"
-        
-        for url in urls[:5]:  # Check first 5 URLs
-            url_valid = InputValidator.validate_url(url)
-            if not url_valid.is_valid:
-                warning += f\"Found suspicious URL: {url_valid.error_message}. \"
-        
-        return ValidationResult(
-            is_valid=True,
-            warning_message=warning.strip() if warning else \"\"
-        )
-    
+            warning += f"Contains {len(urls)} URLs. "
+
+        for url in urls[:5]:
+
+            url_result = InputValidator.validate_url(url)
+
+            if not url_result.is_valid:
+                warning += f"Suspicious URL ({url}). "
+
+        return ValidationResult(True, warning_message=warning.strip())
+
+    # =========================================================
+    # URL VALIDATION
+    # =========================================================
+
     @staticmethod
     def validate_url(url: str) -> ValidationResult:
-        \"\"\"
-        Comprehensive URL validation.
-        
-        Args:
-            url: URL to validate
-        
-        Returns:
-            ValidationResult
-        \"\"\"
-        
-        # 1. Format check
+
         if not url or not isinstance(url, str):
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"Invalid URL (empty or not string)\"
-            )
-        
+            return ValidationResult(False, "Invalid URL")
+
         url = url.strip()
-        
-        # 2. Scheme check
-        if not url.startswith(('http://', 'https://')):
+
+        if not url.startswith(("http://", "https://")):
             return ValidationResult(
-                is_valid=False,
-                error_message=\"URL must start with http:// or https://\"
+                False,
+                "URL must start with http/https"
             )
-        
-        # 3. Length check
+
         if len(url) > InputValidator.MAX_URL_LENGTH:
-            return ValidationResult(
-                is_valid=False,
-                error_message=f\"URL too long ({len(url)} > {InputValidator.MAX_URL_LENGTH} max)\"
-            )
-        
-        # 4. Parse URL
+            return ValidationResult(False, "URL too long")
+
         try:
             parsed = urlparse(url)
-        except Exception as e:
-            return ValidationResult(
-                is_valid=False,
-                error_message=f\"Invalid URL format: {str(e)[:50]}\"
-            )
-        
-        # 5. Check domain
+        except Exception:
+            return ValidationResult(False, "Invalid URL format")
+
         domain = parsed.netloc.lower()
+
         if not domain:
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"URL has no domain\"
-            )
-        
-        # 6. Check for suspicious TLDs
+            return ValidationResult(False, "URL has no domain")
+
+        # suspicious tld
         for tld in InputValidator.SUSPICIOUS_TLDS:
             if domain.endswith(tld):
                 return ValidationResult(
-                    is_valid=False,
-                    error_message=f\"URL from suspicious domain ({tld})\"
+                    False,
+                    f"Suspicious domain {tld}"
                 )
-        
-        # 7. IP address check (could be internal/private)
-        ip_pattern = r'^(\\d+\\.){3}\\d+$'
-        if re.match(ip_pattern, domain):
+
+        # IP address
+        if re.match(r"^(\d+\.){3}\d+$", domain):
             return ValidationResult(
-                is_valid=False,
-                error_message=\"URL with IP address is not allowed\"
+                False,
+                "IP based URL not allowed"
             )
-        
-        # 8. Check for common phishing patterns
+
         phishing_patterns = [
-            r'amazon\\..*facebook',  # Typosquatting
-            r'localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0',  # Local addresses
-            r'xn--',  # IDN homograph attack
+            r'localhost',
+            r'127\.0\.0\.1',
+            r'0\.0\.0\.0',
+            r'xn--'
         ]
-        
+
         for pattern in phishing_patterns:
-            if re.search(pattern, domain, re.IGNORECASE):
-                return ValidationResult(
-                    is_valid=False,
-                    error_message=\"URL matches phishing pattern\"
-                )
-        
-        return ValidationResult(is_valid=True)
-    
+            if re.search(pattern, domain, re.I):
+                return ValidationResult(False, "Phishing pattern detected")
+
+        return ValidationResult(True)
+
+    # =========================================================
+    # LOG SANITIZATION
+    # =========================================================
+
     @staticmethod
-    def sanitize_for_logging(value: any, max_length: int = 200) -> str:
-        \"\"\"
-        Sanitize value for safe logging (prevents injection in logs).
-        
-        ✅ FIXES Issue 6.2 (SQL injection risk in logs)
-        
-        Args:
-            value: Value to sanitize
-            max_length: Maximum length
-        
-        Returns:
-            Sanitized string safe for logging
-        \"\"\"
-        import html
-        
-        str_val = str(value)
-        
-        # 1. Escape HTML/XML
-        str_val = html.escape(str_val, quote=False)
-        
-        # 2. Remove newlines (prevent log injection)
-        str_val = str_val.replace('\\n', ' ').replace('\\r', ' ')
-        
-        # 3. Remove common injection characters
-        str_val = str_val.replace(';', '-').replace('--', '-').replace('/*', '*')
-        
-        # 4. Truncate
-        if len(str_val) > max_length:
-            str_val = str_val[:max_length] + \"...\"
-        
-        return str_val
-    
+    def sanitize_for_logging(value: Any, max_length: int = 200) -> str:
+
+        text = str(value)
+
+        text = html.escape(text, quote=False)
+
+        text = text.replace("\n", " ").replace("\r", " ")
+
+        text = text.replace(";", "-").replace("--", "-").replace("/*", "*")
+
+        if len(text) > max_length:
+            text = text[:max_length] + "..."
+
+        return text
+
+    # =========================================================
+    # USERNAME
+    # =========================================================
+
     @staticmethod
     def validate_username(username: str) -> ValidationResult:
-        \"\"\"Validate username format.\"\"\"
-        
+
         if not username or len(username) < 3:
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"Username too short (minimum 3 characters)\"
-            )
-        
+            return ValidationResult(False, "Username too short")
+
         if len(username) > 32:
+            return ValidationResult(False, "Username too long")
+
+        if not re.match(r"^[A-Za-z0-9_]+$", username):
             return ValidationResult(
-                is_valid=False,
-                error_message=\"Username too long (maximum 32 characters)\"
+                False,
+                "Only letters numbers underscore allowed"
             )
-        
-        # Only alphanumeric and underscore
-        if not re.match(r'^[\\w]+$', username):
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"Username can only contain letters, numbers, and underscore\"
-            )
-        
-        return ValidationResult(is_valid=True)
-    
+
+        return ValidationResult(True)
+
+    # =========================================================
+    # EMAIL
+    # =========================================================
+
     @staticmethod
     def validate_email(email: str) -> ValidationResult:
-        \"\"\"Validate email format.\"\"\"
-        
-        if not email or len(email) < 5:
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"Invalid email address\"
-            )
-        
-        # Basic email regex
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, email):
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"Invalid email format\"
-            )
-        
-        return ValidationResult(is_valid=True)
-    
+
+        if not email:
+            return ValidationResult(False, "Invalid email")
+
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+
+        if not re.match(pattern, email):
+            return ValidationResult(False, "Invalid email format")
+
+        return ValidationResult(True)
+
+    # =========================================================
+    # PASSWORD
+    # =========================================================
+
     @staticmethod
     def validate_password(password: str) -> ValidationResult:
-        \"\"\"Validate password strength.\"\"\"
-        
+
         if not password or len(password) < 8:
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"Password too short (minimum 8 characters)\"
-            )
-        
+            return ValidationResult(False, "Password too short")
+
         if len(password) > 128:
+            return ValidationResult(False, "Password too long")
+
+        common = {"password", "password123", "12345678"}
+
+        if password.lower() in common:
             return ValidationResult(
-                is_valid=False,
-                error_message=\"Password too long (maximum 128 characters)\"
+                False,
+                "Password too common"
             )
-        
-        # Check for common patterns
-        if password.lower() in ['password', 'password123', '12345678']:
-            return ValidationResult(
-                is_valid=False,
-                error_message=\"Password too common, please choose a stronger password\"
-            )
-        
-        warning = \"\"
-        
-        # Check password strength
-        if not re.search(r'[a-z]', password):
-            warning += \"Missing lowercase letters. \"
-        if not re.search(r'[A-Z]', password):
-            warning += \"Missing uppercase letters. \"
-        if not re.search(r'[0-9]', password):
-            warning += \"Missing numbers. \"
-        if not re.search(r'[^a-zA-Z0-9]', password):
-            warning += \"Missing special characters. \"
-        
-        if warning:
-            return ValidationResult(
-                is_valid=True,
-                warning_message=f\"Weak password: {warning.strip()}\"
-            )
-        
-        return ValidationResult(is_valid=True)
+
+        warning = ""
+
+        if not re.search(r"[a-z]", password):
+            warning += "Missing lowercase. "
+
+        if not re.search(r"[A-Z]", password):
+            warning += "Missing uppercase. "
+
+        if not re.search(r"[0-9]", password):
+            warning += "Missing number. "
+
+        if not re.search(r"[^a-zA-Z0-9]", password):
+            warning += "Missing special char. "
+
+        return ValidationResult(True, warning_message=warning.strip())
 
 
-# ============================================================================
-# USAGE EXAMPLES
-# ============================================================================
-if __name__ == \"__main__\":
+# =========================================================
+# TEST
+# =========================================================
+
+if __name__ == "__main__":
+
     logging.basicConfig(level=logging.INFO)
-    
-    # Example 1: Valid Thai text
-    result = InputValidator.validate_text(\"เนื้อหาข่าวที่ดีและเชื่อถือได้สำหรับการวิเคราะห์\")
-    print(f\"Thai text: Valid={result.is_valid}, Message={result.error_message}\")
-    
-    # Example 2: Too short
-    result = InputValidator.validate_text(\"Hi\")
-    print(f\"Short text: Valid={result.is_valid}, Message={result.error_message}\")
-    
-    # Example 3: Spam pattern
-    result = InputValidator.validate_text(\"!!!!!!!! ???????? กกกกกก\" * 100)
-    print(f\"Spam text: Valid={result.is_valid}, Message={result.error_message}\")
-    
-    # Example 4: URL validation
-    result = InputValidator.validate_url(\"https://example.tk/malware\")
-    print(f\"Suspicious URL: Valid={result.is_valid}, Message={result.error_message}\")
-    
-    # Example 5: Sanitize for logging
-    dangerous = \"'; DROP TABLE users; --\"; 
-    safe = InputValidator.sanitize_for_logging(dangerous)
-    print(f\"Sanitized: {safe}\")
+
+    text = "ข่าวรัฐบาลประกาศนโยบายใหม่เพื่อพัฒนาเศรษฐกิจ"
+
+    result = InputValidator.validate_text(text)
+
+    print("Valid:", result.is_valid)
+    print("Error:", result.error_message)
+    print("Warning:", result.warning_message)
+
+    url = "https://example.tk/malware"
+
+    result = InputValidator.validate_url(url)
+
+    print("URL Valid:", result.is_valid)
+
+    dangerous = "'; DROP TABLE users; --"
+
+    print(
+        "Sanitized:",
+        InputValidator.sanitize_for_logging(dangerous)
+    )
