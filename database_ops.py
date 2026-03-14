@@ -10,6 +10,7 @@ import pandas as pd
 import psycopg2
 from config import config
 
+
 # Optional import for Streamlit (only needed when running as Streamlit app)
 try:
     import streamlit as st
@@ -22,27 +23,30 @@ from supabase import create_client, Client
 # ==========================================
 # ⚙️ 0. CONFIGURATION & DATABASE INIT
 # ==========================================
-# ✅ FIX #3: Credentials now loaded from .env file via config.py
-# This prevents hardcoded credentials in source code
-
-SUPABASE_URL = config.database.supabase_url
-SUPABASE_KEY = config.database.supabase_key
-SENDER_EMAIL = config.email.sender_email
-SENDER_PASSWORD = config.email.sender_password
+# ลบ SUPABASE_URL และ SUPABASE_KEY ที่อยู่ข้างนอกฟังก์ชันทิ้งไปเลยครับ 
 
 def get_supabase() -> Client:
-    """เชื่อมต่อกับ Supabase API
+    """เชื่อมต่อกับ Supabase API โดยดึงค่าแบบ Real-time"""
     
-    Raises: OSError if cannot connect to Supabase
-    """
-    if not SUPABASE_URL or not SUPABASE_KEY:
+    # 1. ดึงค่าสดๆ หน้างาน เพื่อแก้ปัญหา Uvicorn อ่านไฟล์ .env ไม่ทัน
+    raw_url = config.database.supabase_url
+    raw_key = config.database.supabase_key
+    
+    # 2. คลีนข้อมูลให้สะอาดหมดจด (ลบฟันหนู ช่องว่าง และตัวขึ้นบรรทัดใหม่)
+    clean_url = str(raw_url).strip().strip('"').strip("'") if raw_url else ""
+    clean_key = str(raw_key).strip().strip('"').strip("'") if raw_key else ""
+    
+    # 3. ปริ้นท์เพื่อเช็กให้ชัวร์ว่าเซิร์ฟเวอร์เห็น URL เป็นอะไรตอนล็อกอิน
+    print(f"👉 [DEBUG] ระบบกำลังเชื่อมต่อ Supabase ด้วย URL: {repr(clean_url)}")
+    
+    if not clean_url or not clean_key:
         raise ValueError(
-            "Missing Supabase credentials in .env file. "
-            "Ensure SUPABASE_URL and SUPABASE_KEY are set."
+            "Missing Supabase credentials! "
+            "Ensure SUPABASE_URL and SUPABASE_KEY are properly loaded by config."
         )
     
     try:
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
+        return create_client(clean_url, clean_key)
     except Exception as e:
         print(f"❌ Failed to create Supabase client: {e}")
         raise
@@ -253,8 +257,8 @@ def read_all_feedbacks() -> List[Tuple[int, str, str, str, str]]:
     supabase = get_supabase()
     try:
         response = supabase.table("feedbacks")\
-            .select("id, user_report, comment, status, timestamp, predictions(title)")\
-            .order("timestamp", desc=True).execute()
+    .select("id, user_report, comment, status, timestamp, predictions!fk_prediction(title)")\
+    .order("timestamp", desc=True).execute()
             
         rows = []
         data = response.data
@@ -305,8 +309,9 @@ def get_dashboard_kpi():
 
         # 3. Accuracy Calculation (นับจาก Feedback ที่ Verify แล้ว)
         # ดึง user_report และ ai_result (ผ่านการ Join ตาราง predictions)
-        res_fb = supabase.table('feedbacks').select('user_report, status, predictions(result)').neq('status', 'pending').execute()
-        fb_list = res_fb.data or []
+        res_fb = supabase.table('feedbacks').select('user_report, status, predictions!fk_prediction(result)').neq('status', 'pending').execute()
+
+        fb_list = res_fb.data or []stat
         stats['feedback_total'] = len(fb_list)
 
         if stats['feedback_total'] > 0:

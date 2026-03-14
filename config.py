@@ -7,12 +7,14 @@ import logging
 from pathlib import Path
 from dataclasses import dataclass
 from dotenv import load_dotenv
+from pathlib import Path
 
-# ✅ FIX: โหลดตัวแปรจากไฟล์ .env เข้าสู่ระบบก่อน เพื่อให้ os.getenv() ดึงค่าได้
-load_dotenv()
-
-# Get root directory
+# หาตำแหน่งของไฟล์ config.py ปัจจุบัน
 PROJECT_ROOT = Path(__file__).parent
+
+# บังคับล็อกเป้าไปที่ไฟล์ .env ในโฟลเดอร์นี้เท่านั้น!
+env_path = PROJECT_ROOT / ".env"
+load_dotenv(dotenv_path=env_path)
 
 
 # ============================================================================
