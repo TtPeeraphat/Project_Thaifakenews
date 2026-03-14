@@ -1256,7 +1256,7 @@ else:
                     key="input_url"
                 )
             with _clr_url_col:
-                st.button("🗑️ ล้าง", type="secondary",
+                st.button("🗑️ ล้างข้อความ", type="secondary",
                           on_click=clear_url, use_container_width=True)
             input_url = st.session_state['input_url']
         else:
