@@ -274,7 +274,7 @@ class TextPreprocessor:
         
         # 2. Validation checks
         if len(text) < min_length:
-            return "", False, f\"Text too short ({len(text)} < {min_length})\"
+            return "", False, f"Text too short ({len(text)} < {min_length})"
         
         word_count = len(text.split())
         if word_count < 3:

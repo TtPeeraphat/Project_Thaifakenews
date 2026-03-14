@@ -17,6 +17,8 @@ torch
 torch-geometric
 transformers
 sentencepiece
+config 
+dotenv 
 
 # --- Data & Math ---
 numpy
