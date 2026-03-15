@@ -514,7 +514,7 @@ def send_otp_email(to_email) -> Tuple[bool, str]:
             server.sendmail(sender_email, to_email, msg.as_string())
         return True, "✅ ส่งรหัส OTP ไปที่อีเมลแล้ว"
     except Exception as e:
-        return False, "❌ ส่งอีเมลไม่สำเร็จ (เช็ค App Password)"
+         return False, f"❌ ส่งอีเมลไม่สำเร็จ: {str(e)}"
 
 def verify_otp_and_reset(email, otp, new_password) -> Tuple[bool, str]:
     supabase = get_supabase()
