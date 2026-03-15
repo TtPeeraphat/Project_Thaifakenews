@@ -818,39 +818,106 @@ def manage_trending_news():
             if flt!="All": df=df[df['label']==flt]
             st.caption(f"พบ {len(df)} รายการ")
 
-            for _,row in df.iterrows():
-                ekey=f"edit_{row['id']}"
-                if ekey not in st.session_state: st.session_state[ekey]=False
-                ts = str(row.get('updated_at','-')).replace("T"," ")[:16]
-                with st.expander(row['headline'][:72], expanded=st.session_state[ekey]):
-                    if not st.session_state[ekey]:
-                        st.markdown(f"{status_badge(row['label'])} &nbsp;<span style='font-size:0.78rem;color:#94A3B8;'>อัปเดต {ts}</span>", unsafe_allow_html=True)
-                        st.markdown(f"<div style='background:#F8FAFC;border-radius:7px;padding:11px 13px;font-size:0.9rem;color:#334155;line-height:1.6;margin:10px 0;'>{row['content']}</div>", unsafe_allow_html=True)
-                        ca2,cb2,_ = st.columns([1,1,5])
-                        with ca2:
-                            if st.button("✏️ แก้ไข", key=f"e_{row['id']}"):
-                                st.session_state[ekey]=True; st.rerun()
-                        with cb2:
-                            if st.button("🗑️ ลบ", key=f"d_{row['id']}"):
-                                if db.delete_trending(row['id']):
-                                    db.log_system_event(user_id=st.session_state.get('user_id'),action="DELETE_DATA",details=f"Deleted trending ID {row['id']}",level="WARNING")
-                                    st.rerun()
-                    else:
-                        eh=st.text_input("หัวข้อ",value=row['headline'],key=f"h_{row['id']}")
-                        ec=st.text_area("เนื้อหา",value=row['content'],height=110,key=f"c_{row['id']}")
-                        opts=["Fake","Real","Unverified"]
-                        el=st.selectbox("สถานะ",opts,index=opts.index(row['label']) if row['label'] in opts else 0,key=f"l_{row['id']}")
-                        sa,sb,_ = st.columns([1,1,4])
-                        with sa:
-                            if st.button("💾 บันทึก",key=f"s_{row['id']}",type="primary"):
-                                if eh.strip() and ec.strip():
-                                    db.update_trending(row['id'],eh,ec,el)
-                                    db.log_system_event(user_id=st.session_state.get('user_id'),action="UPDATE_TRENDING",details=f"Updated ID {row['id']}",level="INFO")
-                                    st.session_state[ekey]=False; st.rerun()
-                                else: st.warning("กรุณากรอกข้อมูลให้ครบ")
-                        with sb:
-                            if st.button("✕ ยกเลิก",key=f"x_{row['id']}"):
-                                st.session_state[ekey]=False; st.rerun()
+            for _, row in df.iterrows():
+                ekey = f"edit_{row['id']}"
+                if ekey not in st.session_state:
+                    st.session_state[ekey] = False
+                ts = str(row.get('updated_at', '-')).replace("T", " ")[:16]
+
+    # ── View mode ──
+                if not st.session_state[ekey]:
+                    label_cfg = {
+                        "Fake":       ("#FEE2E2", "#991B1B", "#EF4444"),
+                        "Real":       ("#DCFCE7", "#166534", "#22C55E"),
+                        "Unverified": ("#FEF3C7", "#92400E", "#F59E0B"),
+                    }.get(row['label'], ("#F1F5F9", "#475569", "#CBD5E1"))
+
+                    st.markdown(f"""
+        <div style="background:var(--surface,#fff);border:1px solid #E2E8F0;
+                    border-radius:12px;padding:16px 20px;margin-bottom:10px;">
+
+          <div style="display:flex;align-items:center;
+                      justify-content:space-between;gap:12px;margin-bottom:10px;">
+            <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:0.95rem;
+                        font-weight:700;color:#1E293B;flex:1;line-height:1.4;">
+              {row['headline'][:80]}
+            </div>
+            <span style="flex-shrink:0;background:{label_cfg[0]};color:{label_cfg[1]};
+                         border:1px solid {label_cfg[2]}44;font-size:0.7rem;font-weight:800;
+                         padding:3px 10px;border-radius:99px;text-transform:uppercase;
+                         letter-spacing:0.5px;">
+              {row['label']}
+            </span>
+          </div>
+
+          <div style="font-size:0.87rem;color:#475569;line-height:1.65;
+                      margin-bottom:12px;">
+            {row['content'][:200]}{'…' if len(str(row['content'])) > 200 else ''}
+          </div>
+
+          <div style="display:flex;align-items:center;
+                      justify-content:space-between;">
+            <span style="font-size:0.74rem;color:#94A3B8;">🕒 {ts}</span>
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+                    ca2, cb2, _ = st.columns([1, 1, 5])
+                    with ca2:
+                        if st.button("✏️ แก้ไข", key=f"e_{row['id']}", use_container_width=True):
+                            st.session_state[ekey] = True
+                            st.rerun()
+                    with cb2:
+                        if st.button("🗑️ ลบ", key=f"d_{row['id']}", use_container_width=True):
+                            if db.delete_trending(row['id']):
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="DELETE_DATA",
+                                    details=f"Deleted trending ID {row['id']}",
+                                    level="WARNING"
+                                )
+                                st.rerun()
+
+    # ── Edit mode ──
+                else:
+                    st.markdown(f"""
+        <div style="background:#F0F6FF;border:1.5px solid #BFDBFE;
+                    border-radius:12px;padding:16px 20px;margin-bottom:4px;">
+          <div style="font-size:0.72rem;font-weight:700;color:#1148A8;
+                      text-transform:uppercase;letter-spacing:0.6px;margin-bottom:12px;">
+            ✏️ แก้ไขข่าว
+          </div>
+                    </div>""", unsafe_allow_html=True)
+
+                    eh = st.text_input("หัวข้อข่าว", value=row['headline'], key=f"h_{row['id']}")
+                    ec = st.text_area("เนื้อหา", value=row['content'], height=120, key=f"c_{row['id']}")
+                    opts = ["Fake", "Real", "Unverified"]
+                    el = st.selectbox(
+                        "สถานะ", opts,
+                        index=opts.index(row['label']) if row['label'] in opts else 0,
+                        key=f"l_{row['id']}"
+                    )
+
+                    sa, sb, _ = st.columns([1, 1, 4])
+                    with sa:
+                        if st.button("💾 บันทึก", key=f"s_{row['id']}", type="primary", use_container_width=True):
+                            if eh.strip() and ec.strip():
+                                db.update_trending(row['id'], eh, ec, el)
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="UPDATE_TRENDING",
+                                    details=f"Updated ID {row['id']}",
+                                    level="INFO"
+                                )
+                                st.session_state[ekey] = False
+                                st.rerun()
+                            else:
+                                st.warning("กรุณากรอกข้อมูลให้ครบ")
+                    with sb:
+                        if st.button("✕ ยกเลิก", key=f"x_{row['id']}", use_container_width=True):
+                            st.session_state[ekey] = False
+                            st.rerun()
+
+                    st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
     with tab2:
         with st.form("add_news",clear_on_submit=True):
