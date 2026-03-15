@@ -586,8 +586,7 @@ def card_wrap(content_fn, *args, **kwargs):
 def show_admin_dashboard_enhanced():
     stats   = db.get_dashboard_kpi()
     df_perf = db.get_model_performance_data()
-    df_perf['timestamp'] = pd.to_datetime(df_perf['timestamp'], utc=True).dt.tz_convert("Asia/Bangkok")
-
+   
     c1,c2,c3 = st.columns(3)
     with c1: kpi_card("🎯","Accuracy (Verified)", f"{stats['accuracy']}%",
                        f"{stats['feedback_total']} verified samples", stats['accuracy']>=70)
