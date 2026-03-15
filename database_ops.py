@@ -488,22 +488,30 @@ def send_otp_email(to_email) -> Tuple[bool, str]:
     supabase = get_supabase()
     try:
         user_check = supabase.table("users").select("id").eq("email", to_email).execute()
-        if not (user_check.data and isinstance(user_check.data, list) and len(user_check.data) > 0): return False, "❌ ไม่พบอีเมลนี้ในระบบ"
-    except Exception as e: return False, f"Check Email Error: {e}"
+        if not (user_check.data and isinstance(user_check.data, list) and len(user_check.data) > 0):
+            return False, "❌ ไม่พบอีเมลนี้ในระบบ"
+    except Exception as e:
+        return False, f"Check Email Error: {e}"
 
     otp = ''.join(random.choices(string.digits, k=6))
-    try: supabase.table("users").update({"reset_token": otp}).eq("email", to_email).execute()
-    except Exception as e: return False, f"Database Error: {e}"
+    try:
+        supabase.table("users").update({"reset_token": otp}).eq("email", to_email).execute()
+    except Exception as e:
+        return False, f"Database Error: {e}"
+
+    # ✅ ดึงค่าจาก config แทนการใช้ตัวแปร global
+    sender_email    = str(config.email.sender_email).strip()
+    sender_password = str(config.email.sender_password).strip()
 
     msg = MIMEText(f"รหัส OTP ของคุณคือ: {otp}\n\nกรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่")
     msg['Subject'] = "🔑 รหัสยืนยันการเปลี่ยนรหัสผ่าน (Thai Fake News)"
-    msg['From'] = SUPABASE_EMAIL
-    msg['To'] = to_email
+    msg['From']    = sender_email  # ✅ ใช้ค่าจาก config
+    msg['To']      = to_email
 
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(SUPABASE_EMAIL, SUPABASE_PASSWORD)
-            server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
+            server.login(sender_email, sender_password)  # ✅ ใช้ค่าจาก config
+            server.sendmail(sender_email, to_email, msg.as_string())
         return True, "✅ ส่งรหัส OTP ไปที่อีเมลแล้ว"
     except Exception as e:
         return False, "❌ ส่งอีเมลไม่สำเร็จ (เช็ค App Password)"
