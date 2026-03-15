@@ -502,6 +502,8 @@ def send_otp_email(to_email) -> Tuple[bool, str]:
     # ✅ ดึงค่าจาก config แทนการใช้ตัวแปร global
     sender_email    = str(config.email.sender_email).strip()
     sender_password = str(config.email.sender_password).strip()
+    print(f"📧 sender_email = {repr(sender_email)}")
+    print(f"🔑 password length = {len(sender_password)} chars")
 
     msg = MIMEText(f"รหัส OTP ของคุณคือ: {otp}\n\nกรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่")
     msg['Subject'] = "🔑 รหัสยืนยันการเปลี่ยนรหัสผ่าน (Thai Fake News)"
