@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Tuple, Union, cast
 
 import pandas as pd
-import psycopg2
+
 from config import config
 
 
@@ -51,23 +51,7 @@ def get_supabase() -> Client:
         print(f"❌ Failed to create Supabase client: {e}")
         raise
 
-def get_db_connection():
-    """Connect to PostgreSQL directly (for complex queries)
-    
-    Note: Uses config (.env) instead of st.secrets for compatibility
-    """
-    try:
-        # Use config from .env file  
-        return psycopg2.connect(
-            host=config.database.db_host or "db.orxtfxdernqmpkfmsijj.supabase.co",
-            database=config.database.db_name or "postgres",
-            user=config.database.db_user or "postgres",
-            password=config.database.db_password or "",
-            port=config.database.db_port or 5432
-        )
-    except Exception as e:
-        print(f"❌ Failed to connect to PostgreSQL: {e}")
-        raise
+
 
 # ==========================================
 # 👤 1. USER MANAGEMENT
