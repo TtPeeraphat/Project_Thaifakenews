@@ -2,6 +2,8 @@
 # Location: ai_cache.py
 # This file fixes Issue 2.1 (No Model Caching) and Issue 2.2 (Thread Safety)
 
+import sys
+
 import torch
 import numpy as np
 import pickle
@@ -47,18 +49,9 @@ class GCNNet(torch.nn.Module):
 # ============================================================================
 # 2. ✅ CRITICAL FIX: Model Caching with @st.cache_resource
 # ============================================================================
+
 @st.cache_resource
 def load_model_pipeline() -> Dict[str, Any]:
-    """
-    Load and cache the complete ML pipeline.
-    
-    ✅ FIXES:
-    - Issue 2.1: No model caching (5-10s per prediction saved)
-    - Issue 2.2: Thread safety (pure function, no global state)
-    
-    Returns:
-        dict: Contains model, tokenizer, BERT model, kNN, database, device
-    """
     try:
         logger.info("🔄 Loading ML Pipeline (First time only)...")
         
@@ -67,6 +60,10 @@ def load_model_pipeline() -> Dict[str, Any]:
         
         # 1. Load artifacts (kNN database)
         logger.info("📂 Loading artifacts...")
+
+        # ✅ แก้ปัญหา GCNNet ไม่เจอตอน pickle.load
+        setattr(sys.modules['__main__'], 'GCNNet', GCNNet)
+
         with open(ARTIFACTS_PATH, 'rb') as f:
             artifacts = pickle.load(f)
         

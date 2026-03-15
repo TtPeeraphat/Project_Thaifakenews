@@ -723,3 +723,21 @@ def update_user_email(user_id, new_email):
     except Exception as e:
         print(f"Error updating email: {e}")
         return False
+def get_user_by_id(user_id):
+    try:
+        supabase = get_supabase()
+        res = supabase.table("users") \
+                      .select("id, username, role") \
+                      .eq("id", int(user_id)) \
+                      .single() \
+                      .execute()
+        # ✅ เช็คว่าเป็น dict ก่อนเข้าถึง key
+        if res.data and isinstance(res.data, dict):
+            return {
+                "id":       res.data.get("id"),
+                "username": res.data.get("username"),
+                "role":     res.data.get("role"),
+            }
+        return None
+    except Exception:
+        return None

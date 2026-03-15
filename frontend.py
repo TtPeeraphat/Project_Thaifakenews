@@ -1,5 +1,7 @@
 import email
 import sys
+from PIL.Image import item
+from PIL.DdsImagePlugin import item
 import streamlit as st
 import pandas as pd
 import time
@@ -10,7 +12,8 @@ import re
 from datetime import datetime, timedelta
 import asyncio
 from streamlit_cookies_controller import CookieController
-
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo 
 import database_ops as db
 import ai_engine as ai
 from scraper_ops import get_content_from_url
@@ -20,6 +23,11 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 cookie_controller = CookieController()
+TZ_BKK = ZoneInfo("Asia/Bangkok")     # UTC+7
+
+def now_bkk() -> datetime:
+    """Current time in Bangkok (GMT+7), timezone-aware."""
+    return datetime.now(tz=TZ_BKK)
 
 # 1. ฟังก์ชันล้างข้อความ (เอาไว้ด้านบนสุด หรือก่อนถึง if menu...)
 def clear_text():
@@ -47,7 +55,7 @@ def check_persistent_login():
         return
     if isinstance(all_cookies, dict):
         if st.session_state.get('do_logout'):
-            for k in ('saved_user_id', 'saved_role'):
+            for k in ('saved_user_id',):  # ✅ ลบแค่ user_id พอ ไม่มี saved_role แล้ว
                 try: cookie_controller.remove(k)
                 except KeyError: pass
             st.session_state['logged_in'] = False
@@ -58,16 +66,23 @@ def check_persistent_login():
             return
         if st.session_state.get('need_to_save_cookie'):
             cookie_controller.set('saved_user_id', str(st.session_state['user_id']), max_age=86400)
-            cookie_controller.set('saved_role',    str(st.session_state['role']),    max_age=86400)
+            # ✅ ลบออก: ไม่เก็บ role ใน cookie อีกต่อไป
             st.session_state['need_to_save_cookie'] = False
         saved_user_id = all_cookies.get('saved_user_id')
-        saved_role    = all_cookies.get('saved_role')
         if saved_user_id and not st.session_state.get('logged_in'):
-            st.session_state['user_id']   = saved_user_id
-            st.session_state['role']      = saved_role
-            st.session_state['logged_in'] = True
-            st.session_state["cookie_wait"] = 0
-            st.rerun()
+            # ✅ ดึง role และข้อมูลจาก DB แทนการอ่านจาก cookie
+            user_data = db.get_user_by_id(saved_user_id)
+            if user_data:
+                st.session_state['user_id']   = user_data['id']
+                st.session_state['role']      = user_data['role']      # จาก DB ✅
+                st.session_state['username']  = user_data['username']  # จาก DB ✅
+                st.session_state['logged_in'] = True
+                st.session_state["cookie_wait"] = 0
+                st.rerun()
+            else:
+                # ✅ ถ้าไม่เจอ user ใน DB ให้ลบ cookie ทิ้งเลย (อาจถูกลบออกจากระบบ)
+                try: cookie_controller.remove('saved_user_id')
+                except KeyError: pass
 
 check_persistent_login()
 
@@ -538,13 +553,23 @@ def status_badge(label: str) -> str:
 
 def time_ago(ts):
     try:
-        dt = datetime.strptime(str(ts), "%Y-%m-%d %H:%M:%S") if isinstance(ts,str) else ts
-        s  = (datetime.now()-dt).total_seconds()
-        if s<60:    return "Just now"
-        if s<3600:  return f"{int(s//60)}m ago"
-        if s<86400: return f"{int(s//3600)}h ago"
-        return f"{int(s//86400)}d ago"
-    except: return str(ts)
+        if isinstance(ts, str):
+            dt = datetime.strptime(str(ts), "%Y-%m-%d %H:%M:%S")
+        else:
+            dt = ts
+
+        # Make dt timezone-aware in GMT+7 if it's naive
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=TZ_BKK)
+
+        s = (now_bkk() - dt).total_seconds()
+
+        if s < 60:    return "Just now"
+        if s < 3600:  return f"{int(s // 60)}m ago"
+        if s < 86400: return f"{int(s // 3600)}h ago"
+        return f"{int(s // 86400)}d ago"
+    except:
+        return str(ts)
 
 
 def card_wrap(content_fn, *args, **kwargs):
@@ -561,6 +586,7 @@ def card_wrap(content_fn, *args, **kwargs):
 def show_admin_dashboard_enhanced():
     stats   = db.get_dashboard_kpi()
     df_perf = db.get_model_performance_data()
+    df_perf['timestamp'] = pd.to_datetime(df_perf['timestamp'], utc=True).dt.tz_convert("Asia/Bangkok")
 
     c1,c2,c3 = st.columns(3)
     with c1: kpi_card("🎯","Accuracy (Verified)", f"{stats['accuracy']}%",
@@ -570,6 +596,7 @@ def show_admin_dashboard_enhanced():
 
     section_title("Cumulative Model Accuracy Over Time")
     if not df_perf.empty:
+        df_perf['timestamp'] = pd.to_datetime(df_perf['timestamp'], utc=True).dt.tz_convert("Asia/Bangkok")  # ✅ แปลง GMT+7 ก่อน
         df_perf = df_perf.sort_values('timestamp')
         df_perf['cumulative_accuracy'] = df_perf['is_correct'].expanding().mean()*100
         fig = px.line(df_perf, x='timestamp', y='cumulative_accuracy',
@@ -699,7 +726,17 @@ def show_feedback_review():
                     overflow-y:auto;-webkit-text-fill-color:#334155;">{html.escape(str(item['text']))}</div>""", unsafe_allow_html=True)
                 st.caption(f"📅 {item['timestamp']}")
             with c2:
-                    ai_b = status_badge(item['ai_result']) if item['ai_result'] in ('Real','Fake','Unverified') else f"<span style='font-size:0.82rem;font-weight:600;'>{item['ai_result']}</span>"
+                ai_b = status_badge(item['ai_result']) if item['ai_result'] in ('Real','Fake','Unverified') else f"<span style='font-size:0.82rem;font-weight:600;'>{item['ai_result']}</span>"
+
+            # ✅ สร้าง badge แสดง feedback จาก user
+            fb = item.get('user_report') or item.get('comment') or ''
+            if fb == 'Correct':
+                fb_html = "<span style='background:#DCFCE7;color:#166534;padding:3px 10px;border-radius:99px;font-weight:700;font-size:0.82rem;'>👍 AI ทายถูก</span>"
+            elif fb == 'Incorrect':
+                fb_html = "<span style='background:#FEE2E2;color:#991B1B;padding:3px 10px;border-radius:99px;font-weight:700;font-size:0.82rem;'>👎 AI ทายผิด</span>"
+            else:
+                fb_html = "<span style='color:#94A3B8;font-size:0.88rem;'>— ยังไม่มี Feedback</span>"
+
             st.markdown(f"""
             <div style="display:flex;flex-direction:column;gap:9px;margin-top:2px;">
       <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:11px 13px;
@@ -714,7 +751,7 @@ def show_feedback_review():
         <div style="font-size:0.72rem;color:#92400E !important;font-weight:700;
                     -webkit-text-fill-color:#92400E;
                     text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">💬 USER SAYS</div>
-        <div style="font-size:0.88rem;color:#78350F;-webkit-text-fill-color:#78350F;">{item['user_comment'] or '—'}</div>
+        {fb_html}
       </div>
     </div>""", unsafe_allow_html=True)
 
@@ -866,7 +903,7 @@ def show_system_analytics():
         color:#1E293B;">Daily Usage — Last 7 Days</div>
         <div style="font-size:0.79rem;color:#94A3B8;margin-bottom:12px;">Checks & active users per day</div>""",
         unsafe_allow_html=True)
-        last7=[(datetime.now()-timedelta(days=i)).date() for i in range(6,-1,-1)]
+        last7 = [(now_bkk() - timedelta(days=i)).date() for i in range(6, -1, -1)]
         dft=pd.DataFrame({'Date':last7})
         cpd=df_preds.groupby('date').size() if not df_preds.empty else pd.Series()
         upd=df_logs.groupby('date')['user_id'].nunique() if not df_logs.empty else pd.Series()
