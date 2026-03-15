@@ -9,7 +9,7 @@ streamlit-cookies-controller==0.0.4
 
 # --- Database & Backend ---
 supabase==2.0.3
-psycopg2-binary==2.9.9
+
 python-dotenv==1.0.0
 
 # --- AI & Deep Learning ---
