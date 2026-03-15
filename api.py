@@ -1,4 +1,5 @@
 # api.py
+import sys
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import torch
@@ -50,6 +51,10 @@ try:
     # 2.1 Load Artifacts
     if not os.path.exists('artifacts.pkl'):
         raise FileNotFoundError("❌ ไม่พบไฟล์ artifacts.pkl")
+
+    # ✅ บอก pickle ว่า GCNNet อยู่ที่นี่ก่อน load
+    setattr(sys.modules['__main__'], 'GCNNet', GCNNet)
+
     
     with open('artifacts.pkl', 'rb') as f:
         artifacts = pickle.load(f)
@@ -121,7 +126,7 @@ def predict(req: NewsRequest):
         ).to(device)
         
         # 1.2 Pass through Model
-        with torch.no_grad():
+        with torch.inference_mode():
             outputs = bert_model(**inputs)
         
         # 1.3 แก้ Mean Pooling (ให้คำนวณละเอียด ตัดคำว่างทิ้ง)

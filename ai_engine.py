@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, AutoModel
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 import logging
-from typing import Dict, Any
+from typing import Counter, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,8 @@ def load_model_pipeline() -> Dict[str, Any]:
         
         x_database = artifacts['x_np']
         id2label = artifacts['id2label']
+        id2cat      = artifacts.get('id2cat')       # ✅ เพิ่ม
+        y_cat_np    = artifacts.get('y_cat_np')     # ✅ เพิ่ม
         k_neighbors = artifacts.get('k', 10)
         logger.info(f"✅ Loaded {len(x_database)} news vectors for kNN")
         
@@ -100,7 +102,9 @@ def load_model_pipeline() -> Dict[str, Any]:
             'x_database': x_database,
             'id2label': id2label,
             'device': device,
-            'k_neighbors': k_neighbors
+            'k_neighbors': k_neighbors,
+            'id2cat':      id2cat,       # ✅ เพิ่ม
+            'y_cat_np':    y_cat_np,     # ✅ เพิ่ม
         }
     
     except Exception as e:
@@ -166,7 +170,7 @@ def predict_news(text: str, pipeline: Dict[str, Any]) -> Dict[str, Any]:
         logger.debug(f"Tokenizing text (length: {len(text)})")
         inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=256).to(device)
         
-        with torch.no_grad():
+        with torch.inference_mode():
             outputs = bert_model(**inputs)
             # Use CLS token (first token) for better stability
             emb = outputs.last_hidden_state[:, 0, :].cpu().numpy()
@@ -178,6 +182,22 @@ def predict_news(text: str, pipeline: Dict[str, Any]) -> Dict[str, Any]:
         logger.debug(f"Searching {k_neighbors} nearest neighbors...")
         dists, idxs = nbrs.kneighbors(emb, n_neighbors=k_neighbors)
         idxs = idxs[0]
+
+        id2cat   = pipeline.get('id2cat')
+        y_cat_np = pipeline.get('y_cat_np')
+
+# ✅ ทำนาย category จาก majority vote ของ neighbors
+        pred_category = "ไม่ระบุ"
+        if y_cat_np is not None and id2cat is not None:
+            try:
+                neighbor_cat_ids = y_cat_np[idxs]
+                neighbor_cats    = [id2cat[cid] for cid in neighbor_cat_ids]
+                most_common      = Counter(neighbor_cats).most_common(1)
+                if most_common:
+                    pred_category = most_common[0][0]
+            except Exception:
+                pass
+
         
         # C. Build small graph (new news + k neighbors)
         logger.debug("Building computation graph...")
@@ -222,6 +242,7 @@ def predict_news(text: str, pipeline: Dict[str, Any]) -> Dict[str, Any]:
             'result': result_text,
             'confidence': round(confidence, 2),
             'thai_label': label,
+            'category':   pred_category,   # ✅ เพิ่ม
             'error': None
         }
     

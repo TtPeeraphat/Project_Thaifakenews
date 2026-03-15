@@ -1459,7 +1459,9 @@ else:
         # Result
         if 'current_result' in st.session_state:
             res=st.session_state['current_result']
-            label=res['result']; conf=float(res['confidence'])
+            label=res['result']; 
+            conf=float(res['confidence'])
+            cat   = res.get('category', 'ไม่ระบุ')  
 
             if conf<70:
                 cfg=dict(bg="#FFFBEB",border="#F59E0B",bc="#92400E",bbg="#FEF3C7",
@@ -1474,47 +1476,56 @@ else:
                          icon="✅",verdict="REAL NEWS",bar="#22C55E",
                          desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ")
 
-            st.markdown("<div style='height:18px;'></div>",unsafe_allow_html=True)
-            st.markdown(f"""
-            <div style="background:{cfg['bg']};border:1.5px solid {cfg['border']};
-                        border-radius:16px;padding:26px 28px;
-                        box-shadow:0 4px 20px rgba(0,0,0,0.06);">
-              <div style="display:flex;align-items:flex-start;gap:15px;margin-bottom:18px;">
-                <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
-                <div style="flex:1;">
-                  <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
-                               font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;
-                               font-size:1.15rem;padding:5px 16px;border-radius:8px;
-                               letter-spacing:-0.2px;">{cfg['verdict']}</span>
-                  <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
-                    {cfg['desc']}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-                  <span style="font-size:0.8rem;font-weight:600;color:#64748B;">AI Confidence</span>
-                  <span style="font-size:0.88rem;font-weight:800;color:{cfg['bc']};">{conf:.1f}%</span>
-                </div>
-                <div style="background:rgba(0,0,0,0.07);border-radius:99px;height:7px;overflow:hidden;">
-                  <div style="width:{conf}%;height:100%;background:{cfg['bar']};
-                              border-radius:99px;"></div>
-                </div>
-              </div>
-            </div>""", unsafe_allow_html=True)
+            st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
 
-            # Feedback
-            st.markdown("<div style='height:16px;'></div>",unsafe_allow_html=True)
+            st.markdown(f"""
+        <div style="background:{cfg['bg']};border:1.5px solid {cfg['border']};
+                    border-radius:16px;padding:26px 28px;
+                    box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+        <div style="display:flex;align-items:flex-start;gap:15px;margin-bottom:18px;">
+            <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
+            <div style="flex:1;">
+            <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
+                        font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;
+                        font-size:1.15rem;padding:5px 16px;border-radius:8px;
+                        letter-spacing:-0.2px;">{cfg['verdict']}</span>
+            <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
+                {cfg['desc']}
+            </div>
+            </div>
+        </div>
+        <div style="margin-bottom:14px;">
+            <span style="font-size:0.75rem;font-weight:600;color:#64748B;">📂 หมวดหมู่ข่าว</span>
+            &nbsp;
+            <span style="background:#EFF6FF;color:#1148A8;font-size:0.82rem;font-weight:700;
+                        padding:4px 12px;border-radius:99px;border:1px solid #BFDBFE;">
+            {cat}
+            </span>
+        </div>
+        <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:0.8rem;font-weight:600;color:#64748B;">AI Confidence</span>
+            <span style="font-size:0.88rem;font-weight:800;color:{cfg['bc']};">{conf:.1f}%</span>
+            </div>
+            <div style="background:rgba(0,0,0,0.07);border-radius:99px;height:7px;overflow:hidden;">
+            <div style="width:{conf}%;height:100%;background:{cfg['bar']};
+                        border-radius:99px;"></div>
+            </div>
+        </div>
+        </div>""", unsafe_allow_html=True)
+
+# Feedback
+            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
             st.markdown("""
             <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;
-                        padding:18px 20px 10px;">
-              <div style="font-weight:700;font-size:0.9rem;color:#1E293B;">
-                💬 AI ทายถูกหรือเปล่า?
-              </div>
-              <div style="font-size:0.8rem;color:#94A3B8;margin:3px 0 12px;">
-                Feedback ของคุณช่วยให้ AI แม่นยำขึ้น
-              </div>
-            </div>""", unsafe_allow_html=True)
+            padding:18px 20px 10px;">
+  <div style="font-weight:700;font-size:0.9rem;color:#1E293B;">
+    💬 AI ทายถูกหรือเปล่า?
+  </div>
+  <div style="font-size:0.8rem;color:#94A3B8;margin:3px 0 12px;">
+    Feedback ของคุณช่วยให้ AI แม่นยำขึ้น
+  </div>
+</div>""", unsafe_allow_html=True)
             if not st.session_state.get('feedback_given'):
                 fc1,fc2=st.columns(2)
                 with fc1:
