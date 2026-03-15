@@ -596,14 +596,16 @@ def show_admin_dashboard_enhanced():
 
     section_title("Cumulative Model Accuracy Over Time")
     if not df_perf.empty:
-        df_perf['timestamp'] = pd.to_datetime(df_perf['timestamp'], utc=True).dt.tz_convert("Asia/Bangkok")  # ✅ แปลง GMT+7 ก่อน
+    # ✅ เช็คว่ามี column timestamp จริงก่อนแปลง
+        if 'timestamp' in df_perf.columns:
+            df_perf['timestamp'] = pd.to_datetime(df_perf['timestamp'], utc=True).dt.tz_convert("Asia/Bangkok")
         df_perf = df_perf.sort_values('timestamp')
         df_perf['cumulative_accuracy'] = df_perf['is_correct'].expanding().mean()*100
         fig = px.line(df_perf, x='timestamp', y='cumulative_accuracy',
-                      line_shape='spline', color_discrete_sequence=['#1565C0'])
+                    line_shape='spline', color_discrete_sequence=['#1565C0'])
         fig.update_layout(yaxis_range=[0,100], plot_bgcolor='white', paper_bgcolor='white',
-                          font_color='#334155', margin=dict(l=0,r=0,t=10,b=0),
-                          xaxis_title="", yaxis_title="Accuracy (%)")
+                      font_color='#334155', margin=dict(l=0,r=0,t=10,b=0),
+                      xaxis_title="", yaxis_title="Accuracy (%)")
         fig.update_traces(line=dict(width=2.5))
         st.plotly_chart(fig, width="stretch")
     else:
