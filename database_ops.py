@@ -197,36 +197,50 @@ def save_feedback(prediction_id, user_report, comment="") -> bool:
 def get_pending_feedbacks():
     supabase = get_supabase()
     try:
-        res_f = supabase.table('feedbacks').select('*').eq('status', 'pending').execute()
+        # ✅ ดึงทุก status ไม่ใช่แค่ pending
+        res_f = supabase.table('feedbacks') \
+                        .select('id, prediction_id, user_report, comment, status, timestamp') \
+                        .execute()
         feedbacks = res_f.data if res_f.data else []
         if not feedbacks: return []
 
-        result_list = []
+        fb_map = {}
         for fb in feedbacks:
             if not isinstance(fb, dict): continue
-            pred_id = fb.get('prediction_id')
-            
-            if pred_id:
-                res_p = supabase.table('predictions').select('*').eq('id', str(pred_id)).execute()
-                if res_p.data and isinstance(res_p.data, list) and len(res_p.data) > 0:
-                    pred_data = res_p.data[0]
-                    if isinstance(pred_data, dict):
-                        result_list.append({
-                            'feedback_id': fb.get('id'),
-                            'prediction_id': pred_id,
-                            'title': pred_data.get('title', 'No Title'),
-                            'text': pred_data.get('text', ''),
-                            'ai_result': pred_data.get('result', 'Unknown'),
-                            'ai_confidence': pred_data.get('confidence', 0), # แก้ไขคำว่า confident
-                            'user_comment': fb.get('comment', '-'),
-                            'user_report': fb.get('user_report', '-'),
-                            'timestamp': fb.get('timestamp')
-                        })
+            if fb.get('id') is None: continue
+            pid = str(fb.get('prediction_id'))
+            fb_map[pid] = fb
+
+        res_p = supabase.table('predictions').select('*').execute()
+        predictions = res_p.data if res_p.data else []
+
+        result_list = []
+        for pred in predictions:
+            if not isinstance(pred, dict): continue
+            pid = str(pred.get('id'))
+            fb  = fb_map.get(pid)
+            if fb is None or fb.get('id') is None: continue
+
+            result_list.append({
+                'feedback_id':   fb.get('id'),
+                'prediction_id': pid,
+                'title':         pred.get('title', 'No Title'),
+                'text':          pred.get('text', ''),
+                'ai_result':     pred.get('result', 'Unknown'),
+                'ai_confidence': pred.get('confidence', 0),
+                'user_report':   fb.get('user_report', None),
+                'user_comment':  fb.get('comment', ''),
+                'timestamp':     pred.get('timestamp'),
+                'status':        fb.get('status', 'pending'),  # ✅ เพิ่ม status
+                'has_feedback':  True,
+            })
+
         return result_list
+
     except Exception as e:
         print(f"❌ Error fetching pending feedbacks: {e}")
         return []
-
+    
 def update_feedback_status(feedback_id, new_status) -> bool:
     """Admin ใช้เปลี่ยนสถานะจาก pending -> verified_real หรือ verified_fake"""
     supabase = get_supabase()
@@ -665,20 +679,31 @@ def update_user_role_status(target_user_id, new_role, new_status):
 
 
 def get_approved_feedbacks():
-    """ดึง Feedback ที่แอดมินตรวจสอบแล้ว (Real หรือ Fake เท่านั้น) เพื่อนำไป Train โมเดล"""
     supabase = get_supabase()
     try:
-        # ดึงเฉพาะรายการที่ status เป็น Real หรือ Fake (ข้าม Ignored หรือ Pending)
-        # 🚨 อย่าลืมเช็คชื่อคอลัมน์ status และ text ให้ตรงกับในตาราง Supabase ของคุณนะครับ
-        response = supabase.table("user_feedbacks") \
-                           .select("text, status") \
-                           .in_("status", ["Real", "Fake"]) \
-                           .execute()
-                           
-        if response.data:
-            return pd.DataFrame(response.data)
-        return pd.DataFrame()
-        
+        # ✅ ดึงจาก feedbacks + join predictions เพื่อเอา text
+        res = supabase.table("feedbacks") \
+                      .select("id, status, prediction_id, predictions!fk_prediction(text, result)") \
+                      .in_("status", ["Real", "Fake"]) \
+                      .execute()
+
+        if not res.data:
+            return pd.DataFrame()
+
+        rows = []
+        for item in res.data:
+            if not isinstance(item, dict): continue
+            pred = item.get('predictions')
+            if not pred: continue
+
+            text = pred.get('text', '') if isinstance(pred, dict) else ''
+            rows.append({
+                'text':   text,
+                'status': item.get('status')
+            })
+
+        return pd.DataFrame(rows) if rows else pd.DataFrame()
+
     except Exception as e:
         print(f"❌ Get Approved Feedbacks Error: {e}")
         return pd.DataFrame()

@@ -1,7 +1,5 @@
 import email
 import sys
-from PIL.Image import item
-from PIL.DdsImagePlugin import item
 import streamlit as st
 import pandas as pd
 import time
@@ -541,10 +539,10 @@ def kpi_card(icon: str, label: str, value, delta: str = "", delta_ok: bool = Tru
 
 def status_badge(label: str) -> str:
     cfg = {
-        "Real":       ("#DCFCE7","#166534","✓"),
-        "Fake":       ("#FEE2E2","#991B1B","✕"),
+        "Real":       ("#00FF5943","#000000","✓"),
+        "Fake":       ("#FF0000","#991B1B","✕"),
         "Unverified": ("#FEF3C7","#92400E","?"),
-    }.get(label, ("#F1F5F9","#475569","·"))
+    }.get(label, ("#000000","#000000","·"))
     return (f"<span style='display:inline-flex;align-items:center;gap:3px;"
             f"background:{cfg[0]};color:{cfg[1]};font-size:0.72rem;font-weight:800;"
             f"padding:3px 10px;border-radius:99px;text-transform:uppercase;"
@@ -649,21 +647,73 @@ def show_model_performance():
     st.success(f"คำนวณจาก {len(df_ev)} รายการที่ผ่านการตรวจสอบ")
     try:
         acc  = accuracy_score(df_ev['status'], df_ev['prediction'])
-        prec = precision_score(df_ev['status'], df_ev['prediction'], pos_label='Fake', zero_division=0)
-        rec  = recall_score(df_ev['status'],    df_ev['prediction'], pos_label='Fake', zero_division=0)
-        f1   = f1_score(df_ev['status'],        df_ev['prediction'], pos_label='Fake', zero_division=0)
-        sp   = lambda v: float(max(0.0,min(1.0,v)))
-        for col, lbl, val in zip(st.columns(4),
-                                  ["Overall Accuracy","Precision (Fake)","Recall (Fake)","F1 Score"],
-                                  [acc, prec, rec, f1]):
-            with col:
-                st.metric(lbl, f"{val*100:.1f}%"); st.progress(sp(val))
+        prec_fake = precision_score(df_ev['status'], df_ev['prediction'], pos_label='Fake', zero_division=0)
+        rec_fake  = recall_score(df_ev['status'],    df_ev['prediction'], pos_label='Fake', zero_division=0)
+        f1_fake   = f1_score(df_ev['status'],        df_ev['prediction'], pos_label='Fake', zero_division=0)
+        prec_real = precision_score(df_ev['status'], df_ev['prediction'], pos_label='Real', zero_division=0)
+        rec_real  = recall_score(df_ev['status'],    df_ev['prediction'], pos_label='Real', zero_division=0)
+
+        sp = lambda v: float(max(0.0, min(1.0, v)))
+
+    # ── แถว 1: ภาพรวม ──
+        section_title("📊 ภาพรวม")
+        c1, c2 = st.columns(2)
+        with c1: st.metric("Overall Accuracy", f"{acc*100:.1f}%"); st.progress(sp(acc))
+        with c2: st.metric("F1 Score (Fake)", f"{f1_fake*100:.1f}%"); st.progress(sp(f1_fake))
+
+    # ── แถว 2: Fake ──
+        section_title("🚨 Fake News Detection")
+        c1, c2 = st.columns(2)
+        with c1: st.metric("Precision (Fake)", f"{prec_fake*100:.1f}%",
+                        help="ที่ทายว่า Fake จริง Fake กี่%"); st.progress(sp(prec_fake))
+        with c2: st.metric("Recall (Fake)", f"{rec_fake*100:.1f}%",
+                        help="Fake จริงๆ จับได้กี่%"); st.progress(sp(rec_fake))
+
+    # ── แถว 3: Real ──
+        section_title("✅ Real News Detection")
+        c1, c2 = st.columns(2)
+        with c1: st.metric("Precision (Real)", f"{prec_real*100:.1f}%",
+                        help="ที่ทายว่า Real จริง Real กี่%"); st.progress(sp(prec_real))
+        with c2: st.metric("Recall (Real)", f"{rec_real*100:.1f}%",
+                        help="Real จริงๆ จับได้กี่%"); st.progress(sp(rec_real))
+
+    # ── Confusion Matrix ──
+        from sklearn.metrics import confusion_matrix
+        cm = confusion_matrix(df_ev['status'], df_ev['prediction'], labels=['Real','Fake'])
+        tn, fp, fn, tp = cm.ravel()
+
+        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px 22px;">
+      <div style="font-weight:700;font-size:0.9rem;color:#1E293B;margin-bottom:14px;">
+        🔢 Confusion Matrix
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:#DCFCE7;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#166534;">{tn}</div>
+          <div style="font-size:0.76rem;color:#166534;font-weight:600;">True Negative<br>Real → Real ✅</div>
+        </div>
+        <div style="background:#FEE2E2;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#991B1B;">{fp}</div>
+          <div style="font-size:0.76rem;color:#991B1B;font-weight:600;">False Positive<br>Real → Fake ❌</div>
+        </div>
+        <div style="background:#FEF3C7;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#92400E;">{fn}</div>
+          <div style="font-size:0.76rem;color:#92400E;font-weight:600;">False Negative<br>Fake → Real ⚠️</div>
+        </div>
+        <div style="background:#DCFCE7;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:800;color:#166534;">{tp}</div>
+          <div style="font-size:0.76rem;color:#166534;font-weight:600;">True Positive<br>Fake → Fake ✅</div>
+        </div>
+      </div>
+    </div>""", unsafe_allow_html=True)
+
         with st.expander("ดูรายการที่ตรวจสอบแล้ว"):
             cols = [c for c in ['prediction','status','confidence'] if c in df_ev.columns]
             st.dataframe(df_ev[cols], width="stretch")
+
     except Exception as e:
         st.error(f"คำนวณไม่ได้: {e}")
-
 
 # ═══════════════════════════════════════════════════════
 #  ADMIN: Review Feedback
@@ -700,73 +750,160 @@ def show_feedback_review():
 
     st.markdown("<hr style='margin:20px 0;'>", unsafe_allow_html=True)
 
-    pending = db.get_pending_feedbacks()
-    if not pending:
-        st.success("🎉 ไม่มีงานค้าง — ตรวจสอบครบหมดแล้ว!")
-        st.balloons(); return
+    all_items = db.get_pending_feedbacks()
+
+    # ✅ filter bar — แสดงเสมอ ไม่ early return
+    col_f, col_s = st.columns([2, 1])
+    with col_f:
+        search_q = st.text_input("🔍 ค้นหา", placeholder="พิมพ์คำค้นหา...", label_visibility="collapsed")
+    with col_s:
+        filter_status = st.selectbox("สถานะ", ["ทั้งหมด", "pending", "Real", "Fake", "Ignored"], label_visibility="collapsed")
+
+    # filter
+    filtered = all_items
+    if filter_status != "ทั้งหมด":
+        filtered = [i for i in filtered if i.get('status') == filter_status]
+    if search_q:
+        filtered = [i for i in filtered if search_q.lower() in str(i.get('title','')).lower()
+                    or search_q.lower() in str(i.get('text','')).lower()]
+
+    # summary cards
+    n_pending  = sum(1 for i in all_items if i.get('status') == 'pending')
+    n_reviewed = sum(1 for i in all_items if i.get('status') != 'pending')
+    n_true     = sum(1 for i in all_items if i.get('status') == 'Real')
+    n_fake     = sum(1 for i in all_items if i.get('status') == 'Fake')
+    n_ignored  = sum(1 for i in all_items if i.get('status') == 'Ignored')
 
     st.markdown(f"""
-    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;
-                padding:13px 17px;margin-bottom:18px;display:flex;align-items:center;gap:10px;">
-      <span style="font-size:1.1rem;">📋</span>
-      <div>
-        <strong style="color:#1148A8;">{len(pending)} รายการรอตรวจสอบ</strong>
-        <div style="font-size:0.81rem;color:#3B82F6;">กรุณาให้เฉลยเพื่อช่วยสอน AI</div>
+    <div style="display:flex;gap:10px;margin-bottom:18px;">
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#ffc000;">{n_pending}</div>
+        <div style="font-size:0.78rem;color:#ffc000;">รอตรวจสอบ</div>
+      </div>
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#1148A8;">{n_reviewed}</div>
+        <div style="font-size:0.78rem;color:#1148A8;">ตรวจสอบแล้ว</div>
+      </div>
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#166534;">{n_true}</div>
+        <div style="font-size:0.78rem;color:#16A34A;">ข่าวจริง</div>
+      </div>
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#991B1B;">{n_fake}</div>
+        <div style="font-size:0.78rem;color:#991B1B;">ข่าวปลอม</div>
+      </div>
+      <div style="background:#F0FDF4;border:1px solid #475569;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#166534;">{n_ignored}</div>
+        <div style="font-size:0.78rem;color:#475569;">ถูกปฏิเสธ</div>
+      </div>
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#1E293B;">{len(all_items)}</div>
+        <div style="font-size:0.78rem;color:#64748B;">ทั้งหมด</div>
       </div>
     </div>""", unsafe_allow_html=True)
+
+    if not filtered:
+        st.info("ไม่พบรายการที่ตรงกับเงื่อนไข")
+        return
+
+    st.caption(f"แสดง {len(filtered)} รายการ")
+
     import html
-    for item in pending:
+    for idx, item in enumerate(filtered):
+        # ✅ badge สี ตาม status
+        status_cfg = {
+            'pending':  ("#000000","#92400E","⏳ รอตรวจสอบ"),
+            'Real':     ("#00FF59","#166534","✅ Real"),
+            'Fake':     ("#FF0000","#991B1B","❌ Fake"),
+            'Ignored':  ("#69B4FF","#475569","🗑️ Ignored"),
+        }.get(item.get('status','pending'), ("#F1F5F9","#475569","—"))
+
         ttl = (item['title'][:55]+"…") if item['title'] and len(item['title'])>55 else (item['title'] or "No Title")
-        with st.expander(f"📰 {ttl}", expanded=True):
-            c1,c2 = st.columns([3,2])
+
+        with st.expander(f"📰 {ttl}", expanded=(item.get('status')=='pending')):
+            st.markdown(f"""
+    <span style="background:{status_cfg[0]};color:{status_cfg[1]};
+                 font-size:0.75rem;font-weight:700;padding:3px 10px;
+                 border-radius:99px;">{status_cfg[2]}</span>
+    """, unsafe_allow_html=True)
+
+            c1, c2 = st.columns([3,2])
             with c1:
                 st.markdown("**เนื้อหาข่าว**")
-                st.markdown(f"""<div style="background:#F8FAFC;border:1px solid #E2E8F0;
-                    border-radius:8px;padding:13px 15px;font-size:0.9rem;
-                    line-height:1.6;color:#334155;max-height:300px;
-                    overflow-y:auto;-webkit-text-fill-color:#334155;">{html.escape(str(item['text']))}</div>""", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div style="background:#1E293B;border:1px solid #334155;border-radius:8px;
+                padding:13px 15px;font-size:0.9rem;line-height:1.6;
+                color:#E2E8F0;max-height:300px;overflow-y:auto;">
+                {html.escape(str(item['text']))}
+                </div>""", unsafe_allow_html=True)
                 st.caption(f"📅 {item['timestamp']}")
+
             with c2:
-                ai_b = status_badge(item['ai_result']) if item['ai_result'] in ('Real','Fake','Unverified') else f"<span style='font-size:0.82rem;font-weight:600;'>{item['ai_result']}</span>"
+                ai_b = status_badge(item['ai_result']) if item['ai_result'] in ('Real','Fake','Unverified') else item['ai_result']
+                fb = item.get('user_report') or ''
+                fb_html = {
+                    "Correct": "<span style='background:#DCFCE7;color:#166534;-webkit-text-fill-color:#166534;padding:3px 10px;border-radius:99px;font-weight:700;font-size:0.82rem;'>👍 AI ทายถูก</span>",
+                    "Incorrect": "<span style='background:#FEE2E2;color:#991B1B;-webkit-text-fill-color:#991B1B;padding:3px 10px;border-radius:99px;font-weight:700;font-size:0.82rem;'>👎 AI ทายผิด</span>"
+                }.get(fb, "<span style='color:#94A3B8;-webkit-text-fill-color:#94A3B8;font-size:0.88rem;'>— ยังไม่มี Feedback</span>")
 
-            # ✅ สร้าง badge แสดง feedback จาก user
-            fb = item.get('user_report') or item.get('comment') or ''
-            if fb == 'Correct':
-                fb_html = "<span style='background:#DCFCE7;color:#166534;padding:3px 10px;border-radius:99px;font-weight:700;font-size:0.82rem;'>👍 AI ทายถูก</span>"
-            elif fb == 'Incorrect':
-                fb_html = "<span style='background:#FEE2E2;color:#991B1B;padding:3px 10px;border-radius:99px;font-weight:700;font-size:0.82rem;'>👎 AI ทายผิด</span>"
-            else:
-                fb_html = "<span style='color:#94A3B8;font-size:0.88rem;'>— ยังไม่มี Feedback</span>"
+    # ✅ แปลง confidence เป็น float และปัดทศนิยม 2 ตำแหน่ง
+                try:
+                    conf_display = f"{float(item['ai_confidence']):.2f}%"
+                except:
+                    conf_display = f"{item['ai_confidence']}%"
 
-            st.markdown(f"""
+                st.markdown(f"""
             <div style="display:flex;flex-direction:column;gap:9px;margin-top:2px;">
-      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:11px 13px;
-                  -webkit-text-fill-color:#1E293B;">
-        <div style="font-size:0.72rem;color:#64748B !important;font-weight:700;
-                    -webkit-text-fill-color:#64748B;
-                    text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">AI PREDICTION</div>
-        {ai_b} &nbsp;<span style="font-size:0.83rem;color:#64748B;-webkit-text-fill-color:#64748B;">{item['ai_confidence']}%</span>
-      </div>
-      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:11px 13px;
-                  -webkit-text-fill-color:#78350F;">
-        <div style="font-size:0.72rem;color:#92400E !important;font-weight:700;
-                    -webkit-text-fill-color:#92400E;
-                    text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">💬 USER SAYS</div>
-        {fb_html}
-      </div>
-    </div>""", unsafe_allow_html=True)
+            <div style="background:#2D3F55;border:1px solid #3D5068;
+                  border-radius:8px;padding:11px 13px;">
+                <div style="font-size:0.72rem;color:#93C5FD;font-weight:700;
+                    text-transform:uppercase;margin-bottom:5px;">AI PREDICTION</div>
+                {ai_b}&nbsp;
+                <span style="font-size:0.83rem;color:#E2E8F0;font-weight:600;">
+                {conf_display}
+                </span>
+            </div>
+            <div style="background:#2D3320;border:1px solid #4A3B10;
+                  border-radius:8px;padding:11px 13px;">
+                <div style="font-size:0.72rem;color:#FCD34D;font-weight:700;
+                    text-transform:uppercase;margin-bottom:4px;">💬 USER SAYS</div>
+                {fb_html}
+            </div>
+            </div>""", unsafe_allow_html=True)
 
-            st.markdown("<div style='margin:14px 0 8px;font-weight:700;font-size:0.88rem;color:#1E293B;'>👨‍⚖️ Admin Decision</div>", unsafe_allow_html=True)
-            b1,b2,b3 = st.columns(3)
-            with b1:
-                if st.button("✅ Real", key=f"real_{item['feedback_id']}", type="primary", width="stretch"):
-                    db.update_feedback_status(item['feedback_id'],'Real'); st.rerun()
-            with b2:
-                if st.button("❌ Fake", key=f"fake_{item['feedback_id']}", type="primary", width="stretch"):
-                    db.update_feedback_status(item['feedback_id'],'Fake'); st.rerun()
-            with b3:
-                if st.button("🗑️ Ignore", key=f"del_{item['feedback_id']}", width="stretch"):
-                    db.update_feedback_status(item['feedback_id'],'Ignored'); st.rerun()
+                st.markdown("<div style='margin:14px 0 8px;font-weight:700;font-size:0.88rem;color:#1E293B;'>👨‍⚖️ Admin Decision</div>", unsafe_allow_html=True)
+                fid = item['feedback_id'] if item['feedback_id'] is not None else idx
+                b1, b2, b3 = st.columns(3)
+                with b1:
+                        if st.button("✅ Real", key=f"real_{fid}_{idx}", type="primary", width="stretch"):
+                            if item['feedback_id'] is not None:
+                                db.update_feedback_status(item['feedback_id'], 'Real')
+                                db.log_system_event(user_id=st.session_state.get('user_id'),
+                                            action="REVIEW_FEEDBACK",
+                                            details=f"feedback_id={fid} → Real", level="WARNING")
+                                st.rerun()
+                with b2:
+                        if st.button("❌ Fake", key=f"fake_{fid}_{idx}", type="primary", width="stretch"):
+                            if item['feedback_id'] is not None:
+                                db.update_feedback_status(item['feedback_id'], 'Fake')
+                                db.log_system_event(user_id=st.session_state.get('user_id'),
+                                            action="REVIEW_FEEDBACK",
+                                            details=f"feedback_id={fid} → Fake", level="WARNING")
+                                st.rerun()
+                with b3:
+                        if st.button("🗑️ Ignore", key=f"del_{fid}_{idx}", width="stretch"):
+                            if item['feedback_id'] is not None:
+                                db.update_feedback_status(item['feedback_id'], 'Ignored')
+                                db.log_system_event(user_id=st.session_state.get('user_id'),
+                                            action="REVIEW_FEEDBACK",
+                                            details=f"feedback_id={fid} → Ignored", level="WARNING")
+                                st.rerun()
 
 
 # ═══════════════════════════════════════════════════════
@@ -831,7 +968,7 @@ def manage_trending_news():
                         "Fake":       ("#FEE2E2", "#991B1B", "#EF4444"),
                         "Real":       ("#DCFCE7", "#166534", "#22C55E"),
                         "Unverified": ("#FEF3C7", "#92400E", "#F59E0B"),
-                    }.get(row['label'], ("#F1F5F9", "#475569", "#CBD5E1"))
+                    }.get(row['label'], ("#F1F5F9", "#000000", "#000000"))
 
                     st.markdown(f"""
         <div style="background:var(--surface,#fff);border:1px solid #E2E8F0;
@@ -1103,10 +1240,15 @@ def manage_users_page():
     with fc: rf=st.selectbox("Role",["All","user","admin"])
 
     dfd=df.copy()
-    if sq: dfd=dfd[dfd['email'].str.contains(sq,case=False,na=False)|dfd['username'].str.contains(sq,case=False,na=False)]
+    if sq:
+        mask = pd.Series([False] * len(dfd), index=dfd.index)
+        if 'email'    in dfd.columns: mask |= dfd['email'].astype(str).str.contains(sq, case=False, na=False)
+        if 'username' in dfd.columns: mask |= dfd['username'].astype(str).str.contains(sq, case=False, na=False)
+        dfd = dfd[mask]
+
     if rf!="All": dfd=dfd[dfd['role']==rf]
 
-    dcols={k:v for k,v in {'id':'ID','email':'Email','role':'Role','status':'Status','checks':'Checks','created_at':'Joined','last_active':'Last Active'}.items() if k in dfd.columns}
+    dcols={k:v for k,v in {'id':'ID','username':'Username','email':'Email','role':'Role','status':'Status','checks':'Checks','created_at':'Joined','last_active':'Last Active'}.items() if k in dfd.columns}
     st.dataframe(dfd[list(dcols)].rename(columns=dcols),width="stretch",hide_index=True,
                  column_config={"ID":st.column_config.TextColumn("ID",width="small"),
                                 "Checks":st.column_config.NumberColumn("Checks",format="%d"),
@@ -1123,7 +1265,7 @@ def manage_users_page():
             elif len(tu)>1: st.info("พบหลายคน — กรุณาระบุให้แม่นยำขึ้น"); st.dataframe(tu[['id','email','role']],hide_index=True)
             else:
                 ud=tu.iloc[0]; sid=ud['id']
-                st.success(f"พบ: **{ud['email']}** (ID: {sid})")
+                st.success(f"พบ: **{ud.get('username','—')}** | {ud['email']} (ID: {sid})")
                 if sid==st.session_state.get('user_id'):
                     st.info("ไม่สามารถแก้ไขบัญชีตัวเองได้")
                 else:
@@ -1310,11 +1452,16 @@ elif not st.session_state['logged_in']:
                     'role': udata[2],
                     'need_to_save_cookie': True
                 })
+                db.log_system_event(user_id=udata[0], action="USER_LOGIN",
+                details=f"{udata[1]} เข้าสู่ระบบสำเร็จ (role: {udata[2]})", level="INFO")
                 st.rerun()
             else:
                 try:
                     db.get_supabase()
                     st.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+                    # ✅ log login fail
+                    db.log_system_event(user_id=None, action="LOGIN_FAILED",
+                    details=f"Login failed for username: '{u_in}'", level="WARNING")
                 except Exception:
                     st.error("⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูลได้ — กรุณาตรวจสอบอินเทอร์เน็ต")
 
@@ -1409,7 +1556,7 @@ else:
         st.markdown("<hr style='margin:14px 0;'>",unsafe_allow_html=True)
         if st.button("  🚪  ออกจากระบบ",key="logout_btn",width="stretch"):
             db.log_system_event(user_id=st.session_state.get('user_id'),action="USER_LOGOUT",
-                                details=f"{uname} logged out",level="INFO")
+                details=f"{uname} logged out",level="INFO")
             st.session_state['do_logout']=True; st.rerun()
 
     menu=st.session_state.active_menu
@@ -1483,6 +1630,8 @@ else:
             if check_mode=="🔗  URL ลิงก์ข่าว":
                 if not input_url: st.warning("กรุณาวาง URL ก่อนกด"); st.stop()
                 with st.spinner("กำลังดึงข้อมูลจากลิงก์..."):
+                    db.log_system_event(user_id=st.session_state.get('user_id'), action="URL_FETCH",
+                    details=f"Fetched: {input_url}", level="INFO")
                     title,content=get_content_from_url(input_url)
                 if title and not str(content).startswith("Error"):
                     clean=f"{title}\n\n{content}"
@@ -1505,7 +1654,7 @@ else:
                         rl, rc = result.get('result'), result.get('confidence')
                         uname = st.session_state.get('username', 'Unknown')
                         db.log_system_event(user_id=st.session_state.get('user_id'), action="PREDICT",
-                    details=f"[{uname}] ทำนาย: '{clean[:50]}' → {rl} ({rc}%)", level="INFO")
+                        details=f"[{uname}] ทำนาย: '{clean[:50]}' → {rl} ({rc}%)", level="INFO")
                         pid = db.create_prediction(st.session_state.get('user_id'), clean[:50]+"…",
                                                 clean, input_url or None, rl, rc)
                         st.session_state.update({'current_result': result, 'current_pred_id': pid, 'feedback_given': False})
@@ -1591,11 +1740,16 @@ else:
                 fc1,fc2=st.columns(2)
                 with fc1:
                     if st.button("👍  ถูกต้อง — AI ทายถูก",type="primary",width="stretch"):
-                        db.save_feedback(st.session_state['current_pred_id'],"Correct")
+                        db.save_feedback(st.session_state['current_pred_id'], "Correct")
+                        db.log_system_event(user_id=st.session_state.get('user_id'), action="FEEDBACK",
+                        details=f"[{st.session_state.get('username')}] Feedback: Correct (pred_id: {st.session_state['current_pred_id']})", level="INFO")
+
                         st.session_state['feedback_given']=True; st.toast("ขอบคุณ!"); time.sleep(0.7); st.rerun()
                 with fc2:
                     if st.button("👎  ไม่ถูกต้อง — AI ทายผิด",width="stretch"):
                         db.save_feedback(st.session_state['current_pred_id'],"Incorrect")
+                        db.log_system_event(user_id=st.session_state.get('user_id'), action="FEEDBACK",
+                        details=f"[{st.session_state.get('username')}] Feedback: Incorrect (pred_id: {st.session_state['current_pred_id']})", level="INFO")
                         st.session_state['feedback_given']=True; st.toast("ขอบคุณ! เราจะนำไปปรับปรุง"); time.sleep(0.7); st.rerun()
             else:
                 st.success("✅ ส่ง Feedback แล้ว — ขอบคุณที่ช่วยพัฒนา AI!")
