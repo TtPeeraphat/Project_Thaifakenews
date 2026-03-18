@@ -1902,7 +1902,7 @@ else:
                 with col_s:
                     filter_label = st.selectbox(
                         "กรองตามประเภท",
-                        ["ทั้งหมด", "Real", "Fake", "Unverified"],
+                        ["ทั้งหมด", "Real", "Fake"],
                         label_visibility="collapsed"
                     )
                 with col_f:
