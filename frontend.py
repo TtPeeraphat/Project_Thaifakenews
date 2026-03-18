@@ -1383,16 +1383,49 @@ if st.session_state['reset_mode']:
             oi=st.text_input("รหัส OTP 6 หลัก",max_chars=6)
             np=st.text_input("รหัสผ่านใหม่",type="password")
             cp=st.text_input("ยืนยันรหัสผ่านใหม่",type="password")
-            c1,c2=st.columns(2)
+            # ✅ เพิ่มตรงนี้ — เหมือน Register เลย
+            if np:
+                checks = {
+                    "อย่างน้อย 8 ตัวอักษร":   len(np) >= 8,
+                    "มีตัวพิมพ์เล็ก (a-z)":    any(c.islower() for c in np),
+                    "มีตัวพิมพ์ใหญ่ (A-Z)":    any(c.isupper() for c in np),
+                    "มีตัวเลข (0-9)":           any(c.isdigit() for c in np),
+                }
+                for label, passed in checks.items():
+                    icon  = "✅" if passed else "❌"
+                    color = "#166534" if passed else "#991B1B"
+                    bg    = "#DCFCE7" if passed else "#FEE2E2"
+                    st.markdown(f"""
+                    <div style="background:{bg};color:{color};font-size:0.78rem;font-weight:600;
+                                padding:4px 10px;border-radius:6px;margin-bottom:3px;">
+                    {icon} {label}
+                    </div>""", unsafe_allow_html=True)
+
+            c1, c2 = st.columns(2)
+            
             with c1:
-                if st.button("ยืนยัน",type="primary",width="stretch"):
-                    if np!=cp: st.error("รหัสผ่านไม่ตรงกัน")
+                if st.button("ยืนยัน", type="primary", width="stretch"):
+                    if not np or not cp:
+                        st.error("กรุณากรอกรหัสผ่านให้ครบ")
+                    elif np != cp:
+                        st.error("❌ รหัสผ่านไม่ตรงกัน")
+                    elif len(np) < 8:
+                        st.error("❌ รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร")
+                    elif not any(c.islower() for c in np):
+                        st.error("❌ รหัสผ่านต้องมีตัวพิมพ์เล็กอย่างน้อย 1 ตัว")
+                    elif not any(c.isupper() for c in np):
+                        st.error("❌ รหัสผ่านต้องมีตัวพิมพ์ใหญ่อย่างน้อย 1 ตัว")
+                    elif not any(c.isdigit() for c in np):
+                        st.error("❌ รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว")
                     else:
-                        ok,msg=db.verify_otp_and_reset(st.session_state['reset_email_temp'],oi,np)
+                        ok, msg = db.verify_otp_and_reset(
+                            st.session_state['reset_email_temp'], oi, np)
                         if ok:
                             st.balloons(); st.success(msg); time.sleep(2)
-                            st.session_state.update({'reset_mode':False,'otp_sent':False}); st.rerun()
-                        else: st.error(msg)
+                            st.session_state.update({'reset_mode': False, 'otp_sent': False})
+                            st.rerun()
+                        else:
+                            st.error(msg)
             with c2:
                 if st.button("← ย้อนกลับ",width="stretch"):
                     st.session_state['otp_sent']=False; st.rerun()
