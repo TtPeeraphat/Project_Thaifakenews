@@ -1215,16 +1215,48 @@ elif st.session_state['register_mode']:
         ne=st.text_input("📧 Email")
         np=st.text_input("🔒 Password",type="password")
         cp=st.text_input("🔒 ยืนยัน Password",type="password")
+        # ✅ แสดง password strength แบบ real-time
+        if np:
+            checks = {
+                "อย่างน้อย 8 ตัวอักษร":     len(np) >= 8,
+                "มีตัวพิมพ์เล็ก (a-z)":      any(c.islower() for c in np),
+                "มีตัวพิมพ์ใหญ่ (A-Z)":      any(c.isupper() for c in np),
+                "มีตัวเลข (0-9)":             any(c.isdigit() for c in np),
+            }
+            for label, passed in checks.items():
+                icon  = "✅" if passed else "❌"
+                color = "#166534" if passed else "#991B1B"
+                bg    = "#DCFCE7" if passed else "#FEE2E2"
+                st.markdown(f"""
+                <div style="background:{bg};color:{color};font-size:0.78rem;font-weight:600;
+                            padding:4px 10px;border-radius:6px;margin-bottom:3px;">
+                  {icon} {label}
+                </div>""", unsafe_allow_html=True)
+
         st.write("")
         b1,b2=st.columns(2)
         with b1:
             if st.button("✅ สมัครสมาชิก",type="primary",width="stretch"):
-                if not all([nu,np,ne]): st.warning("กรุณากรอกข้อมูลให้ครบ")
-                elif np!=cp: st.error("รหัสผ่านไม่ตรงกัน")
+                # ✅ validate ก่อน
+                if not all([nu,np,ne]):
+                    st.warning("กรุณากรอกข้อมูลให้ครบ")
+                elif np != cp:
+                    st.error("รหัสผ่านไม่ตรงกัน")
+                elif len(np) < 8:
+                    st.error("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร")
+                elif not any(c.islower() for c in np):
+                    st.error("รหัสผ่านต้องมีตัวพิมพ์เล็กอย่างน้อย 1 ตัว")
+                elif not any(c.isupper() for c in np):
+                    st.error("รหัสผ่านต้องมีตัวพิมพ์ใหญ่อย่างน้อย 1 ตัว")
+                elif not any(c.isdigit() for c in np):
+                    st.error("รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว")
                 elif db.create_user(nu,np,ne):
+                    db.log_system_event(user_id=None, action="USER_REGISTER",
+                        details=f"New user registered: {nu} ({ne})", level="INFO")
                     st.success("สมัครสำเร็จ!"); time.sleep(1.2)
                     st.session_state['register_mode']=False; st.rerun()
-                else: st.error("Username หรือ Email นี้มีผู้ใช้งานแล้ว")
+                else:
+                    st.error("Username หรือ Email นี้มีผู้ใช้งานแล้ว")
         with b2:
             if st.button("← กลับ Login",width="stretch"):
                 st.session_state['register_mode']=False; st.rerun()
