@@ -99,7 +99,7 @@ st.set_page_config(
 # ═══════════════════════════════════════════════════════
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
 /* ══════════════════════════════
    FORCE LIGHT MODE
 ══════════════════════════════ */
@@ -178,14 +178,14 @@ section.main,
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body, [class*="css"] {
-  font-family: 'Inter', sans-serif !important;
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;  /* เปลี่ยนจาก Inter */
   color: var(--grey-800) !important;
   background: var(--bg) !important;
   -webkit-font-smoothing: antialiased !important;
 }
 
 h1,h2,h3,h4,h5,h6 {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;
   color: var(--grey-900) !important;
   letter-spacing: -0.25px !important;
 }
@@ -242,7 +242,7 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   border: none !important;
   box-shadow: none !important;
   color: rgba(255,255,255,0.62) !important;
-  font-family: 'Inter', sans-serif !important;
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-size: 0.875rem !important;
   font-weight: 500 !important;
   text-align: left !important;
@@ -303,7 +303,7 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   letter-spacing: 0.7px !important;
 }
 [data-testid="stMetricValue"] {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-weight: 800 !important;
   font-size: 1.9rem !important;
   color: var(--grey-900) !important;
@@ -318,7 +318,7 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   color: #fff !important;
   border: none !important;
   border-radius: var(--r-sm) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-weight: 700 !important;
   font-size: 0.9rem !important;
   padding: 11px 24px !important;
@@ -357,7 +357,7 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   border: 1.5px solid var(--grey-200) !important;
   border-radius: var(--r-sm) !important;
   color: var(--grey-900) !important;
-  font-family: 'Inter', sans-serif !important;
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-size: 0.92rem !important;
   padding: 10px 14px !important;
   transition: border 0.15s, box-shadow 0.15s !important;
@@ -393,7 +393,7 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
 .stTabs [data-baseweb="tab"] {
   background: transparent !important;
   color: var(--grey-500) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-weight: 600 !important; font-size: 0.9rem !important;
   padding: 12px 20px !important; border-radius: 0 !important;
   border-bottom: 2px solid transparent !important;
@@ -407,6 +407,22 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
 .stTabs [data-baseweb="tab-panel"] { padding-top: 20px !important; }
 
 /* Expander */
+            [data-testid="stExpander"] .stButton > button {
+  background: #FFFFFF !important;
+  color: #1E293B !important;
+  border: 1.5px solid #CBD5E1 !important;
+  -webkit-text-fill-color: #1E293B !important;
+}
+[data-testid="stExpander"] .stButton > button:hover {
+  background: #F1F5F9 !important;
+  border-color: #1565C0 !important;
+}
+[data-testid="stExpander"] .stButton > button[kind="primary"] {
+  background: linear-gradient(135deg,#EF4444,#991B1B) !important;
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+  border: none !important;
+}
 .streamlit-expanderHeader,
 [data-testid="stExpander"] summary,
 [data-testid="stExpander"] > details > summary {
@@ -482,7 +498,7 @@ hr { border-color: var(--border) !important; margin: 1.25rem 0 !important; }
   background: linear-gradient(135deg,var(--blue-500) 0%,var(--blue-800) 100%) !important;
   color: #fff !important; border: none !important;
   border-radius: var(--r-sm) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-weight: 700 !important;
   box-shadow: 0 2px 8px rgba(13,71,161,0.28) !important;
 }
@@ -514,7 +530,7 @@ def section_title(text: str, caption: str = ""):
     cap = f"<div style='font-size:0.8rem;color:#94A3B8;margin-top:2px;'>{caption}</div>" if caption else ""
     st.markdown(f"""
     <div style="margin:22px 0 12px;">
-      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1rem;
+      <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1rem;
                   font-weight:700;color:#1E293B;">{text}</div>
       {cap}
     </div>""", unsafe_allow_html=True)
@@ -531,7 +547,7 @@ def kpi_card(icon: str, label: str, value, delta: str = "", delta_ok: bool = Tru
         <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
                      letter-spacing:0.7px;color:#64748B;">{label}</span>
       </div>
-      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.85rem;
+      <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1.85rem;
                   font-weight:800;color:#0F172A;line-height:1.1;">{value}</div>
       {d_html}
     </div>""", unsafe_allow_html=True)
@@ -600,10 +616,19 @@ def show_admin_dashboard_enhanced():
         df_perf['cumulative_accuracy'] = df_perf['is_correct'].expanding().mean()*100
         fig = px.line(df_perf, x='timestamp', y='cumulative_accuracy',
                     line_shape='spline', color_discrete_sequence=['#1565C0'])
-        fig.update_layout(yaxis_range=[0,100], plot_bgcolor='white', paper_bgcolor='white',
-                      font_color='#334155', margin=dict(l=0,r=0,t=10,b=0),
-                      xaxis_title="", yaxis_title="Accuracy (%)")
-        fig.update_traces(line=dict(width=2.5))
+        fig.update_layout(
+            yaxis_range=[0,100],
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            font_color='#1E293B',        # ✅ เข้มขึ้น
+            font=dict(size=12),
+            margin=dict(l=0,r=0,t=10,b=0),
+            xaxis_title="",
+            yaxis_title="Accuracy (%)",
+            xaxis=dict(tickfont=dict(color='#1E293B', size=11)),
+            yaxis=dict(tickfont=dict(color='#1E293B', size=11),
+                    title_font=dict(color='#1E293B')),
+        )
         st.plotly_chart(fig, width="stretch")
     else:
         st.info("ยังไม่มีข้อมูลที่ผ่านการตรวจสอบ")
@@ -725,7 +750,7 @@ def show_feedback_review():
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1148A8,#0097A7);border-radius:14px;
                 padding:22px 26px;margin-bottom:24px;">
-      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1rem;font-weight:700;
+      <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1rem;font-weight:700;
                   color:#fff;margin-bottom:4px;">🧠 Export Training Dataset</div>
       <div style="font-size:0.83rem;color:rgba(255,255,255,0.75);">
         รวมข้อมูลที่ตรวจสอบแล้วพร้อม Trending News เพื่อนำไป Retrain โมเดล
@@ -976,7 +1001,7 @@ def manage_trending_news():
 
           <div style="display:flex;align-items:center;
                       justify-content:space-between;gap:12px;margin-bottom:10px;">
-            <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:0.95rem;
+            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:0.95rem;
                         font-weight:700;color:#1E293B;flex:1;line-height:1.4;">
               {row['headline'][:80]}
             </div>
@@ -1075,21 +1100,30 @@ def manage_trending_news():
 # ═══════════════════════════════════════════════════════
 def show_system_analytics():
     with st.spinner("กำลังโหลดข้อมูล..."):
-        data=db.get_system_analytics_data()
-    total_users=data["total_users"]; df_preds=data["df_preds"]; df_logs=data["df_logs"]
+        data = db.get_system_analytics_data()
+    total_users = data["total_users"]
+    df_preds    = data["df_preds"]
+    df_logs     = data["df_logs"]
 
-    total_checks=0; avg_daily=0; peak_hour="—"
+    total_checks = 0; avg_daily = 0; peak_hour = "—"
+
     if not df_preds.empty:
-        total_checks=len(df_preds)
-        df_preds['timestamp']=pd.to_datetime(df_preds['timestamp'])
-        df_preds['date']=df_preds['timestamp'].dt.date
-        df_preds['hour']=df_preds['timestamp'].dt.hour
-        mh=df_preds['hour'].mode()
-        if not mh.empty: peak_hour=f"{int(mh[0]):02d}:00"
+        total_checks = len(df_preds)
+        # ✅ แปลง UTC → GMT+7
+        df_preds['timestamp'] = pd.to_datetime(df_preds['timestamp'], utc=True) \
+                                   .dt.tz_convert("Asia/Bangkok")
+        df_preds['date'] = df_preds['timestamp'].dt.date
+        df_preds['hour'] = df_preds['timestamp'].dt.hour
+        mh = df_preds['hour'].mode()
+        if not mh.empty: peak_hour = f"{int(mh[0]):02d}:00"
+
     if not df_logs.empty:
-        df_logs['timestamp']=pd.to_datetime(df_logs['timestamp'])
-        df_logs['date']=df_logs['timestamp'].dt.date
-        avg_daily=int(df_logs.groupby('date')['user_id'].nunique().mean() or 0)
+        # ✅ แปลง UTC → GMT+7
+        df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'], utc=True) \
+                                  .dt.tz_convert("Asia/Bangkok")
+        df_logs['date'] = df_logs['timestamp'].dt.date
+        avg_daily = int(df_logs.groupby('date')['user_id'].nunique().mean() or 0)
+
 
     c1,c2,c3,c4=st.columns(4)
     with c1: kpi_card("👥","Total Users",      f"{total_users:,}")
@@ -1104,28 +1138,38 @@ def show_system_analytics():
     with row1a:
         st.markdown("""<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
         padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:0.95rem;
+        <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:0.95rem;
         color:#1E293B;">Daily Usage — Last 7 Days</div>
         <div style="font-size:0.79rem;color:#94A3B8;margin-bottom:12px;">Checks & active users per day</div>""",
         unsafe_allow_html=True)
         last7 = [(now_bkk() - timedelta(days=i)).date() for i in range(6, -1, -1)]
-        dft=pd.DataFrame({'Date':last7})
-        cpd=df_preds.groupby('date').size() if not df_preds.empty else pd.Series()
-        upd=df_logs.groupby('date')['user_id'].nunique() if not df_logs.empty else pd.Series()
-        dft['News Checks']=dft['Date'].map(cpd).fillna(0).astype(int)
-        dft['Users']=dft['Date'].map(upd).fillna(0).astype(int)
-        dft['Date']=pd.to_datetime(dft['Date']).dt.strftime('%b %d')
+        dft   = pd.DataFrame({'Date': last7})
+        cpd = df_preds.groupby('date').size() if not df_preds.empty else pd.Series()
+        upd = df_logs.groupby('date')['user_id'].nunique() if not df_logs.empty else pd.Series()
+        dft['News Checks'] = dft['Date'].map(cpd).fillna(0).astype(int)
+        dft['Users']       = dft['Date'].map(upd).fillna(0).astype(int)
+        dft['Date']        = pd.to_datetime(dft['Date']).dt.strftime('%b %d')
         fig1=px.area(dft,x='Date',y=['News Checks','Users'],color_discrete_sequence=COLORS[:2])
-        fig1.update_layout(margin=dict(l=0,r=0,t=0,b=0),plot_bgcolor='white',paper_bgcolor='white',
-                           font_color='#334155',legend=dict(orientation="h",y=-0.25,x=0.5,xanchor="center"),
-                           legend_title_text='')
-        st.plotly_chart(fig1,width="stretch",key="trend_chart")
+        # ✅ Daily Usage chart
+        fig1.update_layout(
+            margin=dict(l=0,r=0,t=0,b=0),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            font_color='#1E293B',        # ✅ เปลี่ยนจาก #334155 เป็นเข้มขึ้น
+            font=dict(size=12),          # ✅ เพิ่ม size
+            legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center",
+                        font=dict(color='#1E293B', size=12)),  # ✅ legend สีเข้ม
+            legend_title_text='',
+            xaxis=dict(tickfont=dict(color='#1E293B', size=11)),  # ✅ แกน X
+            yaxis=dict(tickfont=dict(color='#1E293B', size=11)),  # ✅ แกน Y
+        )
+        st.plotly_chart(fig1, width="stretch", key="trend_chart")
         st.markdown("</div>",unsafe_allow_html=True)
 
     with row1b:
         st.markdown("""<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
         padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:0.95rem;
+        <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:0.95rem;
         color:#1E293B;">Classification Results</div>
         <div style="font-size:0.79rem;color:#94A3B8;margin-bottom:12px;">Real vs Fake distribution</div>""",
         unsafe_allow_html=True)
@@ -1136,8 +1180,13 @@ def show_system_analytics():
             fig2=px.pie(dfc,values='Count',names='Result',hole=0.45,color='Result',
                         color_discrete_map={'Real News':'#16A34A','Fake News':'#DC2626','Error':'#94A3B8'})
             fig2.update_traces(textposition='outside',textinfo='percent+label',textfont_size=10)
-            fig2.update_layout(margin=dict(l=10,r=10,t=10,b=10),showlegend=False,
-                               paper_bgcolor='white',font_color='#334155')
+            fig2.update_layout(
+                margin=dict(l=10,r=10,t=10,b=10),
+                showlegend=False,
+                paper_bgcolor='white',
+                font_color='#1E293B',        # ✅ เข้มขึ้น
+                font=dict(size=12),
+            )
             st.plotly_chart(fig2,width="stretch",key="pie_chart")
         else: st.info("ยังไม่มีข้อมูลเพียงพอ")
         st.markdown("</div>",unsafe_allow_html=True)
@@ -1145,7 +1194,7 @@ def show_system_analytics():
     st.markdown("<div style='height:14px;'></div>",unsafe_allow_html=True)
     st.markdown("""<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
     padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:0.95rem;
+    <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:0.95rem;
     color:#1E293B;">Activity by Hour of Day</div>
     <div style="font-size:0.79rem;color:#94A3B8;margin-bottom:12px;">จำนวนการตรวจข่าวรายชั่วโมง</div>""",
     unsafe_allow_html=True)
@@ -1153,8 +1202,16 @@ def show_system_analytics():
     dft2['Checks']=(df_preds.groupby('hour').size() if not df_preds.empty else pd.Series()).reindex(range(24),fill_value=0)
     dft2['Time']=dft2['Hour'].apply(lambda x:f"{x:02d}:00")
     fig3=px.bar(dft2,x='Time',y='Checks',color_discrete_sequence=[COLORS[0]])
-    fig3.update_layout(margin=dict(l=0,r=0,t=0,b=0),xaxis_title="",yaxis_title="",
-                       plot_bgcolor='white',paper_bgcolor='white',font_color='#334155',bargap=0.35)
+    fig3.update_layout(margin=dict(l=0,r=0,t=0,b=0),
+            xaxis_title="", yaxis_title="",
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            font_color='#1E293B',        # ✅ เข้มขึ้น
+            font=dict(size=11),
+            bargap=0.35,
+            xaxis=dict(tickfont=dict(color='#1E293B', size=10)),
+            yaxis=dict(tickfont=dict(color='#1E293B', size=11)),
+        )
     fig3.update_traces(marker_line_width=0)
     st.plotly_chart(fig3,width="stretch",key="hour_chart")
     st.markdown("</div>",unsafe_allow_html=True)
@@ -1163,7 +1220,7 @@ def show_system_analytics():
     st.markdown("<div style='height:14px;'></div>",unsafe_allow_html=True)
     st.markdown("""<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
     padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:0.95rem;
+    <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:0.95rem;
     color:#1E293B;margin-bottom:14px;">Recent System Logs</div>""",unsafe_allow_html=True)
     logs_cont=st.container(height=300)
     with logs_cont:
@@ -1171,7 +1228,9 @@ def show_system_analytics():
         if recent:
             for row in recent:
                 ts, user, action, details, level = row
-                try: ft = pd.to_datetime(ts).strftime("%m/%d %H:%M")
+                try: ft = ft = pd.to_datetime(ts, utc=True) \
+                       .tz_convert("Asia/Bangkok") \
+                       .strftime("%m/%d %H:%M")
                 except: ft = str(ts)
                 bc = {"ERROR":"#DC2626","WARNING":"#D97706"}.get(level,"#1565C0")
                 bg = {"ERROR":"#FFF5F5","WARNING":"#FFFBEB"}.get(level,"#F0F6FF")
@@ -1419,7 +1478,7 @@ elif not st.session_state['logged_in']:
                   border-radius:50%;background:rgba(255,255,255,0.03);pointer-events:none;"></div>
       <div style="position:relative;z-index:1;text-align:center;">
         <div style="font-size:54px;margin-bottom:14px;">🛡️</div>
-        <h1 style="color:#FFFFFF !important;font-family:'Plus Jakarta Sans',sans-serif !important;
+        <h1 style="color:#FFFFFF !important;font-family:'IBM Plex Sans Thai',sans-serif !important;
                    font-size:2.25rem !important;font-weight:800 !important;
                    letter-spacing:-0.5px !important;margin:0 0 10px;">TrueCheck AI</h1>
         <p style="color:rgba(255,255,255,0.80);font-size:1rem;margin:0 0 32px;line-height:1.5;">
@@ -1434,7 +1493,7 @@ elif not st.session_state['logged_in']:
         <div style="background:#fff;border:1px solid #E2E8F0;border-radius:20px;
                     padding:36px 32px;box-shadow:0 4px 20px rgba(17,72,168,0.08);">
           <h3 style="margin:0 0 22px;text-align:center;color:#0F172A !important;
-                     font-family:'Plus Jakarta Sans',sans-serif !important;font-weight:700 !important;">
+                     font-family:'IBM Plex Sans Thai',sans-serif !important;font-weight:700 !important;">
             เข้าสู่ระบบ</h3>
         </div>""", unsafe_allow_html=True)
 
@@ -1500,7 +1559,7 @@ else:
                     margin-bottom:8px;display:flex;align-items:center;gap:10px;">
           <span style="font-size:26px;">🛡️</span>
           <div>
-            <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;
+            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
                         font-size:0.97rem;color:#fff;line-height:1.2;">TrueCheck AI</div>
             <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);
                         text-transform:uppercase;letter-spacing:1.2px;">Fake News Detector</div>
@@ -1601,11 +1660,11 @@ else:
             with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
                 m1, m2 = st.columns(2)
 
-                if m1.button("👽 Fake Example — Aliens", use_container_width=True):
-                    st.session_state['input_text'] = "ข่าวล่าสุด: มนุษย์ต่างดาวลงจอดที่กรุงเทพฯ ใกล้กับสยามพารากอน! พยานระบุว่าพวกมันมีสีเขียวและเป็นมิตร"
+                if m1.button("🚨 ตัวอย่างข่าวปลอม", use_container_width=True, type="primary"):
+                    st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท สามารถเช็คสิทธิ์และลงทะเบียนรับเงินเข้าบัญชีได้ทันทีผ่านเว็บไซต์นี้"
 
-                if m2.button("🏛️ Real Example — Government", use_container_width=True):
-                    st.session_state['input_text'] = "รัฐบาลประกาศวันหยุดพิเศษเพิ่มอีก 1 วัน เพื่อกระตุ้นเศรษฐกิจและการท่องเที่ยวในช่วงเทศกาล"
+                if m2.button("✅ ตัวอย่างข่าวจริง", use_container_width=True):
+                    st.session_state['input_text'] = "คณะกรรมการนโยบายการเงิน (กนง.) ธนาคารแห่งประเทศไทย มีมติปรับขึ้นอัตราดอกเบี้ยนโยบาย 0.25% ต่อปี จาก 2.25% เป็น 2.50% ต่อปี โดยให้มีผลทันที เพื่อเป็นการดูแลอัตราเงินเฟ้อให้อยู่ในกรอบเป้าหมายอย่างยั่งยืน และสอดคล้องกับแนวโน้มเศรษฐกิจที่กำลังฟื้นตัว"
 
             # ปุ่มล้างข้อความ อยู่นอก expander
             _, _clr_col = st.columns([5, 1])
@@ -1657,7 +1716,7 @@ else:
                         details=f"[{uname}] ทำนาย: '{clean[:50]}' → {rl} ({rc}%)", level="INFO")
                         pid = db.create_prediction(st.session_state.get('user_id'), clean[:50]+"…",
                                                 clean, input_url or None, rl, rc)
-                        st.session_state.update({'current_result': result, 'current_pred_id': pid, 'feedback_given': False})
+                        st.session_state.update({'current_result': result, 'current_pred_id': pid, 'feedback_given': False,'current_text':  clean})
                         st.rerun()
                     else:
                         st.error("AI ไม่ตอบสนอง")
@@ -1668,23 +1727,28 @@ else:
 
         # Result
         if 'current_result' in st.session_state:
-            res=st.session_state['current_result']
-            label=res['result']; 
-            conf=float(res['confidence'])
-            cat   = res.get('category', 'ไม่ระบุ')  
+            res   = st.session_state['current_result']
+            label = res['result']
+            conf  = float(res['confidence'])
+            cat   = res.get('category', 'ไม่ระบุ')
 
-            if conf<70:
-                cfg=dict(bg="#FFFBEB",border="#F59E0B",bc="#92400E",bbg="#FEF3C7",
-                         icon="⚠️",verdict="UNVERIFIED",bar="#F59E0B",
-                         desc="AI ยังไม่มีความมั่นใจเพียงพอ — ข้อมูลอาจไม่ครบถ้วน ควรตรวจสอบจากแหล่งอื่นด้วย")
-            elif label=="Fake":
-                cfg=dict(bg="#FFF5F5",border="#EF4444",bc="#991B1B",bbg="#FEE2E2",
-                         icon="🚨",verdict="FAKE NEWS",bar="#EF4444",
-                         desc="เนื้อหานี้มีลักษณะเป็นข่าวปลอมหรือข้อมูลบิดเบือน — กรุณาตรวจสอบแหล่งที่มาก่อนแชร์")
+            # ✅ ดึงจาก current_text แทน input_text
+            raw_text = st.session_state.get('current_text', '')
+            preview  = re.sub(r'\s+', ' ', str(raw_text)).strip()[:150]
+            preview  = (preview + "…") if len(str(raw_text)) > 150 else preview
+
+            if conf < 70:
+                cfg = dict(bg="#FFFBEB", border="#F59E0B", bc="#92400E", bbg="#FEF3C7",
+                        icon="⚠️", verdict="UNVERIFIED", bar="#F59E0B",
+                        desc="AI ยังไม่มีความมั่นใจเพียงพอ — ข้อมูลอาจไม่ครบถ้วน ควรตรวจสอบจากแหล่งอื่นด้วย")
+            elif label == "Fake":
+                cfg = dict(bg="#FFF5F5", border="#EF4444", bc="#991B1B", bbg="#FEE2E2",
+                        icon="🚨", verdict="FAKE NEWS", bar="#EF4444",
+                        desc="เนื้อหานี้มีลักษณะเป็นข่าวปลอมหรือข้อมูลบิดเบือน — กรุณาตรวจสอบแหล่งที่มาก่อนแชร์")
             else:
-                cfg=dict(bg="#F0FDF4",border="#22C55E",bc="#14532D",bbg="#DCFCE7",
-                         icon="✅",verdict="REAL NEWS",bar="#22C55E",
-                         desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ")
+                cfg = dict(bg="#F0FDF4", border="#22C55E", bc="#14532D", bbg="#DCFCE7",
+                        icon="✅", verdict="REAL NEWS", bar="#22C55E",
+                        desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ")
 
             st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
 
@@ -1696,7 +1760,7 @@ else:
             <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
             <div style="flex:1;">
             <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
-                        font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;
+                        font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
                         font-size:1.15rem;padding:5px 16px;border-radius:8px;
                         letter-spacing:-0.2px;">{cfg['verdict']}</span>
             <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
@@ -1704,6 +1768,8 @@ else:
             </div>
             </div>
         </div>
+        
+        {'<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px 16px;margin-bottom:14px;"><div style="font-size:0.72rem;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📄 จากเนื้อหาข่าว</div><div style="font-size:0.88rem;color:#334155;line-height:1.6;font-style:italic;">&quot;' + preview + '&quot;</div></div>' if preview else ''}
         <div style="margin-bottom:14px;">
             <span style="font-size:0.75rem;font-weight:600;color:#64748B;">📂 หมวดหมู่ข่าว</span>
             &nbsp;
@@ -1764,7 +1830,7 @@ else:
             hist=db.get_user_history(uid)
             if hist:
                 df=pd.DataFrame(hist); df.columns=[c.lower() for c in df.columns]
-                sq=st.text_input("","",placeholder="🔍 ค้นหาหัวข้อข่าว...",label_visibility="collapsed")
+                sq = st.text_input("ค้นหาหัวข้อข่าว", "", placeholder="🔍 ค้นหาหัวข้อข่าว...", label_visibility="collapsed")
                 if sq: df=df[df['title'].str.contains(sq,case=False,na=False)]
                 if not df.empty:
                     if 'timestamp' in df.columns:
@@ -1854,7 +1920,7 @@ else:
                       align-items:center;justify-content:center;
                       font-size:28px;flex-shrink:0;">👤</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.35rem;
+            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1.35rem;
                         font-weight:800;color:#fff;">{st.session_state.username}</div>
             <div style="font-size:0.8rem;color:rgba(255,255,255,0.60);margin-top:2px;">
               สมาชิก TrueCheck AI
@@ -1862,7 +1928,7 @@ else:
           </div>
           <div style="text-align:center;background:rgba(255,255,255,0.12);
                       border-radius:12px;padding:13px 22px;flex-shrink:0;">
-            <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.7rem;
+            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1.7rem;
                         font-weight:800;color:#fff;">{check_count}</div>
             <div style="font-size:0.7rem;color:rgba(255,255,255,0.55);
                         text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;">ข่าวที่ตรวจสอบ</div>
@@ -1872,7 +1938,7 @@ else:
         # Settings
         st.markdown("""<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
         padding:22px 26px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:0.95rem;
+        <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:0.95rem;
         color:#1E293B;margin-bottom:16px;">ข้อมูลบัญชี</div>""",unsafe_allow_html=True)
 
         st.markdown(f"""

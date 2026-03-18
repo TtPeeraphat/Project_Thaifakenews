@@ -6,6 +6,7 @@ requests==2.31.0
 pandas>=2.1.0
 plotly==5.17.0
 streamlit-cookies-controller==0.0.4
+pify-client==0.1.0
 
 # --- Database & Backend ---
 supabase==2.0.3

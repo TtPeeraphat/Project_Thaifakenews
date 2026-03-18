@@ -1,158 +1,172 @@
 import requests
 import os
-from datetime import datetime, timedelta
+import re
 from bs4 import BeautifulSoup
+from apify_client import ApifyClient
+from dotenv import load_dotenv  # ✅ นำเข้าตัวช่วยอ่านไฟล์ .env
+from apify_client import ApifyClient
 
-# ✅ เพิ่ม Facebook Graph API config
-FACEBOOK_ACCESS_TOKEN = "EAANIKWNNZCZBIBQ6KoHxPi42dz2vD5qx7vkOjkZBd5CIUwpO3srzGdW29QGCLc0nqnsjClZAh83khHJmielICgUQ2drgx6ukzGkbCYHIbPT8KT8US8bqseUphTg4gtlbeS39fw9nJTmL1oPW5OJ7CfqOCWs4dMbhzKTFrLwaqepgYuRXk88n04BixO9ZCO8bMOnscAalWP7fIlkNE3BYcpXIS4jTbjV6Y9Lc4MFiJc35IMvIJcHZB4TXdwYdRQ1kQ7KuHKtuKaRzH3OLkZD"  # ใส่ token ที่ได้จาก Graph API Explorer
-def refresh_facebook_token():
-    """Auto refresh token ก่อนหมดอายุ"""
-    token     = os.getenv("FACEBOOK_ACCESS_TOKEN", "")
-    app_id    = os.getenv("FACEBOOK_APP_ID", "")
-    app_secret = os.getenv("FACEBOOK_APP_SECRET", "")
+# ✅ โหลดค่าจากไฟล์ .env เข้าสู่ระบบก่อน
+load_dotenv()
 
-    if not all([token, app_id, app_secret]):
-        return token
+# ✅ ดึง API Token ของ Apify จาก .env
+APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN", "")
 
+# ---------------------------------------------------------
+# ฟังก์ชัน: ใช้ Apify ดึงเนื้อหา Facebook
+# ---------------------------------------------------------
+def get_facebook_post_apify(url: str):
+    """ใช้ Apify ดึงข้อมูลโพสต์ Facebook แทน requests ธรรมดา"""
+    if not APIFY_API_TOKEN:
+        return None, "⚠️ ไม่พบ APIFY_API_TOKEN ในระบบ กรุณาตรวจสอบไฟล์ .env"
+        
     try:
-        url = "https://graph.facebook.com/v18.0/oauth/access_token"
-        params = {
-            "grant_type":        "fb_exchange_token",
-            "client_id":         app_id,
-            "client_secret":     app_secret,
-            "fb_exchange_token": token
+        print(f"🚀 กำลังส่งให้ Apify ดึงข้อมูล Facebook จาก: {url}")
+        
+        # เริ่มต้นใช้งาน Apify Client
+        client = ApifyClient(APIFY_API_TOKEN)
+
+        # ตั้งค่า Input สำหรับ Actor
+        run_input = {
+            "startUrls": [{"url": url}],
+            "resultsLimit": 1, # ดึงแค่ 1 โพสต์ตาม URL ที่ส่งมา
         }
-        res  = requests.get(url, params=params, timeout=10)
-        data = res.json()
 
-        if "access_token" in data:
-            new_token = data["access_token"]
-            # ✅ อัปเดต .env อัตโนมัติ
-            _update_env("FACEBOOK_ACCESS_TOKEN", new_token)
-            return new_token
+        # เรียกใช้งาน Actor และรอจนกว่าจะเสร็จ
+        run = client.actor("apify/facebook-posts-scraper").call(run_input=run_input)
+
+        # ไปดึงผลลัพธ์ (Dataset) ที่ Apify รันได้
+        dataset_items = client.dataset(run["defaultDatasetId"]).list_items().items
+
+        if not dataset_items:
+            return None, "⚠️ Apify ไม่พบข้อมูล (อาจเป็นโพสต์ส่วนตัว กลุ่มปิด หรือถูกลบไปแล้ว)"
+
+        # แกะข้อมูลเนื้อหาออกมา
+        post_data = dataset_items[0]
+        
+        # ✅ ดักจับ Key หลายๆ แบบที่ Apify อาจจะส่งกลับมา
+        content = post_data.get("text") or post_data.get("message") or post_data.get("postText") or ""
+        title = "Facebook Post"
+
+        if content:
+            print(f"✅ ดึงสำเร็จ! ความยาวข้อความ: {len(content)} ตัวอักษร")
+            return title, content
+        else:
+            return title, "⚠️ ดึงได้ แต่ไม่พบข้อความในโพสต์นี้ (อาจมีแค่รูปภาพหรือวิดีโอ)"
+
     except Exception as e:
-        print(f"⚠️ Token refresh failed: {e}")
+        return None, f"⚠️ Apify Error (Facebook): {str(e)}"
 
-    return token
+# ---------------------------------------------------------
+# ฟังก์ชันอัปเดต: ใช้ Apify ดึงเนื้อหา X (Twitter)
+# ---------------------------------------------------------
+# ---------------------------------------------------------
+# ฟังก์ชันอัปเดต: ใช้ Apify ดึงเนื้อหา X (Twitter)
+# ---------------------------------------------------------
+import re # อย่าลืมเช็คว่ามี import re ด้านบนสุดของไฟล์ด้วยนะครับ (ปกติมีอยู่แล้ว)
 
-
-def _update_env(key: str, value: str):
-    """อัปเดตค่าใน .env file"""
-    env_path = ".env"
+# ---------------------------------------------------------
+# ฟังก์ชันอัปเดต: ใช้ Apify ดึงเนื้อหา X (Twitter) ด้วยบอทตัวใหม่
+# ---------------------------------------------------------
+def get_x_post_apify(url: str):
+    """ใช้ Apify ดึงข้อมูลโพสต์จาก X (Twitter)"""
+    if not APIFY_API_TOKEN:
+        return None, "⚠️ ไม่พบ APIFY_API_TOKEN ในระบบ กรุณาตรวจสอบไฟล์ .env"
+        
     try:
-        with open(env_path, "r") as f:
-            lines = f.readlines()
-        with open(env_path, "w") as f:
-            updated = False
-            for line in lines:
-                if line.startswith(f"{key}="):
-                    f.write(f"{key}={value}\n")
-                    updated = True
-                else:
-                    f.write(line)
-            if not updated:
-                f.write(f"{key}={value}\n")
-    except Exception as e:
-        print(f"⚠️ Cannot update .env: {e}")
+        # ✅ 1. ลบช่องว่างที่อาจติดมากับ URL (เช่น กรณีก็อปปี้มาผิด)
+        clean_url = url.replace(" ", "")
+        print(f"🚀 กำลังเตรียมดึงข้อมูล X (Twitter) จาก: {clean_url}")
+        
+        # ✅ 2. สกัดเอาเฉพาะ Tweet ID (ตัวเลขที่อยู่หลัง /status/) ออกมา
+        match = re.search(r"status/(\d+)", clean_url)
+        if not match:
+            return None, "⚠️ ไม่พบ Tweet ID ในลิงก์ กรุณาก๊อปปี้ลิงก์โพสต์ของ X (Twitter) ให้ครบถ้วน"
+        
+        tweet_id = match.group(1)
+        print(f"🔍 สกัด Tweet ID ได้คือ: {tweet_id} -> กำลังส่งให้ Apify...")
 
-def get_facebook_post(url: str):
-    """ดึงข้อมูลจาก Facebook post/page ผ่าน Graph API"""
-    try:
-        # ดึง post_id จาก URL
-        # รองรับรูปแบบ: facebook.com/page/posts/123 หรือ facebook.com/permalink.php?story_fbid=123
-        import re
-        post_id = None
+        client = ApifyClient(APIFY_API_TOKEN)
 
-        patterns = [
-            r'facebook\.com/.+/posts/(\d+)',
-            r'facebook\.com/permalink\.php\?story_fbid=(\d+)',
-            r'facebook\.com/photo\?fbid=(\d+)',
-            r'/(\d{10,})',
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, url)
-            if match:
-                post_id = match.group(1)
-                break
-
-        if not post_id:
-            return None, "⚠️ ไม่สามารถดึง Post ID จาก URL นี้ได้"
-
-        if not FACEBOOK_ACCESS_TOKEN:
-            return None, "⚠️ ยังไม่ได้ตั้งค่า Facebook Access Token"
-
-        # เรียก Graph API
-        api_url = f"https://graph.facebook.com/v18.0/{post_id}"
-        params = {
-            "fields": "message,story,full_picture,created_time",
-            "access_token": FACEBOOK_ACCESS_TOKEN
+        # ✅ 3. คอนฟิก Input สำหรับบอทตัวใหม่ที่รองรับ API ฟรี (ใช้ tweetIDs แทน startUrls)
+        run_input = {
+            "tweetIDs": [tweet_id], 
+            "maxItems": 1, 
         }
-        res = requests.get(api_url, params=params, timeout=15)
-        data = res.json()
 
-        if "error" in data:
-            return None, f"⚠️ Facebook API Error: {data['error'].get('message','Unknown error')}"
+        # ✅ 4. เรียกใช้งาน Actor ตัวใหม่ (Pay-Per-Result ตัดจากเครดิตฟรี)
+        run = client.actor("kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest").call(run_input=run_input)
 
-        message = data.get("message") or data.get("story") or ""
-        if not message:
-            return None, "⚠️ ไม่พบข้อความใน Post นี้ (อาจเป็น Private)"
+        # ไปดึงผลลัพธ์ (Dataset)
+        dataset_items = client.dataset(run["defaultDatasetId"]).list_items().items
 
-        created_time = data.get("created_time", "")
-        title = f"Facebook Post ({created_time[:10] if created_time else 'ไม่ทราบวันที่'})"
-        return title, message
+        if not dataset_items:
+            return None, "⚠️ Apify ไม่พบข้อมูล Twitter (โพสต์อาจถูกลบ หรือบัญชีถูกตั้งเป็นส่วนตัว)"
+
+        post_data = dataset_items[0]
+
+        # ✅ 5. ดักจับเนื้อหาและคนโพสต์ (ตามโครงสร้างข้อมูลของบอทตัวใหม่)
+        content = post_data.get("text") or post_data.get("full_text") or ""
+        author_info = post_data.get("author", {})
+        author = author_info.get("userName") or "Unknown Author"
+        
+        title = f"X (Twitter) Post by @{author}"
+
+        if content:
+            print(f"✅ ดึงสำเร็จ! ความยาวข้อความ: {len(content)} ตัวอักษร")
+            return title, content
+        else:
+            return title, f"⚠️ ดึงได้ แต่ไม่พบข้อความ (ข้อมูลดิบ: {str(post_data)[:100]})"
 
     except Exception as e:
-        return None, f"⚠️ Facebook Error: {str(e)}"
-
-
+        return None, f"⚠️ Apify Error (X/Twitter): {str(e)}"
+# ---------------------------------------------------------
+# ฟังก์ชันหลัก
+# ---------------------------------------------------------
 def get_content_from_url(url):
-    # ✅ ดักทาง Facebook แยกออกมาใช้ Graph API
-    if "facebook.com" in url.lower():
-        return get_facebook_post(url)
+    # ✅ 1. เช็คว่าเป็นลิงก์ Facebook หรือไม่
+    fb_domains = ["facebook.com", "fb.watch", "fb.com", "fb.me"]
+    if any(domain in url.lower() for domain in fb_domains):
+        return get_facebook_post_apify(url)
 
-    # ปิด social media อื่นๆ
-    blocked_domains = ["x.com", "twitter.com", "tiktok.com", "instagram.com"]
+    # ✅ 2. เช็คว่าเป็นลิงก์ X (Twitter) หรือไม่
+    x_domains = ["x.com", "twitter.com"]
+    if any(domain in url.lower() for domain in x_domains):
+        return get_x_post_apify(url)
+
+    # ✅ 3. ปิด social media อื่นที่ยังไม่มีระบบรองรับ
+    blocked_domains = ["tiktok.com", "instagram.com"]
     if any(domain in url.lower() for domain in blocked_domains):
-        return None, "⚠️ ไม่สามารถดึงข้อมูลจาก Social Media ได้โดยตรง กรุณาก๊อปปี้ข้อความมาวางในโหมด 'พิมพ์เนื้อหา' แทนครับ"
+        return None, "⚠️ ไม่สามารถดึงข้อมูลจาก Social Media ระบบอื่นได้โดยตรง กรุณาก๊อปปี้ข้อความมาวางแทน"
 
+    # ✅ 4. สำหรับเว็บไซต์ข่าวทั่วไป ใช้โค้ด BeautifulSoup เดิม
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
     }
-
     try:
         response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
-
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        title = None
         og_title = soup.find("meta", property="og:title")
         if og_title and og_title.get("content"):
             title = og_title["content"]
         elif soup.find("h1"):
             title = soup.find("h1").get_text(strip=True)
-        elif soup.title:
-            title = soup.title.get_text(strip=True)
         else:
             title = "ไม่พบหัวข้อข่าว"
 
         article_body = soup.find("article")
-        if article_body:
-            paragraphs = article_body.find_all("p")
-        else:
-            paragraphs = soup.find_all("p")
-
+        paragraphs = article_body.find_all("p") if article_body else soup.find_all("p")
         content_list = [p.get_text(strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 20]
         full_content = "\n".join(content_list)
 
         if not full_content:
-            return title, "⚠️ ดึงเนื้อหาไม่สำเร็จ: เว็บไซต์นี้อาจใช้ JavaScript ในการแสดงผล หรือบล็อกการดึงข้อมูล"
+            return title, "⚠️ ดึงเนื้อหาไม่สำเร็จ: เว็บไซต์นี้อาจใช้ JavaScript หรือบล็อกการดึงข้อมูล"
 
         return title, full_content
 
     except requests.exceptions.RequestException as e:
-        return None, f"⚠️ ไม่สามารถเชื่อมต่อกับเว็บไซต์ได้\nรายละเอียด: {str(e)}"
+        return None, f"⚠️ ไม่สามารถเชื่อมต่อได้\nรายละเอียด: {str(e)}"
     except Exception as e:
         return None, f"Error: {str(e)}"
