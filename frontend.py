@@ -1940,10 +1940,7 @@ else:
                             padding:4px 12px;border-radius:99px;">
                     🚨 Fake {n_fake}
                 </span>
-                <span style="background:#FEF3C7;color:#92400E;font-size:0.78rem;font-weight:700;
-                            padding:4px 12px;border-radius:99px;">
-                    ⚠️ Unverified {n_unverified}
-                </span>
+            
                 </div>""", unsafe_allow_html=True)
 
                 st.caption(f"แสดง {len(df_filtered)} รายการ")
@@ -1954,7 +1951,7 @@ else:
                     lcfg = {
                         "Fake":       ("#FEE2E2","#991B1B","#EF4444","🚨"),
                         "Real":       ("#DCFCE7","#166534","#22C55E","✅"),
-                        "Unverified": ("#FEF3C7","#92400E","#F59E0B","⚠️"),
+                
                     }
                     for _, row in df_filtered.iterrows():
                         lc = lcfg.get(row['label'], ("#F1F5F9","#475569","#CBD5E1","📰"))
