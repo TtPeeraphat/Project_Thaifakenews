@@ -1892,17 +1892,71 @@ else:
     # 🔥 TRENDING
     # ══════════════════════════════════════
     elif menu == "🔥 ข่าวที่เป็นกระแส":
-        page_header("🔥", "ข่าวที่เป็นกระแส", "ข่าวสารที่ถูกพูดถึงและผ่านการตรวจสอบโดยทีมงาน")
-        df = db.get_all_trending()
-        if df.empty:
-            st.info("ℹ️ ยังไม่มีข่าวที่เป็นกระแสในขณะนี้")
+    page_header("🔥", "ข่าวที่เป็นกระแส", "ข่าวสารที่ถูกพูดถึงและผ่านการตรวจสอบโดยทีมงาน")
+    df = db.get_all_trending()
+    if df.empty:
+        st.info("ℹ️ ยังไม่มีข่าวที่เป็นกระแสในขณะนี้")
+    else:
+        # ✅ เพิ่ม filter bar
+        col_s, col_f = st.columns([1, 2])
+        with col_s:
+            filter_label = st.selectbox(
+                "กรองตามประเภท",
+                ["ทั้งหมด", "Real", "Fake", "Unverified"],
+                label_visibility="collapsed"
+            )
+        with col_f:
+            search_q = st.text_input(
+                "ค้นหา", placeholder="🔍 ค้นหาข่าว...",
+                label_visibility="collapsed"
+            )
+
+        # ✅ filter ข้อมูล
+        df_filtered = df.copy()
+        if filter_label != "ทั้งหมด":
+            df_filtered = df_filtered[df_filtered['label'] == filter_label]
+        if search_q:
+            df_filtered = df_filtered[
+                df_filtered['headline'].str.contains(search_q, case=False, na=False) |
+                df_filtered['content'].str.contains(search_q, case=False, na=False)
+            ]
+
+        # ✅ summary badges
+        n_real       = len(df[df['label'] == 'Real'])
+        n_fake       = len(df[df['label'] == 'Fake'])
+        n_unverified = len(df[df['label'] == 'Unverified'])
+
+        st.markdown(f"""
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <span style="background:#F1F5F9;color:#475569;font-size:0.78rem;font-weight:700;
+                       padding:4px 12px;border-radius:99px;cursor:pointer;">
+            📰 ทั้งหมด {len(df)}
+          </span>
+          <span style="background:#DCFCE7;color:#166534;font-size:0.78rem;font-weight:700;
+                       padding:4px 12px;border-radius:99px;">
+            ✅ Real {n_real}
+          </span>
+          <span style="background:#FEE2E2;color:#991B1B;font-size:0.78rem;font-weight:700;
+                       padding:4px 12px;border-radius:99px;">
+            🚨 Fake {n_fake}
+          </span>
+          <span style="background:#FEF3C7;color:#92400E;font-size:0.78rem;font-weight:700;
+                       padding:4px 12px;border-radius:99px;">
+            ⚠️ Unverified {n_unverified}
+          </span>
+        </div>""", unsafe_allow_html=True)
+
+        st.caption(f"แสดง {len(df_filtered)} รายการ")
+
+        if df_filtered.empty:
+            st.info("ไม่พบข่าวที่ตรงกับเงื่อนไข")
         else:
             lcfg = {
                 "Fake":       ("#FEE2E2","#991B1B","#EF4444","🚨"),
                 "Real":       ("#DCFCE7","#166534","#22C55E","✅"),
                 "Unverified": ("#FEF3C7","#92400E","#F59E0B","⚠️"),
             }
-            for _, row in df.iterrows():
+            for _, row in df_filtered.iterrows():
                 lc = lcfg.get(row['label'], ("#F1F5F9","#475569","#CBD5E1","📰"))
                 ts = str(row.get('updated_at', '-')).replace("T", " ")[:16]
                 st.markdown(f"""
@@ -1912,7 +1966,7 @@ else:
                   <div style="display:flex;align-items:flex-start;
                               justify-content:space-between;gap:12px;margin-bottom:10px;">
                     <h4 style="margin:0;color:#1E293B !important;font-size:0.97rem !important;
-                               line-height:1.45;flex:1;">{lc[3]}&nbsp; {row['headline']}</h4>
+                               line-height:1.45;flex:1;">{lc[3]}&nbsp;{row['headline']}</h4>
                     <span style="flex-shrink:0;background:{lc[0]};color:{lc[1]};
                                  font-size:0.71rem;font-weight:800;padding:3px 11px;
                                  border-radius:99px;text-transform:uppercase;letter-spacing:0.5px;
