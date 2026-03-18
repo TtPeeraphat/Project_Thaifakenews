@@ -1924,7 +1924,7 @@ else:
                 # ✅ summary badges
                 n_real       = len(df[df['label'] == 'Real'])
                 n_fake       = len(df[df['label'] == 'Fake'])
-                n_unverified = len(df[df['label'] == 'Unverified'])
+                
 
                 st.markdown(f"""
                 <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
