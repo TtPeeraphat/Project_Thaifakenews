@@ -1033,20 +1033,45 @@ def show_system_analytics():
         recent=db.get_system_logs(limit=100)
         if recent:
             for row in recent:
-                ts,user,action,details,level=row
-                try: ft=pd.to_datetime(ts).strftime("%m/%d %H:%M")
-                except: ft=str(ts)
-                bc={"ERROR":"#DC2626","WARNING":"#D97706"}.get(level,"#1565C0")
-                bg={"ERROR":"#FFF5F5","WARNING":"#FFFBEB"}.get(level,"#F0F6FF")
-                tc={"ERROR":"#7F1D1D","WARNING":"#78350F"}.get(level,"#1E3A5F")
+                ts, user, action, details, level = row
+                try: ft = pd.to_datetime(ts).strftime("%m/%d %H:%M")
+                except: ft = str(ts)
+                bc = {"ERROR":"#DC2626","WARNING":"#D97706"}.get(level,"#1565C0")
+                bg = {"ERROR":"#FFF5F5","WARNING":"#FFFBEB"}.get(level,"#F0F6FF")
+                tc = {"ERROR":"#7F1D1D","WARNING":"#78350F"}.get(level,"#1E3A5F")
+
+    # ✅ icon ตาม action
+                action_icon = {
+                    "PREDICT":      "🤖",
+                    "USER_LOGOUT":  "🚪",
+                    "USER_LOGIN":   "🔑",
+                    "EXPORT_DATA":  "📥",
+                    "DELETE_DATA":  "🗑️",
+                    "ROLE_UPDATE":  "🛡️",
+                    "API_ERROR":    "❌",
+                }.get(action, "📋")
+
                 st.markdown(f"""
-                <div style="background:{bg};padding:8px 13px;border-radius:6px;
-                            margin-bottom:5px;border-left:3px solid {bc};
-                            font-size:0.81rem;color:{tc};display:flex;gap:10px;align-items:baseline;">
-                  <span style="opacity:0.55;white-space:nowrap;font-size:0.74rem;">{ft}</span>
-                  <span><strong>{action}</strong> · {(details[:80]+'…') if len(details)>80 else details}</span>
-                  <span style="opacity:0.45;white-space:nowrap;font-size:0.73rem;margin-left:auto;">{user}</span>
-                </div>""",unsafe_allow_html=True)
+    <div style="background:{bg};padding:11px 14px;border-radius:8px;
+                margin-bottom:6px;border-left:3px solid {bc};">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <div style="display:flex;align-items:center;gap:7px;">
+          <span style="font-size:1rem;">{action_icon}</span>
+          <span style="font-size:0.82rem;font-weight:800;color:{bc};">{action}</span>
+          <span style="background:{bc}22;color:{bc};font-size:0.67rem;font-weight:700;
+                       padding:2px 7px;border-radius:99px;">{level}</span>
+        </div>
+        <span style="font-size:0.73rem;color:{tc};opacity:0.6;">{ft}</span>
+      </div>
+      <!-- ✅ แสดง user ชัดเจน -->
+      <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px;">
+        <span style="background:#1E293B;color:#93C5FD;font-size:0.72rem;font-weight:700;
+                     padding:2px 9px;border-radius:99px;">👤 {user}</span>
+        <span style="font-size:0.79rem;color:{tc};">
+          {(details[:100]+'…') if len(details)>100 else details}
+        </span>
+      </div>
+    </div>""", unsafe_allow_html=True)
         else: st.info("ยังไม่มี log")
     st.markdown("</div>",unsafe_allow_html=True)
 
@@ -1143,7 +1168,10 @@ if st.session_state['reset_mode']:
                 if st.button("ส่ง OTP",type="primary",width="stretch"):
                     if ei:
                         with st.spinner("กำลังส่ง..."): ok,msg=db.send_otp_email(ei)
-                        if ok: st.success(msg); st.session_state.update({'otp_sent':True,'reset_email_temp':ei})
+                        if ok: 
+                            st.success(msg)
+                            st.session_state.update({'otp_sent': True, 'reset_email_temp': ei})
+                            st.rerun()  # ✅ เพิ่มบรรทัดนี้
                         else: st.error(msg)
                     else: st.warning("กรุณากรอกอีเมล")
             with c2:
@@ -1443,8 +1471,9 @@ else:
                     if result:
                         time.sleep(0.35)
                         rl, rc = result.get('result'), result.get('confidence')
+                        uname = st.session_state.get('username', 'Unknown')
                         db.log_system_event(user_id=st.session_state.get('user_id'), action="PREDICT",
-                                            details=f"'{clean[:50]}' → {rl} ({rc}%)", level="INFO")
+                    details=f"[{uname}] ทำนาย: '{clean[:50]}' → {rl} ({rc}%)", level="INFO")
                         pid = db.create_prediction(st.session_state.get('user_id'), clean[:50]+"…",
                                                 clean, input_url or None, rl, rc)
                         st.session_state.update({'current_result': result, 'current_pred_id': pid, 'feedback_given': False})
@@ -1726,8 +1755,8 @@ else:
             with c2: kpi_card("👥","Active Users (24h)", f"{stats.get('active_users',0):,}")
             with c3:
                 acc=stats.get('accuracy',0.0)
-                kpi_card("🎯","Model Accuracy",f"{acc}%","✅ ปกติ" if acc>=50 else "⚠️ ต่ำกว่าเกณฑ์",acc>=50)
-            with c4: kpi_card("💬","Feedback Total",f"{stats.get('feedback_total',0):,}")
+                kpi_card("🎯","Model Accuracy Today",f"{acc}%","✅ ปกติ" if acc>=50 else "⚠️ ต่ำกว่าเกณฑ์",acc>=50)
+            with c4: kpi_card("💬","Feedback Total Today",f"{stats.get('feedback_total',0):,}")
 
             st.markdown("<div style='height:24px;'></div>",unsafe_allow_html=True)
             section_title("⏱️ Recent Activity","การใช้งานล่าสุด")
