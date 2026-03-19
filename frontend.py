@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import database_ops as db
 import ai_engine as ai
 from scraper_ops import get_content_from_url
+import streamlit.components.v1 as components
 
 
 if sys.platform == 'win32':
