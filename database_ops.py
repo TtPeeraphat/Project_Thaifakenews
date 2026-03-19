@@ -230,7 +230,8 @@ def get_pending_feedbacks():
                 'text':          pred.get('text', ''),
                 'ai_result':     pred.get('result', 'Unknown'),
                 'ai_confidence': pred.get('confidence', 0),
-                'category':      pred.get('category', 'ไม่ระบุ'),  # ✅ เพิ่ม
+                'category':      pred.get('category', 'ไม่ระบุ'),  
+                'url':           pred.get('url', ''), 
                 'user_report':   fb.get('user_report', None),
                 'user_comment':  fb.get('comment', ''),
                 'timestamp':     pred.get('timestamp'),
@@ -461,14 +462,16 @@ def get_all_trending():
         print(f"❌ Get Trending Error: {e}")
         return pd.DataFrame()
 
-def create_trending(headline, content, label, category="ทั่วไป", image_url=""):
+def create_trending(headline, content, label, category="ทั่วไป", image_url="", source_url=""):
     supabase = get_supabase()
     payload = {
         "headline":   headline,
         "content":    content,
         "label":      label,
-        "category":   category,   # ✅ เพิ่ม
-        "image_url":  image_url if image_url else None,  # ✅ เพิ่ม
+        "category":   category,
+        "image_url":  image_url if image_url else None,
+        "source_url": source_url if source_url else None,   # ← เพิ่ม
+        "created_at": datetime.now().isoformat(),            # ← เพิ่ม
         "updated_at": datetime.now().isoformat()
     }
     try:
@@ -477,9 +480,10 @@ def create_trending(headline, content, label, category="ทั่วไป", ima
     except Exception as e:
         print(f"❌ Create Trending Error: {e}")
         return False
+
     
 # ✅ ใหม่
-def update_trending(news_id, headline, content, label, category="ทั่วไป", image_url=None):
+def update_trending(news_id, headline, content, label, category="ทั่วไป", image_url=None, source_url=None):
     supabase = get_supabase()
     payload = {
         "headline":   headline,
@@ -488,10 +492,10 @@ def update_trending(news_id, headline, content, label, category="ทั่วไ
         "category":   category,
         "updated_at": datetime.now().isoformat()
     }
-    # ✅ อัปเดต image_url เฉพาะถ้ามีรูปใหม่
     if image_url:
         payload["image_url"] = image_url
-
+    if source_url is not None:                # ← เพิ่ม (None = ไม่แก้, "" = ลบ)
+        payload["source_url"] = source_url if source_url else None
     try:
         supabase.table("trending_news").update(payload).eq("id", news_id).execute()
         return True
@@ -695,9 +699,8 @@ def update_user_role_status(target_user_id, new_role, new_status):
 def get_approved_feedbacks():
     supabase = get_supabase()
     try:
-        # ✅ ดึงจาก feedbacks + join predictions เพื่อเอา text
         res = supabase.table("feedbacks") \
-                      .select("id, status, prediction_id, predictions!fk_prediction(text, result)") \
+                      .select("id, status, timestamp, prediction_id, predictions!fk_prediction(text, title, result, category)") \
                       .in_("status", ["Real", "Fake"]) \
                       .execute()
 
@@ -710,10 +713,12 @@ def get_approved_feedbacks():
             pred = item.get('predictions')
             if not pred: continue
 
-            text = pred.get('text', '') if isinstance(pred, dict) else ''
             rows.append({
-                'text':   text,
-                'status': item.get('status')
+                'text':      pred.get('text', '')    if isinstance(pred, dict) else '',
+                'title':     pred.get('title', '')   if isinstance(pred, dict) else '',
+                'category':  pred.get('category', '') if isinstance(pred, dict) else '',
+                'status':    item.get('status'),
+                'timestamp': item.get('timestamp'),
             })
 
         return pd.DataFrame(rows) if rows else pd.DataFrame()
