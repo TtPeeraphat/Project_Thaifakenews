@@ -1102,28 +1102,54 @@ def manage_trending_news():
     # ── Edit mode ──
                 else:
                     st.markdown(f"""
-        <div style="background:#F0F6FF;border:1.5px solid #BFDBFE;
-                    border-radius:12px;padding:16px 20px;margin-bottom:4px;">
-          <div style="font-size:0.72rem;font-weight:700;color:#1148A8;
-                      text-transform:uppercase;letter-spacing:0.6px;margin-bottom:12px;">
-            ✏️ แก้ไขข่าว
-          </div>
+                    <div style="background:#F0F6FF;border:1.5px solid #BFDBFE;
+                                border-radius:12px;padding:16px 20px;margin-bottom:4px;">
+                    <div style="font-size:0.72rem;font-weight:700;color:#1148A8;
+                                text-transform:uppercase;letter-spacing:0.6px;">
+                        ✏️ แก้ไขข่าว
+                    </div>
                     </div>""", unsafe_allow_html=True)
 
                     eh = st.text_input("หัวข้อข่าว", value=row['headline'], key=f"h_{row['id']}")
                     ec = st.text_area("เนื้อหา", value=row['content'], height=120, key=f"c_{row['id']}")
-                    opts = ["Fake", "Real", "Unverified"]
-                    el = st.selectbox(
-                        "สถานะ", opts,
-                        index=opts.index(row['label']) if row['label'] in opts else 0,
-                        key=f"l_{row['id']}"
-                    )
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        opts = ["Fake", "Real", "Unverified"]
+                        el = st.selectbox("สถานะ", opts,
+                                        index=opts.index(row['label']) if row['label'] in opts else 0,
+                                        key=f"l_{row['id']}")
+                    with col2:
+                        # ✅ เพิ่ม category dropdown
+                        CATEGORIES = ["ทั่วไป","การเมือง","เศรษฐกิจ","สุขภาพ",
+                                    "อาชญากรรม","กีฬา","บันเทิง","เทคโนโลยี",
+                                    "ภัยธรรมชาติ","ต่างประเทศ"]
+                        cur_cat = row.get('category') or 'ทั่วไป'
+                        edit_cat = st.selectbox("หมวดหมู่", CATEGORIES,
+                                                index=CATEGORIES.index(cur_cat) if cur_cat in CATEGORIES else 0,
+                                                key=f"cat_{row['id']}")
+
+                    # ✅ เพิ่ม upload รูปใหม่
+                    if row.get('image_url'):
+                        st.image(row['image_url'], width=150, caption="รูปปัจจุบัน")
+                    edit_file = st.file_uploader("เปลี่ยนรูปภาพ (ถ้าต้องการ)",
+                                                type=["jpg","jpeg","png","webp"],
+                                                key=f"img_{row['id']}")
+                    if edit_file:
+                        st.image(edit_file, width=150, caption="รูปใหม่")
 
                     sa, sb, _ = st.columns([1, 1, 4])
                     with sa:
                         if st.button("💾 บันทึก", key=f"s_{row['id']}", type="primary", use_container_width=True):
                             if eh.strip() and ec.strip():
-                                db.update_trending(row['id'], eh, ec, el)
+                                # ✅ อัปโหลดรูปใหม่ถ้ามี
+                                new_image_url = None
+                                if edit_file:
+                                    with st.spinner("กำลังอัปโหลดรูป..."):
+                                        new_image_url = db.upload_image_to_supabase(
+                                            edit_file.read(), edit_file.name
+                                        )
+                                db.update_trending(row['id'], eh, ec, el, edit_cat, new_image_url)
                                 db.log_system_event(
                                     user_id=st.session_state.get('user_id'),
                                     action="UPDATE_TRENDING",

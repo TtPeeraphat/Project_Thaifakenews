@@ -458,14 +458,15 @@ def get_all_trending():
         print(f"❌ Get Trending Error: {e}")
         return pd.DataFrame()
 
-def create_trending(headline, content, label):
-    """เพิ่มข่าวที่เป็นกระแสใหม่"""
+def create_trending(headline, content, label, category="ทั่วไป", image_url=""):
     supabase = get_supabase()
     payload = {
-        "headline": headline, 
-        "content": content, 
-        "label": label, 
-        "updated_at": datetime.now().isoformat() # 🚨 แก้ชื่อคอลัมน์เป็น updated_at
+        "headline":   headline,
+        "content":    content,
+        "label":      label,
+        "category":   category,   # ✅ เพิ่ม
+        "image_url":  image_url if image_url else None,  # ✅ เพิ่ม
+        "updated_at": datetime.now().isoformat()
     }
     try:
         supabase.table("trending_news").insert(payload).execute()
@@ -474,15 +475,20 @@ def create_trending(headline, content, label):
         print(f"❌ Create Trending Error: {e}")
         return False
     
-def update_trending(news_id, headline, content, label):
-    """แก้ไขข่าวที่เป็นกระแส"""
+# ✅ ใหม่
+def update_trending(news_id, headline, content, label, category="ทั่วไป", image_url=None):
     supabase = get_supabase()
     payload = {
-        "headline": headline,
-        "content": content,
-        "label": label,
+        "headline":   headline,
+        "content":    content,
+        "label":      label,
+        "category":   category,
         "updated_at": datetime.now().isoformat()
     }
+    # ✅ อัปเดต image_url เฉพาะถ้ามีรูปใหม่
+    if image_url:
+        payload["image_url"] = image_url
+
     try:
         supabase.table("trending_news").update(payload).eq("id", news_id).execute()
         return True
