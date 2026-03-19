@@ -542,11 +542,6 @@ hr { border-color: var(--border) !important; margin: 1.25rem 0 !important; }
   .mobile-menu-btn { display: none !important; }
 }
 </style>
-
-<button class="mobile-menu-btn" onclick="
-  const sb = document.querySelector('[data-testid=stSidebar]');
-  sb.classList.toggle('open');
-">☰</button>
 """, unsafe_allow_html=True)
 
 
@@ -1702,566 +1697,600 @@ elif not st.session_state['logged_in']:
 #  AUTHENTICATED APP
 # ═══════════════════════════════════════════════════════
 else:
-    if 'active_menu' not in st.session_state:
-        st.session_state.active_menu="🏠 หน้าหลัก"
-
-    # ──────────────────────────────────────
-    # SIDEBAR
-    # ──────────────────────────────────────
-    with st.sidebar:
-        # Brand
+ # ── Mobile sidebar toggle (เฉพาะผู้ล็อกอินแล้ว) ──
         st.markdown("""
-        <div style="padding:22px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.06);
-                    margin-bottom:8px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:26px;">🛡️</span>
-          <div>
-            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
-                        font-size:0.97rem;color:#fff;line-height:1.2;">TrueCheck AI</div>
-            <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);
-                        text-transform:uppercase;letter-spacing:1.2px;">Fake News Detector</div>
-          </div>
-        </div>""", unsafe_allow_html=True)
+        <button class="mobile-menu-btn" id="mobileSidebarBtn" onclick="window._sidebarToggle()">☰</button>
+        <script>
+        (function() {
+            // เก็บสถานะใน window ป้องกัน Streamlit re-render ลบทิ้ง
+            if (window._sidebarOpen === undefined) window._sidebarOpen = false;
 
-        # User card
-        role  = (st.session_state.get('role') or 'user').upper()
-        uname = st.session_state.get('username','User')
-        rc    = "#60A5FA" if role=="ADMIN" else "#64748B"
-        st.markdown(f"""
-        <div style="margin:6px 10px 14px;background:rgba(255,255,255,0.055);
-                    border:1px solid rgba(255,255,255,0.08);border-radius:10px;
-                    padding:11px 13px;display:flex;align-items:center;gap:10px;">
-          <div style="width:32px;height:32px;border-radius:50%;background:rgba(30,136,229,0.30);
-                      display:flex;align-items:center;justify-content:center;
-                      font-size:15px;flex-shrink:0;">👤</div>
-          <div style="min-width:0;">
-            <div style="font-weight:600;font-size:0.86rem;color:#fff;
-                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{uname}</div>
-            <div style="font-size:0.68rem;font-weight:700;color:{rc};
-                        text-transform:uppercase;letter-spacing:0.7px;">{role}</div>
-          </div>
-        </div>""", unsafe_allow_html=True)
+            function applyState() {
+                const sb = document.querySelector('[data-testid="stSidebar"]');
+                if (!sb) return;
+                if (window.innerWidth > 768) return; // ไม่แตะ desktop
+                sb.style.transform  = window._sidebarOpen ? 'translateX(0)' : 'translateX(-100%)';
+                sb.style.transition = 'transform 0.3s ease';
+                sb.style.position   = 'fixed';
+                sb.style.zIndex     = '999';
+                sb.style.height     = '100vh';
+            }
 
-        st.markdown("<div style='padding:2px 14px 5px;font-size:0.67rem;font-weight:700;color:rgba(255,255,255,0.28);text-transform:uppercase;letter-spacing:1.2px;'>MENU</div>", unsafe_allow_html=True)
+            window._sidebarToggle = function() {
+                window._sidebarOpen = !window._sidebarOpen;
+                applyState();
+            };
 
-        nav=[("🏠 หน้าหลัก","🏠  หน้าหลัก"),
-             ("📜 ประวัติการตรวจสอบ","📜  ประวัติการตรวจสอบ"),
-             ("🔥 ข่าวที่เป็นกระแส","🔥  ข่าวที่เป็นกระแส"),
-             ("👤 ข้อมูลส่วนตัว","👤  ข้อมูลส่วนตัว")]
+            // Re-apply ทุกครั้งที่ Streamlit re-render DOM
+            const observer = new MutationObserver(applyState);
+            observer.observe(document.body, { childList: true, subtree: true });
 
-        for key,label in nav:
-            active=st.session_state.active_menu==key
-            if st.button(label,key=f"nav_{key}",width="stretch",
-                         type="primary" if active else "secondary"):
-                st.session_state.active_menu=key; st.rerun()
+            // Apply ครั้งแรก
+            applyState();
+        })();
+        </script>
+        """, unsafe_allow_html=True)       
+    
+        if 'active_menu' not in st.session_state:
+            st.session_state.active_menu="🏠 หน้าหลัก"
 
-        if st.session_state.get('role')=='admin':
-            st.markdown("<div style='margin:10px 14px 0;padding-top:10px;border-top:1px solid rgba(255,255,255,0.07);font-size:0.67rem;font-weight:700;color:rgba(255,255,255,0.28);text-transform:uppercase;letter-spacing:1.2px;'>ADMIN PANEL</div>", unsafe_allow_html=True)
-            admin_nav=[("📊 Dashboard","📊  Dashboard"),
-                       ("📈 Model Performance","📈  Model Performance"),
-                       ("📰 Manage News","📰  Manage News"),
-                       ("💬 Review Feedback","💬  Review Feedback"),
-                       ("🔬 System Analytics","🔬  System Analytics"),
-                       ("👥 Manage Users","👥  Manage Users")]
-            for key,label in admin_nav:
-                active=st.session_state.active_menu==key
-                if st.button(label,key=f"adm_{key}",width="stretch",
-                             type="primary" if active else "secondary"):
-                    st.session_state.active_menu=key; st.rerun()
-
-        st.markdown("<hr style='margin:14px 0;'>",unsafe_allow_html=True)
-        if st.button("  🚪  ออกจากระบบ",key="logout_btn",width="stretch"):
-            db.log_system_event(user_id=st.session_state.get('user_id'),action="USER_LOGOUT",
-                details=f"{uname} logged out",level="INFO")
-            st.session_state['do_logout']=True; st.rerun()
-
-    menu=st.session_state.active_menu
-
-    # ══════════════════════════════════════
-    # 🏠 HOME
-    # ══════════════════════════════════════
-    # --- เริ่มส่วน UI ---
-    if menu == "🏠 หน้าหลัก":
-        page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI ")
-
-        # แก้ Warning: ใส่ข้อความลงใน label แต่สั่งซ่อนไว้
-        check_mode = st.radio(
-            label="เลือกโหมดการตรวจสอบ", 
-            options=["📝  พิมพ์ / วางเนื้อหา", "🔗  URL ลิงก์ข่าว"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-        st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
-
-        input_url = ""
-        input_text = ""
-
-        if check_mode == "🔗  URL ลิงก์ข่าว":
-            # initialise session state key for URL
-            if 'input_url' not in st.session_state:
-                st.session_state['input_url'] = ""
-
-            _url_col, _clr_url_col = st.columns([5, 1])
-            with _url_col:
-                st.text_input(
-                    label="🔗 URL ของข่าว",
-                    placeholder="https://www.example.com/news/...",
-                    label_visibility="collapsed",
-                    key="input_url"
-                )
-            with _clr_url_col:
-                st.button("🗑️ ล้างข้อความ", type="secondary",
-                          on_click=clear_url, use_container_width=True)
-            input_url = st.session_state['input_url']
-        else:
-            with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
-                m1, m2 = st.columns(2)
-
-                if m1.button("🚨 ตัวอย่างข่าวปลอม", use_container_width=True, type="primary"):
-                    st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท สามารถเช็คสิทธิ์และลงทะเบียนรับเงินเข้าบัญชีได้ทันทีผ่านเว็บไซต์นี้"
-
-                if m2.button("✅ ตัวอย่างข่าวจริง", use_container_width=True):
-                    st.session_state['input_text'] = "คณะกรรมการนโยบายการเงิน (กนง.) ธนาคารแห่งประเทศไทย มีมติปรับขึ้นอัตราดอกเบี้ยนโยบาย 0.25% ต่อปี จาก 2.25% เป็น 2.50% ต่อปี โดยให้มีผลทันที เพื่อเป็นการดูแลอัตราเงินเฟ้อให้อยู่ในกรอบเป้าหมายอย่างยั่งยืน และสอดคล้องกับแนวโน้มเศรษฐกิจที่กำลังฟื้นตัว"
-
-            # ปุ่มล้างข้อความ อยู่นอก expander
-            _, _clr_col = st.columns([5, 1])
-            with _clr_col:
-                st.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text,
-                          use_container_width=True)
-
-            # เพิ่มกล่องพิมพ์ข้อความ
-            st.text_area(
-                label="กรอกเนื้อหาข่าว",
-                height=180,
-                placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
-                label_visibility="collapsed",
-                key="input_text"
-            )
-            # ดึงข้อความจากหน้าเว็บมาเก็บในตัวแปร เพื่อเตรียมส่งให้ AI ตรวจสอบ
-            input_text = st.session_state['input_text']
-
-        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-        if st.button("🚀  วิเคราะห์ข่าวนี้", type="primary", width="stretch"):
-            clean = ""
-            if check_mode=="🔗  URL ลิงก์ข่าว":
-                if not input_url: st.warning("กรุณาวาง URL ก่อนกด"); st.stop()
-                with st.spinner("กำลังดึงข้อมูลจากลิงก์..."):
-                    db.log_system_event(user_id=st.session_state.get('user_id'), action="URL_FETCH",
-                    details=f"Fetched: {input_url}", level="INFO")
-                    title,content=get_content_from_url(input_url)
-                if title and not str(content).startswith("Error"):
-                    clean=f"{title}\n\n{content}"
-                else:
-                    st.error(f"ดึงข้อมูลไม่ได้: {content}")
-                    db.log_system_event(user_id=st.session_state.get('user_id'),action="API_ERROR",
-                                        details=f"URL fetch failed: {input_url}",level="ERROR"); st.stop()
-            else:
-                clean=str(input_text).strip()
-                if not clean: st.warning("กรุณาใส่เนื้อหาข่าว"); st.stop()
-
-            with st.spinner("🧠 AI กำลังวิเคราะห์..."):
-                try:
-        # ✅ โหลด pipeline ก่อน แล้วส่งเข้าไปด้วย
-                    pipeline = ai.get_pipeline()
-                    result = ai.predict_news(re.sub(r'\s+',' ', clean).strip(), pipeline)
-        
-                    if result:
-                        time.sleep(0.35)
-                        rl, rc = result.get('result'), result.get('confidence')
-                        uname = st.session_state.get('username', 'Unknown')
-                        db.log_system_event(user_id=st.session_state.get('user_id'), action="PREDICT",
-                        details=f"[{uname}] ทำนาย: '{clean[:50]}' → {rl} ({rc}%)", level="INFO")
-                        pid = db.create_prediction(st.session_state.get('user_id'), clean[:50]+"…",
-                                                clean, input_url or None, rl, rc)
-                        st.session_state.update({'current_result': result, 'current_pred_id': pid, 'feedback_given': False,'current_text':  clean})
-                        st.rerun()
-                    else:
-                        st.error("AI ไม่ตอบสนอง")
-                        db.log_system_event(user_id=st.session_state.get('user_id'), action="API_ERROR",
-                                details="None result", level="ERROR")
-                except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาด: {e}")
-
-        # Result
-        if 'current_result' in st.session_state:
-            res   = st.session_state['current_result']
-            label = res['result']
-            conf  = float(res['confidence'])
-            cat   = res.get('category', 'ไม่ระบุ')
-
-            # ✅ ดึงจาก current_text แทน input_text
-            raw_text = st.session_state.get('current_text', '')
-            preview  = re.sub(r'\s+', ' ', str(raw_text)).strip()[:150]
-            preview  = (preview + "…") if len(str(raw_text)) > 150 else preview
-
-            if conf < 70:
-                cfg = dict(bg="#FFFBEB", border="#F59E0B", bc="#92400E", bbg="#FEF3C7",
-                        icon="⚠️", verdict="UNVERIFIED", bar="#F59E0B",
-                        desc="AI ยังไม่มีความมั่นใจเพียงพอ — ข้อมูลอาจไม่ครบถ้วน ควรตรวจสอบจากแหล่งอื่นด้วย")
-            elif label == "Fake":
-                cfg = dict(bg="#FFF5F5", border="#EF4444", bc="#991B1B", bbg="#FEE2E2",
-                        icon="🚨", verdict="FAKE NEWS", bar="#EF4444",
-                        desc="เนื้อหานี้มีลักษณะเป็นข่าวปลอมหรือข้อมูลบิดเบือน — กรุณาตรวจสอบแหล่งที่มาก่อนแชร์")
-            else:
-                cfg = dict(bg="#F0FDF4", border="#22C55E", bc="#14532D", bbg="#DCFCE7",
-                        icon="✅", verdict="REAL NEWS", bar="#22C55E",
-                        desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ")
-
-            st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
-
-            st.markdown(f"""
-        <div style="background:{cfg['bg']};border:1.5px solid {cfg['border']};
-                    border-radius:16px;padding:26px 28px;
-                    box-shadow:0 4px 20px rgba(0,0,0,0.06);">
-        <div style="display:flex;align-items:flex-start;gap:15px;margin-bottom:18px;">
-            <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
-            <div style="flex:1;">
-            <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
-                        font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
-                        font-size:1.15rem;padding:5px 16px;border-radius:8px;
-                        letter-spacing:-0.2px;">{cfg['verdict']}</span>
-            <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
-                {cfg['desc']}
-            </div>
-            </div>
-        </div>
-        
-        {'<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px 16px;margin-bottom:14px;"><div style="font-size:0.72rem;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📄 จากเนื้อหาข่าว</div><div style="font-size:0.88rem;color:#334155;line-height:1.6;font-style:italic;">&quot;' + preview + '&quot;</div></div>' if preview else ''}
-        <div style="margin-bottom:14px;">
-            <span style="font-size:0.75rem;font-weight:600;color:#64748B;">📂 หมวดหมู่ข่าว</span>
-            &nbsp;
-            <span style="background:#EFF6FF;color:#1148A8;font-size:0.82rem;font-weight:700;
-                        padding:4px 12px;border-radius:99px;border:1px solid #BFDBFE;">
-            {cat}
-            </span>
-        </div>
-        <div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-            <span style="font-size:0.8rem;font-weight:600;color:#64748B;">AI Confidence</span>
-            <span style="font-size:0.88rem;font-weight:800;color:{cfg['bc']};">{conf:.1f}%</span>
-            </div>
-            <div style="background:rgba(0,0,0,0.07);border-radius:99px;height:7px;overflow:hidden;">
-            <div style="width:{conf}%;height:100%;background:{cfg['bar']};
-                        border-radius:99px;"></div>
-            </div>
-        </div>
-        </div>""", unsafe_allow_html=True)
-
-# Feedback
-            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+        # ──────────────────────────────────────
+        # SIDEBAR
+        # ──────────────────────────────────────
+        with st.sidebar:
+            # Brand
             st.markdown("""
-            <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;
-            padding:18px 20px 10px;">
-  <div style="font-weight:700;font-size:0.9rem;color:#1E293B;">
-    💬 AI ทายถูกหรือเปล่า?
-  </div>
-  <div style="font-size:0.8rem;color:#94A3B8;margin:3px 0 12px;">
-    Feedback ของคุณช่วยให้ AI แม่นยำขึ้น
-  </div>
-</div>""", unsafe_allow_html=True)
-            if not st.session_state.get('feedback_given'):
-                fc1,fc2=st.columns(2)
-                with fc1:
-                    if st.button("👍  ถูกต้อง — AI ทายถูก",type="primary",width="stretch"):
-                        db.save_feedback(st.session_state['current_pred_id'], "Correct")
-                        db.log_system_event(user_id=st.session_state.get('user_id'), action="FEEDBACK",
-                        details=f"[{st.session_state.get('username')}] Feedback: Correct (pred_id: {st.session_state['current_pred_id']})", level="INFO")
-
-                        st.session_state['feedback_given']=True; st.toast("ขอบคุณ!"); time.sleep(0.7); st.rerun()
-                with fc2:
-                    if st.button("👎  ไม่ถูกต้อง — AI ทายผิด",width="stretch"):
-                        db.save_feedback(st.session_state['current_pred_id'],"Incorrect")
-                        db.log_system_event(user_id=st.session_state.get('user_id'), action="FEEDBACK",
-                        details=f"[{st.session_state.get('username')}] Feedback: Incorrect (pred_id: {st.session_state['current_pred_id']})", level="INFO")
-                        st.session_state['feedback_given']=True; st.toast("ขอบคุณ! เราจะนำไปปรับปรุง"); time.sleep(0.7); st.rerun()
-            else:
-                st.success("✅ ส่ง Feedback แล้ว — ขอบคุณที่ช่วยพัฒนา AI!")
-
-    # ══════════════════════════════════════
-    # 📜 HISTORY
-    # ══════════════════════════════════════
-    elif menu=="📜 ประวัติการตรวจสอบ":
-        page_header("📜","ประวัติการตรวจสอบ","ข่าวทุกรายการที่คุณเคยวิเคราะห์")
-        uid=st.session_state.get('user_id')
-        if uid:
-            hist=db.get_user_history(uid)
-            if hist:
-                df=pd.DataFrame(hist); df.columns=[c.lower() for c in df.columns]
-                sq = st.text_input("ค้นหาหัวข้อข่าว", "", placeholder="🔍 ค้นหาหัวข้อข่าว...", label_visibility="collapsed")
-                if sq: df=df[df['title'].str.contains(sq,case=False,na=False)]
-                if not df.empty:
-                    if 'timestamp' in df.columns:
-                        df['timestamp']=pd.to_datetime(df['timestamp']).dt.strftime('%d %b %Y, %H:%M')
-                    rmap={'title':'หัวข้อข่าว','result':'ผลลัพธ์','confidence':'ความมั่นใจ (%)','timestamp':'วันที่-เวลา'}
-                    vc=[c for c in rmap if c in df.columns]
-                    dfd = df[vc].rename(columns=rmap)
-                    dfd.index = pd.RangeIndex(1, len(dfd) + 1)
-                    st.caption(f"พบ {len(dfd)} รายการ")
-                    st.dataframe(dfd, width="stretch")
-                else:
-                    st.warning(f"ไม่พบผลลัพธ์สำหรับ '{sq}'")
-            else:
-                st.markdown("""
-                <div style="text-align:center;padding:64px 20px;">
-                  <div style="font-size:52px;margin-bottom:16px;">📭</div>
-                  <div style="font-size:1.05rem;font-weight:700;color:#334155;margin-bottom:8px;">
-                    ยังไม่มีประวัติการตรวจสอบ
-                  </div>
-                  <div style="font-size:0.88rem;color:#94A3B8;">
-                    กลับไปหน้าหลักเพื่อเริ่มตรวจสอบข่าวรายการแรก
-                  </div>
-                </div>""", unsafe_allow_html=True)
-
-    # ══════════════════════════════════════
-    # 🔥 TRENDING
-    # ══════════════════════════════════════
-    elif menu == "🔥 ข่าวที่เป็นกระแส":
-        page_header("🔥", "ข่าวที่เป็นกระแส", "ข่าวสารที่ถูกพูดถึงและผ่านการตรวจสอบโดยทีมงาน")
-        df = db.get_all_trending()
-        if df.empty:
-            st.info("ℹ️ ยังไม่มีข่าวที่เป็นกระแสในขณะนี้")
-        else:
-            col_s, col_f = st.columns([1, 2])
-            with col_s:
-                filter_label = st.selectbox(
-                    "กรองตามประเภท", ["ทั้งหมด", "Real", "Fake"],
-                    label_visibility="collapsed"
-                )
-            with col_f:
-                search_q = st.text_input(
-                    "ค้นหา", placeholder="🔍 ค้นหาข่าว...",
-                    label_visibility="collapsed"
-                )
-
-            df_filtered = df.copy()
-            if filter_label != "ทั้งหมด":
-                df_filtered = df_filtered[df_filtered['label'] == filter_label]
-            if search_q:
-                df_filtered = df_filtered[
-                    df_filtered['headline'].str.contains(search_q, case=False, na=False) |
-                    df_filtered['content'].str.contains(search_q, case=False, na=False)
-                ]
-
-            n_real = len(df[df['label'] == 'Real'])
-            n_fake = len(df[df['label'] == 'Fake'])
-
-            st.markdown(f"""
-            <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-            <span style="background:#F1F5F9;color:#475569;font-size:0.78rem;font-weight:700;
-                        padding:4px 12px;border-radius:99px;">
-                📰 ทั้งหมด {len(df)}
-            </span>
-            <span style="background:#DCFCE7;color:#166534;font-size:0.78rem;font-weight:700;
-                        padding:4px 12px;border-radius:99px;">
-                ✅ Real {n_real}
-            </span>
-            <span style="background:#FEE2E2;color:#991B1B;font-size:0.78rem;font-weight:700;
-                        padding:4px 12px;border-radius:99px;">
-                🚨 Fake {n_fake}
-            </span>
+            <div style="padding:22px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.06);
+                        margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:26px;">🛡️</span>
+            <div>
+                <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
+                            font-size:0.97rem;color:#fff;line-height:1.2;">TrueCheck AI</div>
+                <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);
+                            text-transform:uppercase;letter-spacing:1.2px;">Fake News Detector</div>
+            </div>
             </div>""", unsafe_allow_html=True)
 
-            st.caption(f"แสดง {len(df_filtered)} รายการ")
+            # User card
+            role  = (st.session_state.get('role') or 'user').upper()
+            uname = st.session_state.get('username','User')
+            rc    = "#60A5FA" if role=="ADMIN" else "#64748B"
+            st.markdown(f"""
+            <div style="margin:6px 10px 14px;background:rgba(255,255,255,0.055);
+                        border:1px solid rgba(255,255,255,0.08);border-radius:10px;
+                        padding:11px 13px;display:flex;align-items:center;gap:10px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:rgba(30,136,229,0.30);
+                        display:flex;align-items:center;justify-content:center;
+                        font-size:15px;flex-shrink:0;">👤</div>
+            <div style="min-width:0;">
+                <div style="font-weight:600;font-size:0.86rem;color:#fff;
+                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{uname}</div>
+                <div style="font-size:0.68rem;font-weight:700;color:{rc};
+                            text-transform:uppercase;letter-spacing:0.7px;">{role}</div>
+            </div>
+            </div>""", unsafe_allow_html=True)
 
-            if df_filtered.empty:
-                st.info("ไม่พบข่าวที่ตรงกับเงื่อนไข")
+            st.markdown("<div style='padding:2px 14px 5px;font-size:0.67rem;font-weight:700;color:rgba(255,255,255,0.28);text-transform:uppercase;letter-spacing:1.2px;'>MENU</div>", unsafe_allow_html=True)
+
+            nav=[("🏠 หน้าหลัก","🏠  หน้าหลัก"),
+                ("📜 ประวัติการตรวจสอบ","📜  ประวัติการตรวจสอบ"),
+                ("🔥 ข่าวที่เป็นกระแส","🔥  ข่าวที่เป็นกระแส"),
+                ("👤 ข้อมูลส่วนตัว","👤  ข้อมูลส่วนตัว")]
+
+            for key,label in nav:
+                active=st.session_state.active_menu==key
+                if st.button(label,key=f"nav_{key}",width="stretch",
+                            type="primary" if active else "secondary"):
+                    st.session_state.active_menu=key; st.rerun()
+
+            if st.session_state.get('role')=='admin':
+                st.markdown("<div style='margin:10px 14px 0;padding-top:10px;border-top:1px solid rgba(255,255,255,0.07);font-size:0.67rem;font-weight:700;color:rgba(255,255,255,0.28);text-transform:uppercase;letter-spacing:1.2px;'>ADMIN PANEL</div>", unsafe_allow_html=True)
+                admin_nav=[("📊 Dashboard","📊  Dashboard"),
+                        ("📈 Model Performance","📈  Model Performance"),
+                        ("📰 Manage News","📰  Manage News"),
+                        ("💬 Review Feedback","💬  Review Feedback"),
+                        ("🔬 System Analytics","🔬  System Analytics"),
+                        ("👥 Manage Users","👥  Manage Users")]
+                for key,label in admin_nav:
+                    active=st.session_state.active_menu==key
+                    if st.button(label,key=f"adm_{key}",width="stretch",
+                                type="primary" if active else "secondary"):
+                        st.session_state.active_menu=key; st.rerun()
+
+            st.markdown("<hr style='margin:14px 0;'>",unsafe_allow_html=True)
+            if st.button("  🚪  ออกจากระบบ",key="logout_btn",width="stretch"):
+                db.log_system_event(user_id=st.session_state.get('user_id'),action="USER_LOGOUT",
+                    details=f"{uname} logged out",level="INFO")
+                st.session_state['do_logout']=True; st.rerun()
+
+        menu=st.session_state.active_menu
+
+        # ══════════════════════════════════════
+        # 🏠 HOME
+        # ══════════════════════════════════════
+        # --- เริ่มส่วน UI ---
+        if menu == "🏠 หน้าหลัก":
+            page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI ")
+
+            # แก้ Warning: ใส่ข้อความลงใน label แต่สั่งซ่อนไว้
+            check_mode = st.radio(
+                label="เลือกโหมดการตรวจสอบ", 
+                options=["📝  พิมพ์ / วางเนื้อหา", "🔗  URL ลิงก์ข่าว"],
+                horizontal=True,
+                label_visibility="collapsed"
+            )
+            st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
+
+            input_url = ""
+            input_text = ""
+
+            if check_mode == "🔗  URL ลิงก์ข่าว":
+                # initialise session state key for URL
+                if 'input_url' not in st.session_state:
+                    st.session_state['input_url'] = ""
+
+                _url_col, _clr_url_col = st.columns([5, 1])
+                with _url_col:
+                    st.text_input(
+                        label="🔗 URL ของข่าว",
+                        placeholder="https://www.example.com/news/...",
+                        label_visibility="collapsed",
+                        key="input_url"
+                    )
+                with _clr_url_col:
+                    st.button("🗑️ ล้างข้อความ", type="secondary",
+                            on_click=clear_url, use_container_width=True)
+                input_url = st.session_state['input_url']
             else:
-                lcfg = {
-                    "Fake": ("#FEE2E2","#991B1B","#EF4444","🚨"),
-                    "Real": ("#DCFCE7","#166534","#22C55E","✅"),
-                }
-                for _, row in df_filtered.iterrows():
-                    lc  = lcfg.get(row['label'], ("#F1F5F9","#475569","#CBD5E1","📰"))
-                    ts  = str(row.get('updated_at', '-')).replace("T", " ")[:16]
-                    cat = str(row.get('category') or 'ทั่วไป')
+                with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
+                    m1, m2 = st.columns(2)
 
-                    # ✅ escape content ป้องกัน HTML พัง
-                    import html as html_lib
-                    safe_content = html_lib.escape(str(row.get('content') or ''))
-                    safe_headline = html_lib.escape(str(row.get('headline') or ''))
+                    if m1.button("🚨 ตัวอย่างข่าวปลอม", use_container_width=True, type="primary"):
+                        st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท สามารถเช็คสิทธิ์และลงทะเบียนรับเงินเข้าบัญชีได้ทันทีผ่านเว็บไซต์นี้"
 
-                    # ✅ img บรรทัดเดียว
-                    img_html = ""
-                    image_url = str(row.get("image_url") or "").strip()
-                    if image_url and image_url not in ("None", "null", ""):
-                        img_html = f'<img src="{image_url}" style="width:100%;height:220px;object-fit:contain;background:#F1F5F9;border-radius:10px;margin-bottom:14px;display:block;" />'
+                    if m2.button("✅ ตัวอย่างข่าวจริง", use_container_width=True):
+                        st.session_state['input_text'] = "คณะกรรมการนโยบายการเงิน (กนง.) ธนาคารแห่งประเทศไทย มีมติปรับขึ้นอัตราดอกเบี้ยนโยบาย 0.25% ต่อปี จาก 2.25% เป็น 2.50% ต่อปี โดยให้มีผลทันที เพื่อเป็นการดูแลอัตราเงินเฟ้อให้อยู่ในกรอบเป้าหมายอย่างยั่งยืน และสอดคล้องกับแนวโน้มเศรษฐกิจที่กำลังฟื้นตัว"
 
-                    # ✅ สร้าง HTML string ก่อน แล้วค่อย render
-                    html_content = (
-                        f'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px 24px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">'
-                        f'{img_html}'
-                        f'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">'
-                        f'<div style="font-weight:700;color:#1E293B;flex:1;line-height:1.4;font-size:0.97rem;">{lc[3]}&nbsp;{safe_headline}</div>'
-                        f'<span style="flex-shrink:0;background:{lc[0]};color:{lc[1]};-webkit-text-fill-color:{lc[1]};font-size:0.71rem;font-weight:800;padding:3px 11px;border-radius:99px;text-transform:uppercase;white-space:nowrap;">{row["label"]}</span>'
-                        f'</div>'
-                        f'<div style="margin-bottom:10px;">'
-                        f'<span style="background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:99px;border:1px solid #BFDBFE;">📂 {cat}</span>'
-                        f'</div>'
-                        f'<div style="color:#475569;-webkit-text-fill-color:#475569;font-size:0.88rem;line-height:1.6;margin-bottom:10px;">{safe_content}</div>'
-                        f'<div style="font-size:0.76rem;color:#94A3B8;">🕒 อัปเดตเมื่อ {ts}</div>'
-                        f'</div>'
+                # ปุ่มล้างข้อความ อยู่นอก expander
+                _, _clr_col = st.columns([5, 1])
+                with _clr_col:
+                    st.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text,
+                            use_container_width=True)
+
+                # เพิ่มกล่องพิมพ์ข้อความ
+                st.text_area(
+                    label="กรอกเนื้อหาข่าว",
+                    height=180,
+                    placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
+                    label_visibility="collapsed",
+                    key="input_text"
+                )
+                # ดึงข้อความจากหน้าเว็บมาเก็บในตัวแปร เพื่อเตรียมส่งให้ AI ตรวจสอบ
+                input_text = st.session_state['input_text']
+
+            st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+            if st.button("🚀  วิเคราะห์ข่าวนี้", type="primary", width="stretch"):
+                clean = ""
+                if check_mode=="🔗  URL ลิงก์ข่าว":
+                    if not input_url: st.warning("กรุณาวาง URL ก่อนกด"); st.stop()
+                    with st.spinner("กำลังดึงข้อมูลจากลิงก์..."):
+                        db.log_system_event(user_id=st.session_state.get('user_id'), action="URL_FETCH",
+                        details=f"Fetched: {input_url}", level="INFO")
+                        title,content=get_content_from_url(input_url)
+                    if title and not str(content).startswith("Error"):
+                        clean=f"{title}\n\n{content}"
+                    else:
+                        st.error(f"ดึงข้อมูลไม่ได้: {content}")
+                        db.log_system_event(user_id=st.session_state.get('user_id'),action="API_ERROR",
+                                            details=f"URL fetch failed: {input_url}",level="ERROR"); st.stop()
+                else:
+                    clean=str(input_text).strip()
+                    if not clean: st.warning("กรุณาใส่เนื้อหาข่าว"); st.stop()
+
+                with st.spinner("🧠 AI กำลังวิเคราะห์..."):
+                    try:
+            # ✅ โหลด pipeline ก่อน แล้วส่งเข้าไปด้วย
+                        pipeline = ai.get_pipeline()
+                        result = ai.predict_news(re.sub(r'\s+',' ', clean).strip(), pipeline)
+            
+                        if result:
+                            time.sleep(0.35)
+                            rl, rc = result.get('result'), result.get('confidence')
+                            uname = st.session_state.get('username', 'Unknown')
+                            db.log_system_event(user_id=st.session_state.get('user_id'), action="PREDICT",
+                            details=f"[{uname}] ทำนาย: '{clean[:50]}' → {rl} ({rc}%)", level="INFO")
+                            pid = db.create_prediction(st.session_state.get('user_id'), clean[:50]+"…",
+                                                    clean, input_url or None, rl, rc)
+                            st.session_state.update({'current_result': result, 'current_pred_id': pid, 'feedback_given': False,'current_text':  clean})
+                            st.rerun()
+                        else:
+                            st.error("AI ไม่ตอบสนอง")
+                            db.log_system_event(user_id=st.session_state.get('user_id'), action="API_ERROR",
+                                    details="None result", level="ERROR")
+                    except Exception as e:
+                        st.error(f"เกิดข้อผิดพลาด: {e}")
+
+            # Result
+            if 'current_result' in st.session_state:
+                res   = st.session_state['current_result']
+                label = res['result']
+                conf  = float(res['confidence'])
+                cat   = res.get('category', 'ไม่ระบุ')
+
+                # ✅ ดึงจาก current_text แทน input_text
+                raw_text = st.session_state.get('current_text', '')
+                preview  = re.sub(r'\s+', ' ', str(raw_text)).strip()[:150]
+                preview  = (preview + "…") if len(str(raw_text)) > 150 else preview
+
+                if conf < 70:
+                    cfg = dict(bg="#FFFBEB", border="#F59E0B", bc="#92400E", bbg="#FEF3C7",
+                            icon="⚠️", verdict="UNVERIFIED", bar="#F59E0B",
+                            desc="AI ยังไม่มีความมั่นใจเพียงพอ — ข้อมูลอาจไม่ครบถ้วน ควรตรวจสอบจากแหล่งอื่นด้วย")
+                elif label == "Fake":
+                    cfg = dict(bg="#FFF5F5", border="#EF4444", bc="#991B1B", bbg="#FEE2E2",
+                            icon="🚨", verdict="FAKE NEWS", bar="#EF4444",
+                            desc="เนื้อหานี้มีลักษณะเป็นข่าวปลอมหรือข้อมูลบิดเบือน — กรุณาตรวจสอบแหล่งที่มาก่อนแชร์")
+                else:
+                    cfg = dict(bg="#F0FDF4", border="#22C55E", bc="#14532D", bbg="#DCFCE7",
+                            icon="✅", verdict="REAL NEWS", bar="#22C55E",
+                            desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ")
+
+                st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
+
+                st.markdown(f"""
+            <div style="background:{cfg['bg']};border:1.5px solid {cfg['border']};
+                        border-radius:16px;padding:26px 28px;
+                        box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+            <div style="display:flex;align-items:flex-start;gap:15px;margin-bottom:18px;">
+                <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
+                <div style="flex:1;">
+                <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
+                            font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
+                            font-size:1.15rem;padding:5px 16px;border-radius:8px;
+                            letter-spacing:-0.2px;">{cfg['verdict']}</span>
+                <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
+                    {cfg['desc']}
+                </div>
+                </div>
+            </div>
+            
+            {'<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px 16px;margin-bottom:14px;"><div style="font-size:0.72rem;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📄 จากเนื้อหาข่าว</div><div style="font-size:0.88rem;color:#334155;line-height:1.6;font-style:italic;">&quot;' + preview + '&quot;</div></div>' if preview else ''}
+            <div style="margin-bottom:14px;">
+                <span style="font-size:0.75rem;font-weight:600;color:#64748B;">📂 หมวดหมู่ข่าว</span>
+                &nbsp;
+                <span style="background:#EFF6FF;color:#1148A8;font-size:0.82rem;font-weight:700;
+                            padding:4px 12px;border-radius:99px;border:1px solid #BFDBFE;">
+                {cat}
+                </span>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:0.8rem;font-weight:600;color:#64748B;">AI Confidence</span>
+                <span style="font-size:0.88rem;font-weight:800;color:{cfg['bc']};">{conf:.1f}%</span>
+                </div>
+                <div style="background:rgba(0,0,0,0.07);border-radius:99px;height:7px;overflow:hidden;">
+                <div style="width:{conf}%;height:100%;background:{cfg['bar']};
+                            border-radius:99px;"></div>
+                </div>
+            </div>
+            </div>""", unsafe_allow_html=True)
+
+    # Feedback
+                st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+                st.markdown("""
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;
+                padding:18px 20px 10px;">
+    <div style="font-weight:700;font-size:0.9rem;color:#1E293B;">
+        💬 AI ทายถูกหรือเปล่า?
+    </div>
+    <div style="font-size:0.8rem;color:#94A3B8;margin:3px 0 12px;">
+        Feedback ของคุณช่วยให้ AI แม่นยำขึ้น
+    </div>
+    </div>""", unsafe_allow_html=True)
+                if not st.session_state.get('feedback_given'):
+                    fc1,fc2=st.columns(2)
+                    with fc1:
+                        if st.button("👍  ถูกต้อง — AI ทายถูก",type="primary",width="stretch"):
+                            db.save_feedback(st.session_state['current_pred_id'], "Correct")
+                            db.log_system_event(user_id=st.session_state.get('user_id'), action="FEEDBACK",
+                            details=f"[{st.session_state.get('username')}] Feedback: Correct (pred_id: {st.session_state['current_pred_id']})", level="INFO")
+
+                            st.session_state['feedback_given']=True; st.toast("ขอบคุณ!"); time.sleep(0.7); st.rerun()
+                    with fc2:
+                        if st.button("👎  ไม่ถูกต้อง — AI ทายผิด",width="stretch"):
+                            db.save_feedback(st.session_state['current_pred_id'],"Incorrect")
+                            db.log_system_event(user_id=st.session_state.get('user_id'), action="FEEDBACK",
+                            details=f"[{st.session_state.get('username')}] Feedback: Incorrect (pred_id: {st.session_state['current_pred_id']})", level="INFO")
+                            st.session_state['feedback_given']=True; st.toast("ขอบคุณ! เราจะนำไปปรับปรุง"); time.sleep(0.7); st.rerun()
+                else:
+                    st.success("✅ ส่ง Feedback แล้ว — ขอบคุณที่ช่วยพัฒนา AI!")
+
+        # ══════════════════════════════════════
+        # 📜 HISTORY
+        # ══════════════════════════════════════
+        elif menu=="📜 ประวัติการตรวจสอบ":
+            page_header("📜","ประวัติการตรวจสอบ","ข่าวทุกรายการที่คุณเคยวิเคราะห์")
+            uid=st.session_state.get('user_id')
+            if uid:
+                hist=db.get_user_history(uid)
+                if hist:
+                    df=pd.DataFrame(hist); df.columns=[c.lower() for c in df.columns]
+                    sq = st.text_input("ค้นหาหัวข้อข่าว", "", placeholder="🔍 ค้นหาหัวข้อข่าว...", label_visibility="collapsed")
+                    if sq: df=df[df['title'].str.contains(sq,case=False,na=False)]
+                    if not df.empty:
+                        if 'timestamp' in df.columns:
+                            df['timestamp']=pd.to_datetime(df['timestamp']).dt.strftime('%d %b %Y, %H:%M')
+                        rmap={'title':'หัวข้อข่าว','result':'ผลลัพธ์','confidence':'ความมั่นใจ (%)','timestamp':'วันที่-เวลา'}
+                        vc=[c for c in rmap if c in df.columns]
+                        dfd = df[vc].rename(columns=rmap)
+                        dfd.index = pd.RangeIndex(1, len(dfd) + 1)
+                        st.caption(f"พบ {len(dfd)} รายการ")
+                        st.dataframe(dfd, width="stretch")
+                    else:
+                        st.warning(f"ไม่พบผลลัพธ์สำหรับ '{sq}'")
+                else:
+                    st.markdown("""
+                    <div style="text-align:center;padding:64px 20px;">
+                    <div style="font-size:52px;margin-bottom:16px;">📭</div>
+                    <div style="font-size:1.05rem;font-weight:700;color:#334155;margin-bottom:8px;">
+                        ยังไม่มีประวัติการตรวจสอบ
+                    </div>
+                    <div style="font-size:0.88rem;color:#94A3B8;">
+                        กลับไปหน้าหลักเพื่อเริ่มตรวจสอบข่าวรายการแรก
+                    </div>
+                    </div>""", unsafe_allow_html=True)
+
+        # ══════════════════════════════════════
+        # 🔥 TRENDING
+        # ══════════════════════════════════════
+        elif menu == "🔥 ข่าวที่เป็นกระแส":
+            page_header("🔥", "ข่าวที่เป็นกระแส", "ข่าวสารที่ถูกพูดถึงและผ่านการตรวจสอบโดยทีมงาน")
+            df = db.get_all_trending()
+            if df.empty:
+                st.info("ℹ️ ยังไม่มีข่าวที่เป็นกระแสในขณะนี้")
+            else:
+                col_s, col_f = st.columns([1, 2])
+                with col_s:
+                    filter_label = st.selectbox(
+                        "กรองตามประเภท", ["ทั้งหมด", "Real", "Fake"],
+                        label_visibility="collapsed"
+                    )
+                with col_f:
+                    search_q = st.text_input(
+                        "ค้นหา", placeholder="🔍 ค้นหาข่าว...",
+                        label_visibility="collapsed"
                     )
 
-                    st.markdown(html_content, unsafe_allow_html=True)
-    # ══════════════════════════════════════
-    # 👤 PROFILE
-    # ══════════════════════════════════════
-    elif menu == "👤 ข้อมูลส่วนตัว":
-        for k, v in [('username', "ผู้ใช้งานทั่วไป"), ('email', ""), ('edit_email_mode', False)]:
-            if k not in st.session_state:
-                st.session_state[k] = v
-        page_header("👤", "ข้อมูลส่วนตัว", "จัดการบัญชีและการตั้งค่า")
-        uid = st.session_state.get('user_id')
-        check_count = 0
-        if uid:
-            h=db.get_user_history(uid)
-            if h:
-                df=pd.DataFrame(h); df.columns=[c.lower() for c in df.columns]; check_count=len(df)
-            if 'email' not in st.session_state or not st.session_state.email:
-                st.session_state.email=db.get_user_email(uid)
-        
+                df_filtered = df.copy()
+                if filter_label != "ทั้งหมด":
+                    df_filtered = df_filtered[df_filtered['label'] == filter_label]
+                if search_q:
+                    df_filtered = df_filtered[
+                        df_filtered['headline'].str.contains(search_q, case=False, na=False) |
+                        df_filtered['content'].str.contains(search_q, case=False, na=False)
+                    ]
 
-        # Profile banner
-        st.markdown(f"""
-        <div style="background:linear-gradient(135deg,#1148A8 0%,#1565C0 60%,#0097A7 100%);
-                    border-radius:16px;padding:28px 26px;margin-bottom:20px;
-                    display:flex;align-items:center;gap:20px;
-                    box-shadow:0 4px 20px rgba(17,72,168,0.18);">
-          <div style="width:62px;height:62px;border-radius:50%;
-                      background:rgba(255,255,255,0.16);display:flex;
-                      align-items:center;justify-content:center;
-                      font-size:28px;flex-shrink:0;">👤</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1.35rem;
-                        font-weight:800;color:#fff;">{st.session_state.username}</div>
-            <div style="font-size:0.8rem;color:rgba(255,255,255,0.60);margin-top:2px;">
-              สมาชิก TrueCheck AI
+                n_real = len(df[df['label'] == 'Real'])
+                n_fake = len(df[df['label'] == 'Fake'])
+
+                st.markdown(f"""
+                <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+                <span style="background:#F1F5F9;color:#475569;font-size:0.78rem;font-weight:700;
+                            padding:4px 12px;border-radius:99px;">
+                    📰 ทั้งหมด {len(df)}
+                </span>
+                <span style="background:#DCFCE7;color:#166534;font-size:0.78rem;font-weight:700;
+                            padding:4px 12px;border-radius:99px;">
+                    ✅ Real {n_real}
+                </span>
+                <span style="background:#FEE2E2;color:#991B1B;font-size:0.78rem;font-weight:700;
+                            padding:4px 12px;border-radius:99px;">
+                    🚨 Fake {n_fake}
+                </span>
+                </div>""", unsafe_allow_html=True)
+
+                st.caption(f"แสดง {len(df_filtered)} รายการ")
+
+                if df_filtered.empty:
+                    st.info("ไม่พบข่าวที่ตรงกับเงื่อนไข")
+                else:
+                    lcfg = {
+                        "Fake": ("#FEE2E2","#991B1B","#EF4444","🚨"),
+                        "Real": ("#DCFCE7","#166534","#22C55E","✅"),
+                    }
+                    for _, row in df_filtered.iterrows():
+                        lc  = lcfg.get(row['label'], ("#F1F5F9","#475569","#CBD5E1","📰"))
+                        ts  = str(row.get('updated_at', '-')).replace("T", " ")[:16]
+                        cat = str(row.get('category') or 'ทั่วไป')
+
+                        # ✅ escape content ป้องกัน HTML พัง
+                        import html as html_lib
+                        safe_content = html_lib.escape(str(row.get('content') or ''))
+                        safe_headline = html_lib.escape(str(row.get('headline') or ''))
+
+                        # ✅ img บรรทัดเดียว
+                        img_html = ""
+                        image_url = str(row.get("image_url") or "").strip()
+                        if image_url and image_url not in ("None", "null", ""):
+                            img_html = f'<img src="{image_url}" style="width:100%;height:220px;object-fit:contain;background:#F1F5F9;border-radius:10px;margin-bottom:14px;display:block;" />'
+
+                        # ✅ สร้าง HTML string ก่อน แล้วค่อย render
+                        html_content = (
+                            f'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px 24px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">'
+                            f'{img_html}'
+                            f'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">'
+                            f'<div style="font-weight:700;color:#1E293B;flex:1;line-height:1.4;font-size:0.97rem;">{lc[3]}&nbsp;{safe_headline}</div>'
+                            f'<span style="flex-shrink:0;background:{lc[0]};color:{lc[1]};-webkit-text-fill-color:{lc[1]};font-size:0.71rem;font-weight:800;padding:3px 11px;border-radius:99px;text-transform:uppercase;white-space:nowrap;">{row["label"]}</span>'
+                            f'</div>'
+                            f'<div style="margin-bottom:10px;">'
+                            f'<span style="background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:99px;border:1px solid #BFDBFE;">📂 {cat}</span>'
+                            f'</div>'
+                            f'<div style="color:#475569;-webkit-text-fill-color:#475569;font-size:0.88rem;line-height:1.6;margin-bottom:10px;">{safe_content}</div>'
+                            f'<div style="font-size:0.76rem;color:#94A3B8;">🕒 อัปเดตเมื่อ {ts}</div>'
+                            f'</div>'
+                        )
+
+                        st.markdown(html_content, unsafe_allow_html=True)
+        # ══════════════════════════════════════
+        # 👤 PROFILE
+        # ══════════════════════════════════════
+        elif menu == "👤 ข้อมูลส่วนตัว":
+            for k, v in [('username', "ผู้ใช้งานทั่วไป"), ('email', ""), ('edit_email_mode', False)]:
+                if k not in st.session_state:
+                    st.session_state[k] = v
+            page_header("👤", "ข้อมูลส่วนตัว", "จัดการบัญชีและการตั้งค่า")
+            uid = st.session_state.get('user_id')
+            check_count = 0
+            if uid:
+                h=db.get_user_history(uid)
+                if h:
+                    df=pd.DataFrame(h); df.columns=[c.lower() for c in df.columns]; check_count=len(df)
+                if 'email' not in st.session_state or not st.session_state.email:
+                    st.session_state.email=db.get_user_email(uid)
+            
+
+            # Profile banner
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#1148A8 0%,#1565C0 60%,#0097A7 100%);
+                        border-radius:16px;padding:28px 26px;margin-bottom:20px;
+                        display:flex;align-items:center;gap:20px;
+                        box-shadow:0 4px 20px rgba(17,72,168,0.18);">
+            <div style="width:62px;height:62px;border-radius:50%;
+                        background:rgba(255,255,255,0.16);display:flex;
+                        align-items:center;justify-content:center;
+                        font-size:28px;flex-shrink:0;">👤</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1.35rem;
+                            font-weight:800;color:#fff;">{st.session_state.username}</div>
+                <div style="font-size:0.8rem;color:rgba(255,255,255,0.60);margin-top:2px;">
+                สมาชิก TrueCheck AI
+                </div>
             </div>
-          </div>
-          <div style="text-align:center;background:rgba(255,255,255,0.12);
-                      border-radius:12px;padding:13px 22px;flex-shrink:0;">
-            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1.7rem;
-                        font-weight:800;color:#fff;">{check_count}</div>
-            <div style="font-size:0.7rem;color:rgba(255,255,255,0.55);
-                        text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;">ข่าวที่ตรวจสอบ</div>
-          </div>
-        </div>""", unsafe_allow_html=True)
+            <div style="text-align:center;background:rgba(255,255,255,0.12);
+                        border-radius:12px;padding:13px 22px;flex-shrink:0;">
+                <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1.7rem;
+                            font-weight:800;color:#fff;">{check_count}</div>
+                <div style="font-size:0.7rem;color:rgba(255,255,255,0.55);
+                            text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;">ข่าวที่ตรวจสอบ</div>
+            </div>
+            </div>""", unsafe_allow_html=True)
 
-        # Settings
-        st.markdown("""<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
-        padding:22px 26px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-        <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:0.95rem;
-        color:#1E293B;margin-bottom:16px;">ข้อมูลบัญชี</div>""",unsafe_allow_html=True)
+            # Settings
+            st.markdown("""<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
+            padding:22px 26px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;font-size:0.95rem;
+            color:#1E293B;margin-bottom:16px;">ข้อมูลบัญชี</div>""",unsafe_allow_html=True)
 
-        st.markdown(f"""
-        <div style="display:flex;align-items:center;justify-content:space-between;
-                    padding:12px 0;border-bottom:1px solid #F1F5F9;">
-          <div>
+            st.markdown(f"""
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:12px 0;border-bottom:1px solid #F1F5F9;">
+            <div>
+                <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
+                            letter-spacing:0.6px;color:#94A3B8;margin-bottom:3px;">USERNAME</div>
+                <div style="font-size:0.93rem;font-weight:600;color:#1E293B;">
+                {st.session_state.username}
+                </div>
+            </div>
+            </div>""", unsafe_allow_html=True)
+
+            st.markdown("""<div style="padding-top:13px;">
             <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                        letter-spacing:0.6px;color:#94A3B8;margin-bottom:3px;">USERNAME</div>
-            <div style="font-size:0.93rem;font-weight:600;color:#1E293B;">
-              {st.session_state.username}
-            </div>
-          </div>
-        </div>""", unsafe_allow_html=True)
+                        letter-spacing:0.6px;color:#94A3B8;margin-bottom:7px;">EMAIL</div>
+            </div>""", unsafe_allow_html=True)
 
-        st.markdown("""<div style="padding-top:13px;">
-        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                    letter-spacing:0.6px;color:#94A3B8;margin-bottom:7px;">EMAIL</div>
-        </div>""", unsafe_allow_html=True)
+            ec,eb=st.columns([4,1])
+            new_email=""
+            with ec:
+                if st.session_state.edit_email_mode:
+                    new_email=st.text_input("",value=st.session_state.email,
+                                            label_visibility="collapsed",placeholder="your@email.com")
+                else:
+                    v=st.session_state.email or "ยังไม่ได้ระบุ"
+                    co="#1E293B" if st.session_state.email else "#94A3B8"
+                    st.markdown(f"<div style='font-size:0.92rem;font-weight:600;color:{co};padding:10px 0;'>{v}</div>",unsafe_allow_html=True)
+            with eb:
+                if st.session_state.edit_email_mode:
+                    if st.button("Save",key="save_email",type="primary",width="stretch"):
+                        if not new_email.strip(): st.warning("กรุณากรอกอีเมล")
+                        elif db.update_user_email(uid,new_email):
+                            st.session_state.email=new_email; st.session_state.edit_email_mode=False; st.rerun()
+                        else: st.error("บันทึกไม่ได้")
+                    if st.button("✕",key="cancel_email",width="stretch"):
+                        st.session_state.edit_email_mode=False; st.rerun()
+                else:
+                    lbl="✏️ แก้ไข" if st.session_state.email else "➕ เพิ่ม"
+                    if st.button(lbl,key="edit_email",width="stretch"):
+                        st.session_state.edit_email_mode=True; st.rerun()
 
-        ec,eb=st.columns([4,1])
-        new_email=""
-        with ec:
-            if st.session_state.edit_email_mode:
-                new_email=st.text_input("",value=st.session_state.email,
-                                         label_visibility="collapsed",placeholder="your@email.com")
-            else:
-                v=st.session_state.email or "ยังไม่ได้ระบุ"
-                co="#1E293B" if st.session_state.email else "#94A3B8"
-                st.markdown(f"<div style='font-size:0.92rem;font-weight:600;color:{co};padding:10px 0;'>{v}</div>",unsafe_allow_html=True)
-        with eb:
-            if st.session_state.edit_email_mode:
-                if st.button("Save",key="save_email",type="primary",width="stretch"):
-                    if not new_email.strip(): st.warning("กรุณากรอกอีเมล")
-                    elif db.update_user_email(uid,new_email):
-                        st.session_state.email=new_email; st.session_state.edit_email_mode=False; st.rerun()
-                    else: st.error("บันทึกไม่ได้")
-                if st.button("✕",key="cancel_email",width="stretch"):
-                    st.session_state.edit_email_mode=False; st.rerun()
-            else:
-                lbl="✏️ แก้ไข" if st.session_state.email else "➕ เพิ่ม"
-                if st.button(lbl,key="edit_email",width="stretch"):
-                    st.session_state.edit_email_mode=True; st.rerun()
+            st.markdown("</div>",unsafe_allow_html=True)
+            st.markdown("<div style='height:14px;'></div>",unsafe_allow_html=True)
+            if st.button("🚪 ออกจากระบบ (Logout)",type="primary"):
+                db.log_system_event(user_id=uid,action="USER_LOGOUT",
+                                    details=f"{st.session_state.get('username')} logged out",level="INFO")
+                st.session_state['do_logout']=True; st.rerun()
 
-        st.markdown("</div>",unsafe_allow_html=True)
-        st.markdown("<div style='height:14px;'></div>",unsafe_allow_html=True)
-        if st.button("🚪 ออกจากระบบ (Logout)",type="primary"):
-            db.log_system_event(user_id=uid,action="USER_LOGOUT",
-                                details=f"{st.session_state.get('username')} logged out",level="INFO")
-            st.session_state['do_logout']=True; st.rerun()
+        # ══════════════════════════════════════
+        # ADMIN ROUTES
+        # ══════════════════════════════════════
+        admin_keys={"📊 Dashboard","📈 Model Performance","📰 Manage News",
+                    "💬 Review Feedback","🔬 System Analytics","👥 Manage Users"}
 
-    # ══════════════════════════════════════
-    # ADMIN ROUTES
-    # ══════════════════════════════════════
-    admin_keys={"📊 Dashboard","📈 Model Performance","📰 Manage News",
-                "💬 Review Feedback","🔬 System Analytics","👥 Manage Users"}
+        if menu in admin_keys:
+            if st.session_state.get('role')!='admin':
+                st.error("⛔ Access Denied — หน้านี้สำหรับ Admin เท่านั้น"); st.stop()
 
-    if menu in admin_keys:
-        if st.session_state.get('role')!='admin':
-            st.error("⛔ Access Denied — หน้านี้สำหรับ Admin เท่านั้น"); st.stop()
+            if menu=="📊 Dashboard":
+                page_header("📊","Admin Dashboard","สรุปภาพรวมประสิทธิภาพระบบ (Real-time)")
+                stats=db.get_dashboard_kpi() or {"checks_today":0,"active_users":0,"accuracy":0.0,"feedback_total":0}
+                c1,c2,c3,c4=st.columns(4)
+                with c1: kpi_card("🔍","Checks Today",       f"{stats.get('checks_today',0):,}")
+                with c2: kpi_card("👥","Active Users (24h)", f"{stats.get('active_users',0):,}")
+                with c3:
+                    acc=stats.get('accuracy',0.0)
+                    kpi_card("🎯","Model Accuracy Today",f"{acc}%","✅ ปกติ" if acc>=50 else "⚠️ ต่ำกว่าเกณฑ์",acc>=50)
+                with c4: kpi_card("💬","Feedback Total Today",f"{stats.get('feedback_total',0):,}")
 
-        if menu=="📊 Dashboard":
-            page_header("📊","Admin Dashboard","สรุปภาพรวมประสิทธิภาพระบบ (Real-time)")
-            stats=db.get_dashboard_kpi() or {"checks_today":0,"active_users":0,"accuracy":0.0,"feedback_total":0}
-            c1,c2,c3,c4=st.columns(4)
-            with c1: kpi_card("🔍","Checks Today",       f"{stats.get('checks_today',0):,}")
-            with c2: kpi_card("👥","Active Users (24h)", f"{stats.get('active_users',0):,}")
-            with c3:
-                acc=stats.get('accuracy',0.0)
-                kpi_card("🎯","Model Accuracy Today",f"{acc}%","✅ ปกติ" if acc>=50 else "⚠️ ต่ำกว่าเกณฑ์",acc>=50)
-            with c4: kpi_card("💬","Feedback Total Today",f"{stats.get('feedback_total',0):,}")
-
-            st.markdown("<div style='height:24px;'></div>",unsafe_allow_html=True)
-            section_title("⏱️ Recent Activity","การใช้งานล่าสุด")
-            logs=db.get_system_logs(limit=10)
-            if logs:
-                for row in logs:
-                    ts,user,action,details,level=row
-                    icon="🛡️" if "admin" in str(user).lower() else "👤"
-                    lbg={"ERROR":"#FFF5F5","WARNING":"#FFFBEB"}.get(level,"#F8FAFC")
-                    lborder={"ERROR":"#FECACA","WARNING":"#FDE68A"}.get(level,"#E2E8F0")
-                    st.markdown(f"""
-                    <div style="background:{lbg};border:1px solid {lborder};border-radius:10px;
-                                padding:13px 16px;margin-bottom:7px;
-                                display:flex;align-items:center;gap:13px;">
-                      <span style="font-size:1.2rem;">{icon}</span>
-                      <div style="flex:1;min-width:0;">
-                        <div style="font-weight:700;font-size:0.87rem;color:#1E293B;">{user}</div>
-                        <div style="font-size:0.8rem;color:#64748B;white-space:nowrap;
-                                    overflow:hidden;text-overflow:ellipsis;">
-                          {action} · {(details[:80]+'…') if len(details)>80 else details}
+                st.markdown("<div style='height:24px;'></div>",unsafe_allow_html=True)
+                section_title("⏱️ Recent Activity","การใช้งานล่าสุด")
+                logs=db.get_system_logs(limit=10)
+                if logs:
+                    for row in logs:
+                        ts,user,action,details,level=row
+                        icon="🛡️" if "admin" in str(user).lower() else "👤"
+                        lbg={"ERROR":"#FFF5F5","WARNING":"#FFFBEB"}.get(level,"#F8FAFC")
+                        lborder={"ERROR":"#FECACA","WARNING":"#FDE68A"}.get(level,"#E2E8F0")
+                        st.markdown(f"""
+                        <div style="background:{lbg};border:1px solid {lborder};border-radius:10px;
+                                    padding:13px 16px;margin-bottom:7px;
+                                    display:flex;align-items:center;gap:13px;">
+                        <span style="font-size:1.2rem;">{icon}</span>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:700;font-size:0.87rem;color:#1E293B;">{user}</div>
+                            <div style="font-size:0.8rem;color:#64748B;white-space:nowrap;
+                                        overflow:hidden;text-overflow:ellipsis;">
+                            {action} · {(details[:80]+'…') if len(details)>80 else details}
+                            </div>
                         </div>
-                      </div>
-                      <div style="font-size:0.76rem;color:#94A3B8;white-space:nowrap;">{time_ago(ts)}</div>
-                    </div>""", unsafe_allow_html=True)
-            else: st.info("ยังไม่มีประวัติ")
+                        <div style="font-size:0.76rem;color:#94A3B8;white-space:nowrap;">{time_ago(ts)}</div>
+                        </div>""", unsafe_allow_html=True)
+                else: st.info("ยังไม่มีประวัติ")
 
-        elif menu=="📈 Model Performance":
-            page_header("📈","Model Performance","ความแม่นยำและการทำนายของ AI Model")
-            show_model_performance()
+            elif menu=="📈 Model Performance":
+                page_header("📈","Model Performance","ความแม่นยำและการทำนายของ AI Model")
+                show_model_performance()
 
-        elif menu=="💬 Review Feedback":
-            show_feedback_review()
+            elif menu=="💬 Review Feedback":
+                show_feedback_review()
 
-        elif menu=="📰 Manage News":
-            manage_trending_news()
+            elif menu=="📰 Manage News":
+                manage_trending_news()
 
-        elif menu=="🔬 System Analytics":
-            page_header("🔬","System Analytics","วิเคราะห์การใช้งานและแนวโน้มของระบบ")
-            show_admin_dashboard_enhanced()
-            st.markdown("<hr style='margin:24px 0;'>",unsafe_allow_html=True)
-            show_system_analytics()
+            elif menu=="🔬 System Analytics":
+                page_header("🔬","System Analytics","วิเคราะห์การใช้งานและแนวโน้มของระบบ")
+                show_admin_dashboard_enhanced()
+                st.markdown("<hr style='margin:24px 0;'>",unsafe_allow_html=True)
+                show_system_analytics()
 
-        elif menu=="👥 Manage Users":
-            page_header("👥","Manage Users","จัดการบัญชีผู้ใช้งาน สิทธิ์ และสถานะ")
-            manage_users_page()
+            elif menu=="👥 Manage Users":
+                page_header("👥","Manage Users","จัดการบัญชีผู้ใช้งาน สิทธิ์ และสถานะ")
+                manage_users_page()
