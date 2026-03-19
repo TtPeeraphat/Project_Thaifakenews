@@ -1121,10 +1121,11 @@ def manage_trending_news():
                                         key=f"l_{row['id']}")
                     with col2:
                         # ✅ เพิ่ม category dropdown
-                        CATEGORIES = ["ทั่วไป","การเมือง","เศรษฐกิจ","สุขภาพ",
-                                    "อาชญากรรม","กีฬา","บันเทิง","เทคโนโลยี",
-                                    "ภัยธรรมชาติ","ต่างประเทศ"]
-                        cur_cat = row.get('category') or 'ทั่วไป'
+                        CATEGORIES = [
+                    "นโยบายรัฐบาล-ข่าวสาร","ผลิตภัณฑ์สุขภาพ","การเงิน-หุ้น","ภัยพิบัติ",
+                    "ความสงบและความมั่นคง","ข่าวอื่นๆ","เศรษฐกิจ","ยาเสพติด",  
+                        ]
+                        cur_cat = row.get('category') or 'นโยบายรัฐบาล-ข่าวสาร'
                         edit_cat = st.selectbox("หมวดหมู่", CATEGORIES,
                                                 index=CATEGORIES.index(cur_cat) if cur_cat in CATEGORIES else 0,
                                                 key=f"cat_{row['id']}")
