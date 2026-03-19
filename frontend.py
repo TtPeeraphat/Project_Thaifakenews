@@ -1695,43 +1695,80 @@ elif not st.session_state['logged_in']:
 # ═══════════════════════════════════════════════════════
 else:
  # ── Mobile sidebar toggle (เฉพาะผู้ล็อกอินแล้ว) ──
-        st.markdown("""
-        <button id="mobileSidebarBtn" class="mobile-menu-btn"
-        onclick="
-            var sb = document.querySelector('[data-testid=stSidebar]');
-            if (!sb) return;
-            var isOpen = sb.getAttribute('data-open') === '1';
-            if (isOpen) {
-            sb.style.setProperty('transform', 'translateX(-100%)', 'important');
-            sb.setAttribute('data-open', '0');
-            } else {
-            sb.style.setProperty('transform', 'translateX(0)', 'important');
-            sb.setAttribute('data-open', '1');
-            }
-        ">☰</button>
-        """, unsafe_allow_html=True)
-
-# JS inject แยก ใช้ components.v1.html (height=0 = ไม่กิน space)
         components.html("""
         <script>
         (function() {
-            function initSidebar() {
-                var sb = window.parent.document.querySelector('[data-testid="stSidebar"]');
-                if (!sb) { setTimeout(initSidebar, 200); return; }
-                if (window.parent.innerWidth <= 768) {
-                    var wasOpen = sb.getAttribute('data-open') === '1';
-                    sb.style.setProperty('transition', 'transform 0.3s ease', 'important');
-                    sb.style.setProperty('position', 'fixed', 'important');
-                    sb.style.setProperty('z-index', '999', 'important');
-                    sb.style.setProperty('height', '100vh', 'important');
-                    if (!wasOpen) {
+            function setup() {
+                var pd = window.parent.document;
+
+                // ลบปุ่มเก่าถ้ามี
+                var old = pd.getElementById('mobileSidebarBtn');
+                if (old) old.remove();
+
+                // สร้างปุ่มใหม่ inject เข้า parent
+                var btn = pd.createElement('button');
+                btn.id = 'mobileSidebarBtn';
+                btn.innerHTML = '☰';
+                btn.style.cssText = [
+                    'position:fixed', 'top:12px', 'left:12px',
+                    'z-index:99999', 'background:#1148A8', 'color:white',
+                    'border:none', 'border-radius:8px', 'padding:8px 14px',
+                    'font-size:1.3rem', 'cursor:pointer',
+                    'box-shadow:0 2px 8px rgba(0,0,0,0.25)',
+                    'display:' + (window.parent.innerWidth <= 768 ? 'flex' : 'none')
+                ].join(';');
+
+                btn.addEventListener('click', function() {
+                    var sb = pd.querySelector('[data-testid="stSidebar"]');
+                    if (!sb) return;
+                    var isOpen = sb.getAttribute('data-open') === '1';
+                    if (isOpen) {
                         sb.style.setProperty('transform', 'translateX(-100%)', 'important');
+                        sb.setAttribute('data-open', '0');
+                    } else {
+                        sb.style.setProperty('transform', 'translateX(0)', 'important');
+                        sb.setAttribute('data-open', '1');
                     }
-                }
+                });
+
+                pd.body.appendChild(btn);
             }
-            initSidebar();
-            var obs = new MutationObserver(initSidebar);
-            obs.observe(window.parent.document.body, { childList: true, subtree: false });
+
+            function applySidebarStyles() {
+                var pd = window.parent.document;
+                var sb = pd.querySelector('[data-testid="stSidebar"]');
+                if (!sb) return;
+                if (window.parent.innerWidth > 768) return;
+
+                sb.style.setProperty('transition', 'transform 0.3s ease', 'important');
+                sb.style.setProperty('position', 'fixed', 'important');
+                sb.style.setProperty('z-index', '999', 'important');
+                sb.style.setProperty('height', '100vh', 'important');
+
+                var wasOpen = sb.getAttribute('data-open') === '1';
+                sb.style.setProperty(
+                    'transform',
+                    wasOpen ? 'translateX(0)' : 'translateX(-100%)',
+                    'important'
+                );
+            }
+
+            function init() {
+                var sb = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                if (!sb) { setTimeout(init, 200); return; }
+                setup();
+                applySidebarStyles();
+            }
+
+            init();
+
+            // Re-apply ทุกครั้งที่ Streamlit re-render
+            var obs = new MutationObserver(function() {
+                var pd = window.parent.document;
+                if (!pd.getElementById('mobileSidebarBtn')) setup();
+                applySidebarStyles();
+            });
+            obs.observe(window.parent.document.body, { childList: true, subtree: true });
         })();
         </script>
         """, height=0)
