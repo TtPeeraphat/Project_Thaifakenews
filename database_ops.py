@@ -364,47 +364,52 @@ def get_evaluated_data():
         print(f"❌ Error getting evaluated data: {e}")
         return pd.DataFrame()
 
+
 def get_model_performance_data():
     supabase = get_supabase()
     try:
-        # ✅ จุดที่แก้ไข: เติม !fk_prediction หลังคำว่า predictions เพื่อระบุ Foreign Key ให้ชัดเจน
+        # ✅ ดึงทุก status ที่ไม่ใช่ pending
         res = supabase.table('feedbacks').select('''
-            user_report, 
-            status, 
+            user_report, status,
             predictions!fk_prediction(result, confidence, timestamp)
-        ''').neq('status', 'pending').execute()
-        
+        ''').in_('status', ['Real', 'Fake', 'Ignored']).execute()
+
         if not res.data:
             return pd.DataFrame()
 
         processed_data = []
         for item in res.data:
-            # Supabase มักจะคืนค่า key เป็นชื่อตารางเหมือนเดิม
             pred = item.get('predictions')
             if not pred: continue
-            
-            ai_pred = str(pred.get('result')).capitalize() # Real / Fake
-            user_rep = str(item.get('user_report')).lower()
-            
-            # หาค่าจริง (Ground Truth)
-            if user_rep == 'correct':
+
+            ai_pred  = str(pred.get('result', '')).capitalize()
+            user_rep = str(item.get('user_report', '')).lower()
+            status   = str(item.get('status', ''))
+
+            # ✅ ใช้ status จาก Admin ถ้ามี ไม่งั้นใช้ user_report
+            if status in ['Real', 'Fake']:
+                true_label = status
+                is_correct = (ai_pred == status)
+            elif user_rep == 'correct':
                 true_label = ai_pred
+                is_correct = True
             else:
-                true_label = "Fake" if ai_pred == "Real" else "Real"
-                
+                true_label = 'Fake' if ai_pred == 'Real' else 'Real'
+                is_correct = False
+
             processed_data.append({
-                "timestamp": pred.get('timestamp'),
-                "prediction": ai_pred,
-                "confidence": pred.get('confidence'),
-                "label": true_label,
-                "is_correct": user_rep == 'correct'
+                'timestamp':  pred.get('timestamp'),
+                'prediction': ai_pred,
+                'confidence': pred.get('confidence'),
+                'label':      true_label,
+                'is_correct': is_correct
             })
 
         df = pd.DataFrame(processed_data)
         if not df.empty:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
         return df
-        
+
     except Exception as e:
         print(f"Performance Data Error: {e}")
         return pd.DataFrame()
@@ -760,3 +765,30 @@ def get_user_by_id(user_id):
         return None
     except Exception:
         return None
+def upload_image_to_supabase(file_bytes: bytes, filename: str) -> str:
+    """
+    อัปโหลดรูปไปยัง Supabase Storage
+    คืนค่า public URL ของรูป
+    """
+    supabase = get_supabase()
+    try:
+        import uuid
+        # สร้างชื่อไฟล์ unique ป้องกันซ้ำ
+        ext = filename.split('.')[-1].lower()
+        unique_name = f"{uuid.uuid4().hex}.{ext}"
+        path = f"trending/{unique_name}"
+
+        # อัปโหลดไฟล์
+        supabase.storage.from_("news-images").upload(
+            path=path,
+            file=file_bytes,
+            file_options={"content-type": f"image/{ext}"}
+        )
+
+        # ดึง public URL
+        res = supabase.storage.from_("news-images").get_public_url(path)
+        return res
+
+    except Exception as e:
+        print(f"❌ Upload Error: {e}")
+        return ""

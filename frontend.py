@@ -508,7 +508,45 @@ hr { border-color: var(--border) !important; margin: 1.25rem 0 !important; }
 ::-webkit-scrollbar-thumb { background:var(--grey-300); border-radius:99px; }
 ::-webkit-scrollbar-thumb:hover { background:var(--grey-400); }
 .stSpinner > div { border-top-color: var(--blue-500) !important; }
+</style>    
+<style>
+/* ── Mobile sidebar toggle ── */
+@media (max-width: 768px) {
+  [data-testid="stSidebar"] {
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s ease !important;
+    position: fixed !important;
+    z-index: 999 !important;
+    height: 100vh !important;
+  }
+  [data-testid="stSidebar"].open {
+    transform: translateX(0) !important;
+  }
+  .mobile-menu-btn {
+    display: flex !important;
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 1000 !important;
+    background: #1148A8 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    font-size: 1.2rem !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+  }
+}
+@media (min-width: 769px) {
+  .mobile-menu-btn { display: none !important; }
+}
 </style>
+
+<button class="mobile-menu-btn" onclick="
+  const sb = document.querySelector('[data-testid=stSidebar]');
+  sb.classList.toggle('open');
+">☰</button>
 """, unsafe_allow_html=True)
 
 
@@ -993,36 +1031,57 @@ def manage_trending_news():
                         "Fake":       ("#FEE2E2", "#991B1B", "#EF4444"),
                         "Real":       ("#DCFCE7", "#166534", "#22C55E"),
                         "Unverified": ("#FEF3C7", "#92400E", "#F59E0B"),
-                    }.get(row['label'], ("#F1F5F9", "#000000", "#000000"))
+                    }.get(row['label'], ("#F1F5F9", "#475569", "#CBD5E1"))
+
+                    # ✅ สร้าง image HTML ถ้ามีรูป
+                    img_html = ""
+                    if row.get("image_url"):
+                        img_html = f"""
+                        <img src="{row['image_url']}"
+                            style="width:100%;max-height:180px;object-fit:cover;
+                                    border-radius:8px;margin-bottom:12px;" />
+                        """
+
+                    # ✅ สร้าง category badge
+                    cat = row.get('category') or 'ทั่วไป'
 
                     st.markdown(f"""
-        <div style="background:var(--surface,#fff);border:1px solid #E2E8F0;
-                    border-radius:12px;padding:16px 20px;margin-bottom:10px;">
+                    <div style="background:#fff;border:1px solid #E2E8F0;
+                                border-radius:12px;padding:16px 20px;margin-bottom:10px;">
 
-          <div style="display:flex;align-items:center;
-                      justify-content:space-between;gap:12px;margin-bottom:10px;">
-            <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:0.95rem;
-                        font-weight:700;color:#1E293B;flex:1;line-height:1.4;">
-              {row['headline'][:80]}
-            </div>
-            <span style="flex-shrink:0;background:{label_cfg[0]};color:{label_cfg[1]};
-                         border:1px solid {label_cfg[2]}44;font-size:0.7rem;font-weight:800;
-                         padding:3px 10px;border-radius:99px;text-transform:uppercase;
-                         letter-spacing:0.5px;">
-              {row['label']}
-            </span>
-          </div>
+                    {img_html}
 
-          <div style="font-size:0.87rem;color:#475569;line-height:1.65;
-                      margin-bottom:12px;">
-            {row['content'][:200]}{'…' if len(str(row['content'])) > 200 else ''}
-          </div>
+                    <div style="display:flex;align-items:flex-start;
+                                justify-content:space-between;gap:12px;margin-bottom:8px;">
+                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:0.95rem;
+                                    font-weight:700;color:#1E293B;flex:1;line-height:1.4;">
+                        {row['headline'][:80]}
+                        </div>
+                        <span style="flex-shrink:0;background:{label_cfg[0]};color:{label_cfg[1]};
+                                    -webkit-text-fill-color:{label_cfg[1]};
+                                    border:1px solid {label_cfg[2]}44;font-size:0.7rem;font-weight:800;
+                                    padding:3px 10px;border-radius:99px;text-transform:uppercase;
+                                    letter-spacing:0.5px;">
+                        {row['label']}
+                        </span>
+                    </div>
 
-          <div style="display:flex;align-items:center;
-                      justify-content:space-between;">
-            <span style="font-size:0.74rem;color:#94A3B8;">🕒 {ts}</span>
-          </div>
-        </div>""", unsafe_allow_html=True)
+                    <!-- ✅ category badge -->
+                    <div style="margin-bottom:10px;">
+                        <span style="background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;
+                                    font-size:0.72rem;font-weight:700;padding:2px 10px;
+                                    border-radius:99px;border:1px solid #BFDBFE;">
+                        📂 {cat}
+                        </span>
+                    </div>
+
+                    <div style="font-size:0.87rem;color:#475569;-webkit-text-fill-color:#475569;
+                                line-height:1.65;margin-bottom:12px;">
+                        {row['content'][:200]}{'…' if len(str(row['content'])) > 200 else ''}
+                    </div>
+
+                    <div style="font-size:0.74rem;color:#94A3B8;">🕒 {ts}</div>
+                    </div>""", unsafe_allow_html=True)
 
                     ca2, cb2, _ = st.columns([1, 1, 5])
                     with ca2:
@@ -1083,16 +1142,51 @@ def manage_trending_news():
                     st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
     with tab2:
-        with st.form("add_news",clear_on_submit=True):
+        with st.form("add_news", clear_on_submit=True):
             st.markdown("**เพิ่มข่าวใหม่ลงระบบ**")
-            nh=st.text_input("หัวข้อข่าว",placeholder="พิมพ์พาดหัวข่าว...")
-            nc=st.text_area("เนื้อหา",placeholder="รายละเอียดข่าวโดยย่อ...",height=120)
-            nl=st.selectbox("สถานะ",["Fake","Real","Unverified"])
-            if st.form_submit_button("💾 บันทึกข่าว",type="primary",width="stretch"):
+            nh = st.text_input("หัวข้อข่าว", placeholder="พิมพ์พาดหัวข่าว...")
+            nc = st.text_area("เนื้อหา", placeholder="รายละเอียดข่าวโดยย่อ...", height=120)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                nl = st.selectbox("สถานะ", ["Fake","Real","Unverified"])
+            with col2:
+                CATEGORIES = [
+                    "นโยบายรัฐบาล-ข่าวสาร","ผลิตภัณฑ์สุขภาพ","การเงิน-หุ้น","ภัยพิบัติ",
+                    "ความสงบและความมั่นคง","ข่าวอื่นๆ","เศรษฐกิจ","ยาเสพติด",  
+                ]
+                nc_cat = st.selectbox("หมวดหมู่", CATEGORIES)
+
+            # ✅ อัปโหลดไฟล์รูปแทน URL
+            uploaded_file = st.file_uploader(
+                "รูปภาพประกอบ (ถ้ามี)",
+                type=["jpg","jpeg","png","webp"],
+                help="ขนาดไม่เกิน 5MB"
+            )
+
+            # preview
+            if uploaded_file:
+                st.image(uploaded_file, width=200, caption="Preview")
+
+            if st.form_submit_button("💾 บันทึกข่าว", type="primary", width="stretch"):
                 if nh.strip() and nc.strip():
-                    if db.create_trending(nh,nc,nl): st.success("✅ เพิ่มข่าวเรียบร้อย"); time.sleep(0.7); st.rerun()
-                    else: st.error("เกิดข้อผิดพลาด")
-                else: st.warning("กรุณากรอกข้อมูลให้ครบ")
+                    # ✅ อัปโหลดรูปก่อนบันทึก
+                    image_url = ""
+                    if uploaded_file:
+                        with st.spinner("กำลังอัปโหลดรูป..."):
+                            image_url = db.upload_image_to_supabase(
+                                uploaded_file.read(),
+                                uploaded_file.name
+                            )
+
+                    if db.create_trending(nh, nc, nl, nc_cat, image_url):
+                        st.success("✅ เพิ่มข่าวเรียบร้อย")
+                        time.sleep(0.7)
+                        st.rerun()
+                    else:
+                        st.error("เกิดข้อผิดพลาด")
+                else:
+                    st.warning("กรุณากรอกข้อมูลให้ครบ")
 
 
 # ═══════════════════════════════════════════════════════
@@ -1149,19 +1243,18 @@ def show_system_analytics():
         dft['News Checks'] = dft['Date'].map(cpd).fillna(0).astype(int)
         dft['Users']       = dft['Date'].map(upd).fillna(0).astype(int)
         dft['Date']        = pd.to_datetime(dft['Date']).dt.strftime('%b %d')
-        fig1=px.area(dft,x='Date',y=['News Checks','Users'],color_discrete_sequence=COLORS[:2])
+        fig1 = px.area(dft, x='Date', y=['News Checks','Users'],
+               color_discrete_sequence=COLORS[:2],
+               labels={'value': 'จำนวน', 'Date': 'วันที่', 'variable': 'ประเภท'})
         # ✅ Daily Usage chart
         fig1.update_layout(
             margin=dict(l=0,r=0,t=0,b=0),
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font_color='#1E293B',        # ✅ เปลี่ยนจาก #334155 เป็นเข้มขึ้น
-            font=dict(size=12),          # ✅ เพิ่ม size
-            legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center",
-                        font=dict(color='#1E293B', size=12)),  # ✅ legend สีเข้ม
-            legend_title_text='',
-            xaxis=dict(tickfont=dict(color='#1E293B', size=11)),  # ✅ แกน X
-            yaxis=dict(tickfont=dict(color='#1E293B', size=11)),  # ✅ แกน Y
+            plot_bgcolor='white', paper_bgcolor='white',
+            font_color='#334155',
+            xaxis_title="วันที่",        # ✅ เพิ่ม
+            yaxis_title="จำนวน (ครั้ง)", # ✅ เพิ่ม
+            legend=dict(orientation="h", y=-0.35, x=0.5, xanchor="center"),
+            legend_title_text=''
         )
         st.plotly_chart(fig1, width="stretch", key="trend_chart")
         st.markdown("</div>",unsafe_allow_html=True)
@@ -1201,16 +1294,16 @@ def show_system_analytics():
     dft2=pd.DataFrame({'Hour':range(24)})
     dft2['Checks']=(df_preds.groupby('hour').size() if not df_preds.empty else pd.Series()).reindex(range(24),fill_value=0)
     dft2['Time']=dft2['Hour'].apply(lambda x:f"{x:02d}:00")
-    fig3=px.bar(dft2,x='Time',y='Checks',color_discrete_sequence=[COLORS[0]])
-    fig3.update_layout(margin=dict(l=0,r=0,t=0,b=0),
-            xaxis_title="", yaxis_title="",
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font_color='#1E293B',        # ✅ เข้มขึ้น
-            font=dict(size=11),
-            bargap=0.35,
-            xaxis=dict(tickfont=dict(color='#1E293B', size=10)),
-            yaxis=dict(tickfont=dict(color='#1E293B', size=11)),
+    # แก้ fig3 Activity by Hour
+    fig3 = px.bar(dft2, x='Time', y='Checks',
+                    color_discrete_sequence=[COLORS[0]],
+                    labels={'Time': 'ชั่วโมง', 'Checks': 'จำนวนการตรวจ'})
+    fig3.update_layout(
+            margin=dict(l=0,r=0,t=0,b=0),
+            xaxis_title="ชั่วโมง",         # ✅ เพิ่ม
+            yaxis_title="จำนวนการตรวจ",    # ✅ เพิ่ม
+            plot_bgcolor='white', paper_bgcolor='white',
+            font_color='#334155', bargap=0.35
         )
     fig3.update_traces(marker_line_width=0)
     st.plotly_chart(fig3,width="stretch",key="hour_chart")
