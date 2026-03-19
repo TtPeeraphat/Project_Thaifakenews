@@ -1019,13 +1019,22 @@ def manage_trending_news():
             if flt!="All": df=df[df['label']==flt]
             st.caption(f"พบ {len(df)} รายการ")
 
+            editing_id = None
+            for _, r in df.iterrows():
+                if st.session_state.get(f"edit_{r['id']}", False):
+                    editing_id = r['id']
+                    break
+
             for _, row in df.iterrows():
                 ekey = f"edit_{row['id']}"
                 if ekey not in st.session_state:
                     st.session_state[ekey] = False
                 ts = str(row.get('updated_at', '-')).replace("T", " ")[:16]
 
-    # ── View mode ──
+                # ✅ ถ้ามีข่าวกำลัง edit อยู่ — ซ่อนข่าวอื่นทั้งหมด
+                if editing_id is not None and row['id'] != editing_id:
+                    continue
+
                 if not st.session_state[ekey]:
                     label_cfg = {
                         "Fake":       ("#FEE2E2", "#991B1B", "#EF4444"),
@@ -1034,54 +1043,40 @@ def manage_trending_news():
                     }.get(row['label'], ("#F1F5F9", "#475569", "#CBD5E1"))
 
                     # ✅ สร้าง image HTML ถ้ามีรูป
+                    
+                    # แก้ img_html ในส่วน view mode
                     img_html = ""
-                    if row.get("image_url"):
-                        img_html = f"""
-                        <img src="{row['image_url']}"
-                            style="width:100%;max-height:180px;object-fit:cover;
-                                    border-radius:8px;margin-bottom:12px;" />
-                        """
-
+                    image_url = str(row.get("image_url") or "").strip()
+                    if image_url and image_url != "None":
+                        img_html = f'<img src="{image_url}" style="width:100%;height:220px;object-fit:contain;background:#F1F5F9;border-radius:10px;margin-bottom:14px;display:block;" />'
                     # ✅ สร้าง category badge
-                    cat = row.get('category') or 'ทั่วไป'
+                    cat = row.get('category') or 'ข่าวอื่นๆ'
 
                     st.markdown(f"""
-                    <div style="background:#fff;border:1px solid #E2E8F0;
-                                border-radius:12px;padding:16px 20px;margin-bottom:10px;">
-
-                    {img_html}
-
-                    <div style="display:flex;align-items:flex-start;
-                                justify-content:space-between;gap:12px;margin-bottom:8px;">
-                        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:0.95rem;
-                                    font-weight:700;color:#1E293B;flex:1;line-height:1.4;">
-                        {row['headline'][:80]}
+                        <div style="background:#fff;border:1px solid #E2E8F0;
+                                    border-radius:12px;padding:16px 20px;margin-bottom:10px;">
+                        {img_html}
+                        <div style="display:flex;align-items:flex-start;
+                                    justify-content:space-between;gap:12px;margin-bottom:8px;">
+                            <div style="font-weight:700;color:#1E293B;flex:1;">{row['headline'][:80]}</div>
+                            <span style="flex-shrink:0;background:{label_cfg[0]};color:{label_cfg[1]};
+                                        -webkit-text-fill-color:{label_cfg[1]};border:1px solid {label_cfg[2]}44;
+                                        font-size:0.7rem;font-weight:800;padding:3px 10px;
+                                        border-radius:99px;text-transform:uppercase;">{row['label']}</span>
                         </div>
-                        <span style="flex-shrink:0;background:{label_cfg[0]};color:{label_cfg[1]};
-                                    -webkit-text-fill-color:{label_cfg[1]};
-                                    border:1px solid {label_cfg[2]}44;font-size:0.7rem;font-weight:800;
-                                    padding:3px 10px;border-radius:99px;text-transform:uppercase;
-                                    letter-spacing:0.5px;">
-                        {row['label']}
-                        </span>
-                    </div>
-
-                    <!-- ✅ category badge -->
-                    <div style="margin-bottom:10px;">
-                        <span style="background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;
-                                    font-size:0.72rem;font-weight:700;padding:2px 10px;
-                                    border-radius:99px;border:1px solid #BFDBFE;">
-                        📂 {cat}
-                        </span>
-                    </div>
-
-                    <div style="font-size:0.87rem;color:#475569;-webkit-text-fill-color:#475569;
-                                line-height:1.65;margin-bottom:12px;">
-                        {row['content'][:200]}{'…' if len(str(row['content'])) > 200 else ''}
-                    </div>
-
-                    <div style="font-size:0.74rem;color:#94A3B8;">🕒 {ts}</div>
-                    </div>""", unsafe_allow_html=True)
+                        <div style="margin-bottom:10px;">
+                            <span style="background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;
+                                        font-size:0.72rem;font-weight:700;padding:2px 10px;
+                                        border-radius:99px;border:1px solid #BFDBFE;">
+                            📂 {cat}
+                            </span>
+                        </div>
+                        <div style="font-size:0.87rem;color:#475569;-webkit-text-fill-color:#475569;
+                                    line-height:1.65;margin-bottom:12px;">
+                            {row['content'][:200]}{'…' if len(str(row['content'])) > 200 else ''}
+                        </div>
+                        <div style="font-size:0.74rem;color:#94A3B8;">🕒 {ts}</div>
+                        </div>""", unsafe_allow_html=True)
 
                     ca2, cb2, _ = st.columns([1, 1, 5])
                     with ca2:
@@ -1101,13 +1096,13 @@ def manage_trending_news():
 
     # ── Edit mode ──
                 else:
+                    # ✅ แสดง banner บอกว่ากำลัง edit ข่าวไหน
                     st.markdown(f"""
-                    <div style="background:#F0F6FF;border:1.5px solid #BFDBFE;
-                                border-radius:12px;padding:16px 20px;margin-bottom:4px;">
-                    <div style="font-size:0.72rem;font-weight:700;color:#1148A8;
-                                text-transform:uppercase;letter-spacing:0.6px;">
-                        ✏️ แก้ไขข่าว
-                    </div>
+                    <div style="background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;
+                                padding:10px 14px;margin-bottom:12px;
+                                font-size:0.85rem;color:#856404;-webkit-text-fill-color:#856404;
+                                font-weight:600;">
+                    ✏️ กำลังแก้ไขข่าว — ข่าวอื่นถูกซ่อนชั่วคราว กด "ยกเลิก" เพื่อกลับ
                     </div>""", unsafe_allow_html=True)
 
                     eh = st.text_input("หัวข้อข่าว", value=row['headline'], key=f"h_{row['id']}")
@@ -1169,8 +1164,10 @@ def manage_trending_news():
                     st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
     with tab2:
-        with st.form("add_news", clear_on_submit=True):
-            st.markdown("**เพิ่มข่าวใหม่ลงระบบ**")
+        if 'form_key' not in st.session_state:
+            st.session_state['form_key'] = 0
+
+        with st.form(f"add_news_{st.session_state['form_key']}", clear_on_submit=True):
             nh = st.text_input("หัวข้อข่าว", placeholder="พิมพ์พาดหัวข่าว...")
             nc = st.text_area("เนื้อหา", placeholder="รายละเอียดข่าวโดยย่อ...", height=120)
 
@@ -1208,12 +1205,18 @@ def manage_trending_news():
 
                     if db.create_trending(nh, nc, nl, nc_cat, image_url):
                         st.success("✅ เพิ่มข่าวเรียบร้อย")
+                        st.session_state['form_key'] += 1
                         time.sleep(0.7)
                         st.rerun()
                     else:
                         st.error("เกิดข้อผิดพลาด")
                 else:
-                    st.warning("กรุณากรอกข้อมูลให้ครบ")
+                    st.markdown("""
+                    <div style="background:#FFF5F5;border:1px solid #FCA5A5;border-radius:8px;
+                                padding:10px 14px;color:#991B1B;-webkit-text-fill-color:#991B1B;
+                                font-weight:600;font-size:0.88rem;">
+                    ⚠️ กรุณากรอกหัวข้อและเนื้อหาให้ครบ
+                    </div>""", unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════
@@ -2012,89 +2015,93 @@ else:
     # 🔥 TRENDING
     # ══════════════════════════════════════
     elif menu == "🔥 ข่าวที่เป็นกระแส":
-            page_header("🔥", "ข่าวที่เป็นกระแส", "ข่าวสารที่ถูกพูดถึงและผ่านการตรวจสอบโดยทีมงาน")
-            df = db.get_all_trending()
-            if df.empty:
-                st.info("ℹ️ ยังไม่มีข่าวที่เป็นกระแสในขณะนี้")
+        page_header("🔥", "ข่าวที่เป็นกระแส", "ข่าวสารที่ถูกพูดถึงและผ่านการตรวจสอบโดยทีมงาน")
+        df = db.get_all_trending()
+        if df.empty:
+            st.info("ℹ️ ยังไม่มีข่าวที่เป็นกระแสในขณะนี้")
+        else:
+            col_s, col_f = st.columns([1, 2])
+            with col_s:
+                filter_label = st.selectbox(
+                    "กรองตามประเภท", ["ทั้งหมด", "Real", "Fake"],
+                    label_visibility="collapsed"
+                )
+            with col_f:
+                search_q = st.text_input(
+                    "ค้นหา", placeholder="🔍 ค้นหาข่าว...",
+                    label_visibility="collapsed"
+                )
+
+            df_filtered = df.copy()
+            if filter_label != "ทั้งหมด":
+                df_filtered = df_filtered[df_filtered['label'] == filter_label]
+            if search_q:
+                df_filtered = df_filtered[
+                    df_filtered['headline'].str.contains(search_q, case=False, na=False) |
+                    df_filtered['content'].str.contains(search_q, case=False, na=False)
+                ]
+
+            n_real = len(df[df['label'] == 'Real'])
+            n_fake = len(df[df['label'] == 'Fake'])
+
+            st.markdown(f"""
+            <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <span style="background:#F1F5F9;color:#475569;font-size:0.78rem;font-weight:700;
+                        padding:4px 12px;border-radius:99px;">
+                📰 ทั้งหมด {len(df)}
+            </span>
+            <span style="background:#DCFCE7;color:#166534;font-size:0.78rem;font-weight:700;
+                        padding:4px 12px;border-radius:99px;">
+                ✅ Real {n_real}
+            </span>
+            <span style="background:#FEE2E2;color:#991B1B;font-size:0.78rem;font-weight:700;
+                        padding:4px 12px;border-radius:99px;">
+                🚨 Fake {n_fake}
+            </span>
+            </div>""", unsafe_allow_html=True)
+
+            st.caption(f"แสดง {len(df_filtered)} รายการ")
+
+            if df_filtered.empty:
+                st.info("ไม่พบข่าวที่ตรงกับเงื่อนไข")
             else:
-                # ✅ เพิ่ม filter bar
-                col_s, col_f = st.columns([1, 2])
-                with col_s:
-                    filter_label = st.selectbox(
-                        "กรองตามประเภท",
-                        ["ทั้งหมด", "Real", "Fake"],
-                        label_visibility="collapsed"
+                lcfg = {
+                    "Fake": ("#FEE2E2","#991B1B","#EF4444","🚨"),
+                    "Real": ("#DCFCE7","#166534","#22C55E","✅"),
+                }
+                for _, row in df_filtered.iterrows():
+                    lc  = lcfg.get(row['label'], ("#F1F5F9","#475569","#CBD5E1","📰"))
+                    ts  = str(row.get('updated_at', '-')).replace("T", " ")[:16]
+                    cat = str(row.get('category') or 'ทั่วไป')
+
+                    # ✅ escape content ป้องกัน HTML พัง
+                    import html as html_lib
+                    safe_content = html_lib.escape(str(row.get('content') or ''))
+                    safe_headline = html_lib.escape(str(row.get('headline') or ''))
+
+                    # ✅ img บรรทัดเดียว
+                    img_html = ""
+                    image_url = str(row.get("image_url") or "").strip()
+                    if image_url and image_url not in ("None", "null", ""):
+                        img_html = f'<img src="{image_url}" style="width:100%;height:220px;object-fit:contain;background:#F1F5F9;border-radius:10px;margin-bottom:14px;display:block;" />'
+
+                    # ✅ สร้าง HTML string ก่อน แล้วค่อย render
+                    html_content = (
+                        f'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px 24px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">'
+                        f'{img_html}'
+                        f'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">'
+                        f'<div style="font-weight:700;color:#1E293B;flex:1;line-height:1.4;font-size:0.97rem;">{lc[3]}&nbsp;{safe_headline}</div>'
+                        f'<span style="flex-shrink:0;background:{lc[0]};color:{lc[1]};-webkit-text-fill-color:{lc[1]};font-size:0.71rem;font-weight:800;padding:3px 11px;border-radius:99px;text-transform:uppercase;white-space:nowrap;">{row["label"]}</span>'
+                        f'</div>'
+                        f'<div style="margin-bottom:10px;">'
+                        f'<span style="background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:99px;border:1px solid #BFDBFE;">📂 {cat}</span>'
+                        f'</div>'
+                        f'<div style="color:#475569;-webkit-text-fill-color:#475569;font-size:0.88rem;line-height:1.6;margin-bottom:10px;">{safe_content}</div>'
+                        f'<div style="font-size:0.76rem;color:#94A3B8;">🕒 อัปเดตเมื่อ {ts}</div>'
+                        f'</div>'
                     )
-                with col_f:
-                    search_q = st.text_input(
-                        "ค้นหา", placeholder="🔍 ค้นหาข่าว...",
-                        label_visibility="collapsed"
-                    )
 
-                # ✅ filter ข้อมูล
-                df_filtered = df.copy()
-                if filter_label != "ทั้งหมด":
-                    df_filtered = df_filtered[df_filtered['label'] == filter_label]
-                if search_q:
-                    df_filtered = df_filtered[
-                        df_filtered['headline'].str.contains(search_q, case=False, na=False) |
-                        df_filtered['content'].str.contains(search_q, case=False, na=False)
-                    ]
-
-                # ✅ summary badges
-                n_real       = len(df[df['label'] == 'Real'])
-                n_fake       = len(df[df['label'] == 'Fake'])
-                
-
-                st.markdown(f"""
-                <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-                <span style="background:#F1F5F9;color:#475569;font-size:0.78rem;font-weight:700;
-                            padding:4px 12px;border-radius:99px;cursor:pointer;">
-                    📰 ทั้งหมด {len(df)}
-                </span>
-                <span style="background:#DCFCE7;color:#166534;font-size:0.78rem;font-weight:700;
-                            padding:4px 12px;border-radius:99px;">
-                    ✅ Real {n_real}
-                </span>
-                <span style="background:#FEE2E2;color:#991B1B;font-size:0.78rem;font-weight:700;
-                            padding:4px 12px;border-radius:99px;">
-                    🚨 Fake {n_fake}
-                </span>
-            
-                </div>""", unsafe_allow_html=True)
-
-                st.caption(f"แสดง {len(df_filtered)} รายการ")
-
-                if df_filtered.empty:
-                    st.info("ไม่พบข่าวที่ตรงกับเงื่อนไข")
-                else:
-                    lcfg = {
-                        "Fake":       ("#FEE2E2","#991B1B","#EF4444","🚨"),
-                        "Real":       ("#DCFCE7","#166534","#22C55E","✅"),
-                
-                    }
-                    for _, row in df_filtered.iterrows():
-                        lc = lcfg.get(row['label'], ("#F1F5F9","#475569","#CBD5E1","📰"))
-                        ts = str(row.get('updated_at', '-')).replace("T", " ")[:16]
-                        st.markdown(f"""
-                        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
-                                    padding:20px 24px;margin-bottom:12px;
-                                    box-shadow:0 1px 4px rgba(0,0,0,0.05);">
-                        <div style="display:flex;align-items:flex-start;
-                                    justify-content:space-between;gap:12px;margin-bottom:10px;">
-                            <h4 style="margin:0;color:#1E293B !important;font-size:0.97rem !important;
-                                    line-height:1.45;flex:1;">{lc[3]}&nbsp;{row['headline']}</h4>
-                            <span style="flex-shrink:0;background:{lc[0]};color:{lc[1]};
-                                        font-size:0.71rem;font-weight:800;padding:3px 11px;
-                                        border-radius:99px;text-transform:uppercase;letter-spacing:0.5px;
-                                        border:1px solid {lc[2]}44;white-space:nowrap;">{row['label']}</span>
-                        </div>
-                        <p style="color:#475569;font-size:0.88rem;line-height:1.6;margin:0 0 10px;">
-                            {row['content']}
-                        </p>
-                        <div style="font-size:0.76rem;color:#94A3B8;">🕒 อัปเดตเมื่อ {ts}</div>
-                        </div>""", unsafe_allow_html=True)
-
+                    st.markdown(html_content, unsafe_allow_html=True)
     # ══════════════════════════════════════
     # 👤 PROFILE
     # ══════════════════════════════════════
