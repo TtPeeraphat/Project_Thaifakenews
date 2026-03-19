@@ -513,16 +513,11 @@ hr { border-color: var(--border) !important; margin: 1.25rem 0 !important; }
 /* ── Mobile sidebar toggle ── */
 @media (max-width: 768px) {
   [data-testid="stSidebar"] {
-    transform: translateX(-100%);           /* ← ลบ !important ออก */
     transition: transform 0.3s ease !important;
     position: fixed !important;
     z-index: 999 !important;
     height: 100vh !important;
   }
-  [data-testid="stSidebar"].sidebar-open {
-    transform: translateX(0) !important;   /* ← เพิ่ม class สำหรับ open */
-  }
-}
   .mobile-menu-btn {
     display: flex !important;
     position: fixed !important;
@@ -1700,39 +1695,50 @@ elif not st.session_state['logged_in']:
 else:
  # ── Mobile sidebar toggle (เฉพาะผู้ล็อกอินแล้ว) ──
         st.markdown("""
-            <button class="mobile-menu-btn" id="mobileSidebarBtn" onclick="window._sidebarToggle()">☰</button>
+            <button 
+            id="mobileSidebarBtn"
+            class="mobile-menu-btn"
+            onclick="
+                var sb = document.querySelector('[data-testid=stSidebar]');
+                if (!sb) return;
+                var isOpen = sb.getAttribute('data-open') === '1';
+                if (isOpen) {
+                sb.style.setProperty('transform', 'translateX(-100%)', 'important');
+                sb.setAttribute('data-open', '0');
+                } else {
+                sb.style.setProperty('transform', 'translateX(0)', 'important');
+                sb.setAttribute('data-open', '1');
+                }
+            "
+            >☰</button>
+
             <script>
             (function() {
-                if (window._sidebarOpen === undefined) window._sidebarOpen = false;
-
-                function applyState() {
-                    const sb = document.querySelector('[data-testid="stSidebar"]');
-                    if (!sb) return;
-                    if (window.innerWidth > 768) return;
-
-                    // ✅ ใช้ class แทน inline style เพื่อชนะ CSS !important
-                    if (window._sidebarOpen) {
-                        sb.classList.add('sidebar-open');
-                    } else {
-                        sb.classList.remove('sidebar-open');
+                function initSidebar() {
+                    var sb = document.querySelector('[data-testid="stSidebar"]');
+                    if (!sb) { setTimeout(initSidebar, 200); return; }
+                    if (window.innerWidth <= 768) {
+                        // รักษาสถานะเดิมถ้ามี
+                        var wasOpen = sb.getAttribute('data-open') === '1';
+                        if (!wasOpen) {
+                            sb.style.setProperty('transform', 'translateX(-100%)', 'important');
+                            sb.style.setProperty('transition', 'transform 0.3s ease', 'important');
+                            sb.style.setProperty('position', 'fixed', 'important');
+                            sb.style.setProperty('z-index', '999', 'important');
+                            sb.style.setProperty('height', '100vh', 'important');
+                        } else {
+                            sb.style.setProperty('transform', 'translateX(0)', 'important');
+                        }
                     }
                 }
 
-                window._sidebarToggle = function() {
-                    window._sidebarOpen = !window._sidebarOpen;
-                    applyState();
-                };
-
-                const observer = new MutationObserver(function() {
-                    applyState();
-                });
-                observer.observe(document.body, { childList: true, subtree: true });
-
-                // ✅ delay นิดนึงให้ Streamlit render sidebar ก่อน
-                setTimeout(applyState, 300);
+                // รัน init และ re-init ทุกครั้งที่ Streamlit re-render
+                initSidebar();
+                var obs = new MutationObserver(initSidebar);
+                obs.observe(document.body, { childList: true, subtree: false });
             })();
             </script>
-            """, unsafe_allow_html=True)      
+            """, unsafe_allow_html=True)
     
         if 'active_menu' not in st.session_state:
             st.session_state.active_menu="🏠 หน้าหลัก"
