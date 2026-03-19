@@ -513,15 +513,16 @@ hr { border-color: var(--border) !important; margin: 1.25rem 0 !important; }
 /* ── Mobile sidebar toggle ── */
 @media (max-width: 768px) {
   [data-testid="stSidebar"] {
-    transform: translateX(-100%) !important;
+    transform: translateX(-100%);           /* ← ลบ !important ออก */
     transition: transform 0.3s ease !important;
     position: fixed !important;
     z-index: 999 !important;
     height: 100vh !important;
   }
-  [data-testid="stSidebar"].open {
-    transform: translateX(0) !important;
+  [data-testid="stSidebar"].sidebar-open {
+    transform: translateX(0) !important;   /* ← เพิ่ม class สำหรับ open */
   }
+}
   .mobile-menu-btn {
     display: flex !important;
     position: fixed !important;
@@ -1699,37 +1700,39 @@ elif not st.session_state['logged_in']:
 else:
  # ── Mobile sidebar toggle (เฉพาะผู้ล็อกอินแล้ว) ──
         st.markdown("""
-        <button class="mobile-menu-btn" id="mobileSidebarBtn" onclick="window._sidebarToggle()">☰</button>
-        <script>
-        (function() {
-            // เก็บสถานะใน window ป้องกัน Streamlit re-render ลบทิ้ง
-            if (window._sidebarOpen === undefined) window._sidebarOpen = false;
+            <button class="mobile-menu-btn" id="mobileSidebarBtn" onclick="window._sidebarToggle()">☰</button>
+            <script>
+            (function() {
+                if (window._sidebarOpen === undefined) window._sidebarOpen = false;
 
-            function applyState() {
-                const sb = document.querySelector('[data-testid="stSidebar"]');
-                if (!sb) return;
-                if (window.innerWidth > 768) return; // ไม่แตะ desktop
-                sb.style.transform  = window._sidebarOpen ? 'translateX(0)' : 'translateX(-100%)';
-                sb.style.transition = 'transform 0.3s ease';
-                sb.style.position   = 'fixed';
-                sb.style.zIndex     = '999';
-                sb.style.height     = '100vh';
-            }
+                function applyState() {
+                    const sb = document.querySelector('[data-testid="stSidebar"]');
+                    if (!sb) return;
+                    if (window.innerWidth > 768) return;
 
-            window._sidebarToggle = function() {
-                window._sidebarOpen = !window._sidebarOpen;
-                applyState();
-            };
+                    // ✅ ใช้ class แทน inline style เพื่อชนะ CSS !important
+                    if (window._sidebarOpen) {
+                        sb.classList.add('sidebar-open');
+                    } else {
+                        sb.classList.remove('sidebar-open');
+                    }
+                }
 
-            // Re-apply ทุกครั้งที่ Streamlit re-render DOM
-            const observer = new MutationObserver(applyState);
-            observer.observe(document.body, { childList: true, subtree: true });
+                window._sidebarToggle = function() {
+                    window._sidebarOpen = !window._sidebarOpen;
+                    applyState();
+                };
 
-            // Apply ครั้งแรก
-            applyState();
-        })();
-        </script>
-        """, unsafe_allow_html=True)       
+                const observer = new MutationObserver(function() {
+                    applyState();
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+
+                // ✅ delay นิดนึงให้ Streamlit render sidebar ก่อน
+                setTimeout(applyState, 300);
+            })();
+            </script>
+            """, unsafe_allow_html=True)      
     
         if 'active_menu' not in st.session_state:
             st.session_state.active_menu="🏠 หน้าหลัก"
