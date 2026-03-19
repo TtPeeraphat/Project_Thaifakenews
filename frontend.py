@@ -101,36 +101,44 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
+
 /* ══════════════════════════════
-   FORCE LIGHT MODE
+   FORCE LIGHT MODE — LOCKED
 ══════════════════════════════ */
-html {
-  color-scheme: light only !important;
-}
-            
+html { color-scheme: light only !important; }
+
 html, body,
 [data-testid="stAppViewContainer"],
 [data-testid="stMainBlockContainer"],
 [data-testid="stMain"],
-section.main,
-.main,
-.block-container,
-[class*="css"] {
+section.main, .main, .block-container {
   background-color: #EEF2F8 !important;
   color: #1E293B !important;
-  color-scheme: light !important;
+  color-scheme: light only !important;
 }
-/* Neutralise any dark-mode media query Streamlit injects */
+
 @media (prefers-color-scheme: dark) {
   html { color-scheme: light only !important; }
   html, body,
   [data-testid="stAppViewContainer"],
   [data-testid="stMainBlockContainer"],
-  .main, .block-container, [class*="css"] {
+  .main, .block-container {
     background-color: #EEF2F8 !important;
     color: #1E293B !important;
   }
+  *, *::before, *::after {
+    color-scheme: light only !important;
+  }
+  input, textarea, select {
+    background-color: #FFFFFF !important;
+    color: #1E293B !important;
+    -webkit-text-fill-color: #1E293B !important;
+  }
 }
+
+/* ══════════════════════════════
+   CSS VARIABLES
+══════════════════════════════ */
 :root {
   --blue-800:  #0D47A1;
   --blue-700:  #1148A8;
@@ -140,7 +148,6 @@ section.main,
   --blue-50:   #EFF6FF;
   --teal-600:  #00838F;
   --teal-500:  #0097A7;
-  --teal-50:   #E0F7FA;
   --green-700: #166534;
   --green-600: #16A34A;
   --green-50:  #F0FDF4;
@@ -169,18 +176,21 @@ section.main,
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.06);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 16px rgba(17,72,168,0.10);
-  --shadow-lg: 0 8px 32px rgba(17,72,168,0.14);
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 22px;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px;
 }
 
-*, *::before, *::after { box-sizing: border-box; }
+/* ══════════════════════════════
+   BASE
+══════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  color-scheme: light only !important;
+}
 
 html, body, [class*="css"] {
-  font-family: 'IBM Plex Sans Thai', sans-serif !important;  /* เปลี่ยนจาก Inter */
+  font-family: 'IBM Plex Sans Thai', sans-serif !important;
   color: var(--grey-800) !important;
+  -webkit-text-fill-color: var(--grey-800) !important;
   background: var(--bg) !important;
   -webkit-font-smoothing: antialiased !important;
 }
@@ -188,6 +198,7 @@ html, body, [class*="css"] {
 h1,h2,h3,h4,h5,h6 {
   font-family: 'IBM Plex Sans Thai', sans-serif !important;
   color: var(--grey-900) !important;
+  -webkit-text-fill-color: var(--grey-900) !important;
   letter-spacing: -0.25px !important;
 }
 h1 { font-size:1.85rem !important; font-weight:800 !important; line-height:1.25 !important; }
@@ -195,10 +206,17 @@ h2 { font-size:1.35rem !important; font-weight:700 !important; }
 h3 { font-size:1.1rem  !important; font-weight:700 !important; }
 h4 { font-size:0.97rem !important; font-weight:600 !important; }
 
-/* ── Hide Streamlit chrome ── */
+p, span, label, li {
+  color: var(--grey-800) !important;
+  -webkit-text-fill-color: var(--grey-800) !important;
+}
+
+/* ── Hide chrome ── */
 #MainMenu, footer, header { visibility:hidden !important; }
-[data-testid="stDecoration"]{ display:none !important; }
-[data-testid="stToolbar"]   { display:none !important; }
+[data-testid="stDecoration"],
+[data-testid="stToolbar"],
+[data-testid="stStatusWidget"],
+[data-testid="stStatus"] { display:none !important; }
 
 /* ── Canvas ── */
 .main .block-container {
@@ -208,22 +226,11 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
 }
 
 /* ══════════════════════════════
-   SIDEBAR
+   SIDEBAR (dark)
 ══════════════════════════════ */
-            /* ── Hide sidebar collapse / expand toggle ── */
 [data-testid="stSidebarCollapseButton"],
-[data-testid="collapsedControl"] {
-  display: none !important;
-}
-/* ── Hide Streamlit chrome ── */
-#MainMenu, footer, header { visibility:hidden !important; }
-[data-testid="stDecoration"]        { display:none !important; }
-[data-testid="stToolbar"]           { display:none !important; }
+[data-testid="collapsedControl"] { display:none !important; }
 
-/* ── Hide sidebar collapse / expand toggle ── */
-[data-testid="stSidebarCollapseButton"],
-[data-testid="collapsedControl"]    { display:none !important; }
-                        
 [data-testid="stSidebar"] {
   background: #0A1929 !important;
   border-right: 1px solid rgba(255,255,255,0.05) !important;
@@ -231,18 +238,21 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   max-width: 256px !important;
 }
 [data-testid="stSidebar"] > div:first-child { padding:0 !important; }
-[data-testid="stSidebar"] * { color:#fff !important; }
+[data-testid="stSidebar"] *,
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] div {
+  color: rgba(255,255,255,0.75) !important;
+  -webkit-text-fill-color: rgba(255,255,255,0.75) !important;
+}
 [data-testid="stSidebar"] hr { border-color:rgba(255,255,255,0.07) !important; }
 
-/* Sidebar nav buttons — all states */
-[data-testid="stSidebar"] .stButton > button,
-[data-testid="stSidebar"] .stButton > button:focus,
-[data-testid="stSidebar"] .stButton > button:active {
+[data-testid="stSidebar"] .stButton > button {
   background: transparent !important;
-  background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
   color: rgba(255,255,255,0.62) !important;
+  -webkit-text-fill-color: rgba(255,255,255,0.62) !important;
   font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-size: 0.875rem !important;
   font-weight: 500 !important;
@@ -250,73 +260,67 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   justify-content: flex-start !important;
   padding: 9px 14px !important;
   border-radius: var(--r-sm) !important;
-  margin-bottom: 1px !important;
   width: 100% !important;
-  outline: none !important;
   transition: all 0.14s ease !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
   background: rgba(255,255,255,0.07) !important;
-  background-color: rgba(255,255,255,0.07) !important;
-  color: rgba(255,255,255,0.9) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
 }
 [data-testid="stSidebar"] .stButton > button[kind="primary"] {
   background: rgba(30,136,229,0.20) !important;
-  background-color: rgba(30,136,229,0.20) !important;
   color: #93C5FD !important;
+  -webkit-text-fill-color: #93C5FD !important;
   font-weight: 600 !important;
   border-left: 2px solid #3B82F6 !important;
 }
-[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
-  background: rgba(30,136,229,0.28) !important;
-  background-color: rgba(30,136,229,0.28) !important;
-  box-shadow: none !important;
-  transform: none !important;
-}
 [data-testid="stSidebar"] .stButton > button p,
-[data-testid="stSidebar"] .stButton > button span,
-[data-testid="stSidebar"] .stButton > button div { color: inherit !important; }
-
-[data-testid="stSidebar"] div[data-testid="stContainer"],
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+[data-testid="stSidebar"] .stButton > button span {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
 }
 
 /* ══════════════════════════════
-   MAIN COMPONENTS
+   METRIC CARDS
 ══════════════════════════════ */
-
-/* Metric cards */
 [data-testid="stMetric"] {
-  background: var(--surface) !important;
+  background: #FFFFFF !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--r-md) !important;
   padding: 20px 22px !important;
   box-shadow: var(--shadow-sm) !important;
 }
-[data-testid="stMetricLabel"] {
+[data-testid="stMetricLabel"],
+[data-testid="stMetricLabel"] div,
+[data-testid="stMetricLabel"] p,
+[data-testid="stMetricLabel"] span {
   color: var(--grey-500) !important;
+  -webkit-text-fill-color: var(--grey-500) !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.7px !important;
 }
-[data-testid="stMetricValue"] {
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] div {
   font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-weight: 800 !important;
   font-size: 1.9rem !important;
   color: var(--grey-900) !important;
+  -webkit-text-fill-color: var(--grey-900) !important;
   line-height: 1.1 !important;
 }
 [data-testid="stMetricDelta"] svg { display:none !important; }
 
-/* Primary buttons — main */
+/* ══════════════════════════════
+   BUTTONS — MAIN
+══════════════════════════════ */
 .main .stButton > button[kind="primary"],
 [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
   background: linear-gradient(135deg,var(--blue-500) 0%,var(--blue-800) 100%) !important;
   color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
   border: none !important;
   border-radius: var(--r-sm) !important;
   font-family: 'IBM Plex Sans Thai', sans-serif !important;
@@ -326,43 +330,82 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   box-shadow: 0 2px 8px rgba(13,71,161,0.28) !important;
   transition: all 0.17s ease !important;
 }
-.main .stButton > button[kind="primary"]:hover,
-[data-testid="stMainBlockContainer"] .stButton > button[kind="primary"]:hover {
+.main .stButton > button[kind="primary"] p,
+.main .stButton > button[kind="primary"] span {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+.main .stButton > button[kind="primary"]:hover {
   transform: translateY(-1px) !important;
   box-shadow: 0 5px 18px rgba(13,71,161,0.36) !important;
 }
 
-/* Secondary buttons — main */
 .main .stButton > button[kind="secondary"],
 .main .stButton > button:not([kind="primary"]),
 [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"],
 [data-testid="stMainBlockContainer"] .stButton > button:not([kind="primary"]) {
-  background: var(--surface) !important;
+  background: #FFFFFF !important;
   color: var(--blue-600) !important;
+  -webkit-text-fill-color: var(--blue-600) !important;
   border: 1.5px solid var(--blue-100) !important;
   border-radius: var(--r-sm) !important;
   font-weight: 600 !important;
   font-size: 0.88rem !important;
   transition: all 0.15s ease !important;
 }
-.main .stButton > button[kind="secondary"]:hover,
-[data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"]:hover {
+.main .stButton > button[kind="secondary"] p,
+.main .stButton > button:not([kind="primary"]) p {
+  color: var(--blue-600) !important;
+  -webkit-text-fill-color: var(--blue-600) !important;
+}
+.main .stButton > button[kind="secondary"]:hover {
   background: var(--blue-50) !important;
   border-color: var(--blue-500) !important;
 }
 
-/* Text inputs */
+/* FormSubmit & Download */
+[data-testid="stFormSubmitButton"] > button,
+[data-testid="stFormSubmitButton"] > button p,
+[data-testid="stFormSubmitButton"] > button span {
+  background: linear-gradient(135deg,var(--blue-500) 0%,var(--blue-800) 100%) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: none !important;
+  border-radius: var(--r-sm) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(13,71,161,0.28) !important;
+}
+.stDownloadButton > button,
+.stDownloadButton > button p,
+.stDownloadButton > button span {
+  background: linear-gradient(135deg,var(--teal-500),var(--teal-600)) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: none !important;
+  border-radius: var(--r-sm) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(0,150,167,0.22) !important;
+}
+
+/* ══════════════════════════════
+   INPUTS
+══════════════════════════════ */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea {
-  background: var(--surface) !important;
+  background: #FFFFFF !important;
   border: 1.5px solid var(--grey-200) !important;
   border-radius: var(--r-sm) !important;
   color: var(--grey-900) !important;
+  -webkit-text-fill-color: var(--grey-900) !important;
   font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-size: 0.92rem !important;
   padding: 10px 14px !important;
-  transition: border 0.15s, box-shadow 0.15s !important;
-  box-shadow: var(--shadow-xs) !important;
+  caret-color: var(--blue-500) !important;
+}
+.stTextInput > div > div > input::placeholder,
+.stTextArea > div > div > textarea::placeholder {
+  color: var(--grey-400) !important;
+  -webkit-text-fill-color: var(--grey-400) !important;
 }
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus {
@@ -370,60 +413,87 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   box-shadow: 0 0 0 3px rgba(30,136,229,0.13) !important;
   outline: none !important;
 }
-.stTextInput label, .stTextArea label {
+.stTextInput label, .stTextInput label p,
+.stTextArea label, .stTextArea label p {
   font-weight: 600 !important;
   font-size: 0.84rem !important;
   color: var(--grey-700) !important;
+  -webkit-text-fill-color: var(--grey-700) !important;
 }
 
-/* Selectbox */
-.stSelectbox > div > div {
-  background: var(--surface) !important;
+/* ══════════════════════════════
+   SELECTBOX
+══════════════════════════════ */
+.stSelectbox > div > div,
+.stSelectbox [data-baseweb="select"] > div {
+  background: #FFFFFF !important;
   border: 1.5px solid var(--grey-200) !important;
   border-radius: var(--r-sm) !important;
   color: var(--grey-900) !important;
-  box-shadow: var(--shadow-xs) !important;
+}
+.stSelectbox [data-baseweb="select"] span,
+.stSelectbox [data-baseweb="select"] div {
+  color: var(--grey-900) !important;
+  -webkit-text-fill-color: var(--grey-900) !important;
+}
+.stSelectbox label, .stSelectbox label p {
+  color: var(--grey-700) !important;
+  -webkit-text-fill-color: var(--grey-700) !important;
+  font-weight: 600 !important;
+  font-size: 0.84rem !important;
 }
 
-/* Tabs */
+/* Dropdown popover */
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[data-baseweb="menu"] ul,
+ul[role="listbox"] {
+  background-color: #FFFFFF !important;
+  border: 1px solid var(--border) !important;
+}
+li[role="option"],
+[data-baseweb="select"] li {
+  background-color: #FFFFFF !important;
+  color: var(--grey-800) !important;
+  -webkit-text-fill-color: var(--grey-800) !important;
+}
+li[role="option"]:hover,
+li[role="option"][aria-selected="true"] {
+  background-color: var(--blue-50) !important;
+  color: var(--blue-700) !important;
+  -webkit-text-fill-color: var(--blue-700) !important;
+}
+
+/* ══════════════════════════════
+   TABS
+══════════════════════════════ */
 .stTabs [data-baseweb="tab-list"] {
   background: transparent !important;
   border-bottom: 2px solid var(--border) !important;
   gap: 0 !important; padding: 0 !important;
 }
-.stTabs [data-baseweb="tab"] {
+.stTabs [data-baseweb="tab"],
+.stTabs [data-baseweb="tab"] p {
   background: transparent !important;
   color: var(--grey-500) !important;
+  -webkit-text-fill-color: var(--grey-500) !important;
   font-family: 'IBM Plex Sans Thai', sans-serif !important;
   font-weight: 600 !important; font-size: 0.9rem !important;
   padding: 12px 20px !important; border-radius: 0 !important;
   border-bottom: 2px solid transparent !important;
   margin-bottom: -2px !important;
 }
-.stTabs [aria-selected="true"] {
+.stTabs [aria-selected="true"],
+.stTabs [aria-selected="true"] p {
   color: var(--blue-600) !important;
+  -webkit-text-fill-color: var(--blue-600) !important;
   border-bottom: 2px solid var(--blue-600) !important;
-  background: transparent !important;
 }
 .stTabs [data-baseweb="tab-panel"] { padding-top: 20px !important; }
 
-/* Expander */
-            [data-testid="stExpander"] .stButton > button {
-  background: #FFFFFF !important;
-  color: #1E293B !important;
-  border: 1.5px solid #CBD5E1 !important;
-  -webkit-text-fill-color: #1E293B !important;
-}
-[data-testid="stExpander"] .stButton > button:hover {
-  background: #F1F5F9 !important;
-  border-color: #1565C0 !important;
-}
-[data-testid="stExpander"] .stButton > button[kind="primary"] {
-  background: linear-gradient(135deg,#EF4444,#991B1B) !important;
-  color: #FFFFFF !important;
-  -webkit-text-fill-color: #FFFFFF !important;
-  border: none !important;
-}
+/* ══════════════════════════════
+   EXPANDER
+══════════════════════════════ */
 .streamlit-expanderHeader,
 [data-testid="stExpander"] summary,
 [data-testid="stExpander"] > details > summary {
@@ -431,38 +501,132 @@ h4 { font-size:0.97rem !important; font-weight:600 !important; }
   border: 1px solid #334155 !important;
   border-radius: var(--r-sm) !important;
   color: #F1F5F9 !important;
+  -webkit-text-fill-color: #F1F5F9 !important;
   font-weight: 600 !important;
   font-size: 0.9rem !important;
 }
-/* Kill Streamlit's red/colored focus ring on expander */
-[data-testid="stExpander"] summary:focus,
-[data-testid="stExpander"] > details > summary:focus {
+.streamlit-expanderHeader p,
+[data-testid="stExpander"] summary p {
+  color: #F1F5F9 !important;
+  -webkit-text-fill-color: #F1F5F9 !important;
+}
+[data-testid="stExpander"] summary:focus {
   outline: none !important;
   box-shadow: 0 0 0 2px rgba(30,136,229,0.35) !important;
   border-color: #3B82F6 !important;
 }
+
+/* Expander content — LIGHT */
 .streamlit-expanderContent,
-[data-testid="stExpander"] > details > div {
-  background: #1E293B !important;
-  border: 1px solid #334155 !important;
+[data-testid="stExpander"] > details > div,
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+  background: #F8FAFC !important;
+  border: 1px solid #E2E8F0 !important;
   border-top: none !important;
   border-radius: 0 0 var(--r-sm) var(--r-sm) !important;
-  color: #E2E8F0 !important;
+  color: var(--grey-800) !important;
 }
-/* All text inside expander content readable on dark bg */
+
+/* Text ใน expander */
+[data-testid="stExpander"] details > div p,
+[data-testid="stExpander"] details > div span,
+[data-testid="stExpander"] details > div label,
 [data-testid="stExpander"] p,
-[data-testid="stExpander"] label,
-[data-testid="stExpander"] span {
-  color: #CBD5E1 !important;
+[data-testid="stExpander"] label {
+  color: var(--grey-800) !important;
+  -webkit-text-fill-color: var(--grey-800) !important;
 }
 
-/* Alerts */
-div[data-testid="stInfo"]    { background:var(--blue-50)  !important; border-left:3px solid var(--blue-500)  !important; border-radius:var(--r-sm) !important; color:var(--blue-700)  !important; }
-div[data-testid="stSuccess"] { background:var(--green-50) !important; border-left:3px solid var(--green-600) !important; border-radius:var(--r-sm) !important; color:var(--green-700) !important; }
-div[data-testid="stWarning"] { background:var(--amber-50) !important; border-left:3px solid var(--amber-500) !important; border-radius:var(--r-sm) !important; color:var(--amber-700) !important; }
-div[data-testid="stError"]   { background:var(--red-50)   !important; border-left:3px solid var(--red-600)   !important; border-radius:var(--r-sm) !important; color:var(--red-700)   !important; }
+/* Input/Select ใน expander */
+[data-testid="stExpander"] .stTextInput > div > div > input,
+[data-testid="stExpander"] .stTextArea > div > div > textarea {
+  background: #FFFFFF !important;
+  color: var(--grey-900) !important;
+  -webkit-text-fill-color: var(--grey-900) !important;
+  border-color: var(--grey-300) !important;
+}
+[data-testid="stExpander"] .stTextInput label p,
+[data-testid="stExpander"] .stTextArea label p,
+[data-testid="stExpander"] .stSelectbox label p {
+  color: var(--grey-700) !important;
+  -webkit-text-fill-color: var(--grey-700) !important;
+}
+[data-testid="stExpander"] .stSelectbox > div > div,
+[data-testid="stExpander"] .stSelectbox [data-baseweb="select"] span,
+[data-testid="stExpander"] .stSelectbox [data-baseweb="select"] div {
+  background: #FFFFFF !important;
+  color: var(--grey-900) !important;
+  -webkit-text-fill-color: var(--grey-900) !important;
+  border-color: var(--grey-300) !important;
+}
 
-/* Progress */
+/* Buttons ใน expander */
+[data-testid="stExpander"] .stButton > button[kind="primary"],
+[data-testid="stExpander"] .stButton > button[kind="primary"] p {
+  background: linear-gradient(135deg,var(--blue-500),var(--blue-800)) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: none !important;
+}
+[data-testid="stExpander"] .stButton > button:not([kind="primary"]),
+[data-testid="stExpander"] .stButton > button:not([kind="primary"]) p {
+  background: #FFFFFF !important;
+  color: var(--blue-600) !important;
+  -webkit-text-fill-color: var(--blue-600) !important;
+  border: 1.5px solid #CBD5E1 !important;
+}
+[data-testid="stExpander"] .stButton > button:not([kind="primary"]):hover {
+  background: var(--blue-50) !important;
+  border-color: var(--blue-500) !important;
+}
+
+/* ══════════════════════════════
+   ALERTS
+══════════════════════════════ */
+div[data-testid="stInfo"] {
+  background: var(--blue-50) !important;
+  border-left: 3px solid var(--blue-500) !important;
+  border-radius: var(--r-sm) !important;
+}
+div[data-testid="stInfo"],
+div[data-testid="stInfo"] * {
+  color: #1E3A8A !important;
+  -webkit-text-fill-color: #1E3A8A !important;
+}
+div[data-testid="stSuccess"] {
+  background: var(--green-50) !important;
+  border-left: 3px solid var(--green-600) !important;
+  border-radius: var(--r-sm) !important;
+}
+div[data-testid="stSuccess"],
+div[data-testid="stSuccess"] * {
+  color: var(--green-700) !important;
+  -webkit-text-fill-color: var(--green-700) !important;
+}
+div[data-testid="stWarning"] {
+  background: var(--amber-50) !important;
+  border-left: 3px solid var(--amber-500) !important;
+  border-radius: var(--r-sm) !important;
+}
+div[data-testid="stWarning"],
+div[data-testid="stWarning"] * {
+  color: var(--amber-700) !important;
+  -webkit-text-fill-color: var(--amber-700) !important;
+}
+div[data-testid="stError"] {
+  background: var(--red-50) !important;
+  border-left: 3px solid var(--red-600) !important;
+  border-radius: var(--r-sm) !important;
+}
+div[data-testid="stError"],
+div[data-testid="stError"] * {
+  color: var(--red-700) !important;
+  -webkit-text-fill-color: var(--red-700) !important;
+}
+
+/* ══════════════════════════════
+   MISC
+══════════════════════════════ */
 .stProgress > div > div > div > div {
   background: linear-gradient(90deg,var(--blue-500),var(--teal-500)) !important;
   border-radius: 99px !important;
@@ -472,46 +636,83 @@ div[data-testid="stError"]   { background:var(--red-50)   !important; border-lef
   border-radius: 99px !important; height: 8px !important;
 }
 
-/* DataFrames */
 [data-testid="stDataFrame"] {
   border-radius: var(--r-md) !important; overflow: hidden !important;
-  border: 1px solid var(--border) !important; box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border) !important;
 }
 
 hr { border-color: var(--border) !important; margin: 1.25rem 0 !important; }
-.stCaption, small, caption { color: var(--grey-500) !important; font-size:0.82rem !important; }
+
+.stCaption, .stCaption p,
+[data-testid="stCaptionContainer"] p,
+small, caption {
+  color: var(--grey-500) !important;
+  -webkit-text-fill-color: var(--grey-500) !important;
+  font-size: 0.82rem !important;
+}
+
 .stRadio > div { gap: 12px !important; }
-.stRadio label { font-weight: 500 !important; color: var(--grey-700) !important; }
-.stRadio [data-testid="stMarkdownContainer"] p { color:var(--grey-800) !important; font-weight:500 !important; }
-
-.stDownloadButton > button {
-  background: linear-gradient(135deg,var(--teal-500),var(--teal-600)) !important;
-  color: white !important; border: none !important;
-  border-radius: var(--r-sm) !important; font-weight: 700 !important;
-  box-shadow: 0 2px 8px rgba(0,150,167,0.22) !important;
+.stRadio label, .stRadio label span,
+[data-testid="stRadio"] label span {
+  font-weight: 500 !important;
+  color: var(--grey-700) !important;
+  -webkit-text-fill-color: var(--grey-700) !important;
 }
-.stDownloadButton > button:hover {
-  transform: translateY(-1px) !important;
-  box-shadow: 0 4px 14px rgba(0,150,167,0.32) !important;
+.stRadio [data-testid="stMarkdownContainer"] p {
+  color: var(--grey-800) !important;
+  -webkit-text-fill-color: var(--grey-800) !important;
+  font-weight: 500 !important;
+}
+.stCheckbox label span {
+  color: var(--grey-700) !important;
+  -webkit-text-fill-color: var(--grey-700) !important;
 }
 
-[data-testid="stFormSubmitButton"] > button {
-  background: linear-gradient(135deg,var(--blue-500) 0%,var(--blue-800) 100%) !important;
-  color: #fff !important; border: none !important;
+[data-testid="stFileUploader"] label,
+[data-testid="stFileUploader"] label p,
+[data-testid="stFileUploader"] span,
+[data-testid="stFileUploaderDropzone"] span,
+[data-testid="stFileUploaderDropzone"] p {
+  color: var(--grey-700) !important;
+  -webkit-text-fill-color: var(--grey-700) !important;
+}
+[data-testid="stFileUploaderDropzone"] {
+  background: var(--grey-50) !important;
+  border: 1.5px dashed var(--grey-300) !important;
   border-radius: var(--r-sm) !important;
-  font-family: 'IBM Plex Sans Thai', sans-serif !important;
-  font-weight: 700 !important;
-  box-shadow: 0 2px 8px rgba(13,71,161,0.28) !important;
 }
+
+[data-testid="stMainBlockContainer"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stMainBlockContainer"] [data-testid="stMarkdownContainer"] span,
+[data-testid="stMainBlockContainer"] [data-testid="stMarkdownContainer"] li,
+[data-testid="stMainBlockContainer"] [data-testid="stMarkdownContainer"] strong {
+  color: var(--grey-800) !important;
+  -webkit-text-fill-color: var(--grey-800) !important;
+}
+
+[data-testid="stToast"] {
+  background: var(--grey-800) !important;
+  border: 1px solid var(--grey-700) !important;
+}
+[data-testid="stToast"] p,
+[data-testid="stToast"] span {
+  color: #F1F5F9 !important;
+  -webkit-text-fill-color: #F1F5F9 !important;
+}
+
+[data-testid="stSpinner"] p,
+[data-testid="stSpinner"] span {
+  color: var(--grey-600) !important;
+  -webkit-text-fill-color: var(--grey-600) !important;
+}
+
+.stSpinner > div { border-top-color: var(--blue-500) !important; }
 
 ::-webkit-scrollbar { width:6px; height:6px; }
-::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:var(--grey-300); border-radius:99px; }
-::-webkit-scrollbar-thumb:hover { background:var(--grey-400); }
-.stSpinner > div { border-top-color: var(--blue-500) !important; }
-</style>    
-<style>
-/* ── Mobile sidebar toggle ── */
+::-webkit-scrollbar-track { background: var(--grey-100); }
+::-webkit-scrollbar-thumb { background: var(--grey-300); border-radius:99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--grey-400); }
+
 @media (max-width: 768px) {
   [data-testid="stSidebar"] {
     transition: transform 0.3s ease !important;
@@ -519,80 +720,70 @@ hr { border-color: var(--border) !important; margin: 1.25rem 0 !important; }
     z-index: 999 !important;
     height: 100vh !important;
   }
-  .mobile-menu-btn {
-    display: flex !important;
-    position: fixed !important;
-    top: 12px !important;
-    left: 12px !important;
-    z-index: 1000 !important;
-    background: #1148A8 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 8px !important;
-    padding: 8px 12px !important;
-    font-size: 1.2rem !important;
-    cursor: pointer !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
-  }
-}
-@media (min-width: 769px) {
-  .mobile-menu-btn { display: none !important; }
 }
 </style>
 """, unsafe_allow_html=True)
-
 
 # ═══════════════════════════════════════════════════════
 #  UI COMPONENT HELPERS
 # ═══════════════════════════════════════════════════════
 
 def page_header(icon: str, title: str, subtitle: str = ""):
-    sub = f"<p style='color:#64748B;font-size:0.9rem;margin:4px 0 0;'>{subtitle}</p>" if subtitle else ""
+    sub = f"<p style='color:#64748B;-webkit-text-fill-color:#64748B;font-size:0.9rem;margin:4px 0 0;'>{subtitle}</p>" if subtitle else ""
     st.markdown(f"""
-    <div style="padding-bottom:20px;margin-bottom:24px;
-                border-bottom:1px solid #E2E8F0;">
-      <h1 style="margin:0 !important;">{icon}&nbsp;{title}</h1>
+    <div style="padding-bottom:20px;margin-bottom:24px;border-bottom:1px solid #E2E8F0;">
+      <h1 style="margin:0 !important;color:#0F172A !important;-webkit-text-fill-color:#0F172A !important;">
+        {icon}&nbsp;{title}
+      </h1>
       {sub}
     </div>""", unsafe_allow_html=True)
 
 
 def section_title(text: str, caption: str = ""):
-    cap = f"<div style='font-size:0.8rem;color:#94A3B8;margin-top:2px;'>{caption}</div>" if caption else ""
+    cap = f"<div style='font-size:0.8rem;color:#94A3B8;-webkit-text-fill-color:#94A3B8;margin-top:2px;'>{caption}</div>" if caption else ""
     st.markdown(f"""
     <div style="margin:22px 0 12px;">
       <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1rem;
-                  font-weight:700;color:#1E293B;">{text}</div>
+                  font-weight:700;color:#1E293B;-webkit-text-fill-color:#1E293B;">{text}</div>
       {cap}
     </div>""", unsafe_allow_html=True)
 
 
 def kpi_card(icon: str, label: str, value, delta: str = "", delta_ok: bool = True):
     dc = "#16A34A" if delta_ok else "#DC2626"
-    d_html = f"<div style='font-size:0.78rem;font-weight:600;color:{dc};margin-top:5px;'>{delta}</div>" if delta else ""
+    d_html = f"<div style='font-size:0.78rem;font-weight:600;color:{dc};-webkit-text-fill-color:{dc};margin-top:5px;'>{delta}</div>" if delta else ""
     st.markdown(f"""
-    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;
+    <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;
                 padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.06);height:100%;">
       <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;">
         <span style="font-size:1.2rem;">{icon}</span>
         <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;
-                     letter-spacing:0.7px;color:#64748B;">{label}</span>
+                     letter-spacing:0.7px;color:#64748B;-webkit-text-fill-color:#64748B;">{label}</span>
       </div>
       <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-size:1.85rem;
-                  font-weight:800;color:#0F172A;line-height:1.1;">{value}</div>
+                  font-weight:800;color:#0F172A;-webkit-text-fill-color:#0F172A;line-height:1.1;">{value}</div>
       {d_html}
     </div>""", unsafe_allow_html=True)
 
 
 def status_badge(label: str) -> str:
     cfg = {
-        "Real":       ("#00FF5943","#000000","✓"),
-        "Fake":       ("#FF0000","#991B1B","✕"),
-        "Unverified": ("#FEF3C7","#92400E","?"),
-    }.get(label, ("#000000","#000000","·"))
+        "Real":       ("#DCFCE7", "#166534", "✓"),
+        "Fake":       ("#FEE2E2", "#991B1B", "✕"),
+        "Unverified": ("#FEF3C7", "#92400E", "?"),
+    }.get(label, ("#F1F5F9", "#475569", "·"))
     return (f"<span style='display:inline-flex;align-items:center;gap:3px;"
-            f"background:{cfg[0]};color:{cfg[1]};font-size:0.72rem;font-weight:800;"
-            f"padding:3px 10px;border-radius:99px;text-transform:uppercase;"
-            f"letter-spacing:0.4px;'>{cfg[2]} {label}</span>")
+            f"background:{cfg[0]};color:{cfg[1]};-webkit-text-fill-color:{cfg[1]};"
+            f"font-size:0.72rem;font-weight:800;padding:3px 10px;border-radius:99px;"
+            f"text-transform:uppercase;letter-spacing:0.4px;'>{cfg[2]} {label}</span>")
+
+
+def card_wrap(content_fn, *args, **kwargs):
+    st.markdown('<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:14px;'
+                'padding:22px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px;">',
+                unsafe_allow_html=True)
+    content_fn(*args, **kwargs)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def time_ago(ts):
@@ -615,13 +806,6 @@ def time_ago(ts):
     except:
         return str(ts)
 
-
-def card_wrap(content_fn, *args, **kwargs):
-    """Renders content inside a white card."""
-    st.markdown('<div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;'
-                'padding:22px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px;">', unsafe_allow_html=True)
-    content_fn(*args, **kwargs)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════
@@ -807,6 +991,243 @@ def show_feedback_review():
 
     all_items = db.get_pending_feedbacks()
 
+    col_f, col_s, col_t = st.columns([2, 1, 1])
+    with col_f:
+        search_q = st.text_input("🔍 ค้นหา", placeholder="พิมพ์คำค้นหา...", label_visibility="collapsed")
+    with col_s:
+        filter_status = st.selectbox("สถานะ", ["ทั้งหมด", "pending", "Real", "Fake", "Ignored"], label_visibility="collapsed")
+    with col_t:
+        sort_order = st.selectbox("เรียงตาม", ["🕐 ล่าสุดก่อน", "🕰️ เก่าสุดก่อน"], label_visibility="collapsed")
+
+    filtered = all_items
+    if filter_status != "ทั้งหมด":
+        filtered = [i for i in filtered if i.get('status') == filter_status]
+    if search_q:
+        filtered = [i for i in filtered if search_q.lower() in str(i.get('title','')).lower()
+                    or search_q.lower() in str(i.get('text','')).lower()]
+    filtered = sorted(
+        filtered,
+        key=lambda x: str(x.get('timestamp') or ''),
+        reverse=(sort_order == "🕐 ล่าสุดก่อน")
+    )
+
+    n_pending  = sum(1 for i in all_items if i.get('status') == 'pending')
+    n_reviewed = sum(1 for i in all_items if i.get('status') != 'pending')
+    n_true     = sum(1 for i in all_items if i.get('status') == 'Real')
+    n_fake     = sum(1 for i in all_items if i.get('status') == 'Fake')
+    n_ignored  = sum(1 for i in all_items if i.get('status') == 'Ignored')
+
+    st.markdown(f"""
+    <div style="display:flex;gap:10px;margin-bottom:18px;">
+      <div style="background:#FFF9E6;border:1px solid #FDE68A;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#92400E;
+                    -webkit-text-fill-color:#92400E;">{n_pending}</div>
+        <div style="font-size:0.78rem;color:#92400E;
+                    -webkit-text-fill-color:#92400E;">รอตรวจสอบ</div>
+      </div>
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#1148A8;
+                    -webkit-text-fill-color:#1148A8;">{n_reviewed}</div>
+        <div style="font-size:0.78rem;color:#1148A8;
+                    -webkit-text-fill-color:#1148A8;">ตรวจสอบแล้ว</div>
+      </div>
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#166534;
+                    -webkit-text-fill-color:#166534;">{n_true}</div>
+        <div style="font-size:0.78rem;color:#16A34A;
+                    -webkit-text-fill-color:#16A34A;">ข่าวจริง</div>
+      </div>
+      <div style="background:#FFF5F5;border:1px solid #FECACA;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#991B1B;
+                    -webkit-text-fill-color:#991B1B;">{n_fake}</div>
+        <div style="font-size:0.78rem;color:#991B1B;
+                    -webkit-text-fill-color:#991B1B;">ข่าวปลอม</div>
+      </div>
+      <div style="background:#F8FAFC;border:1px solid #CBD5E1;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#475569;
+                    -webkit-text-fill-color:#475569;">{n_ignored}</div>
+        <div style="font-size:0.78rem;color:#475569;
+                    -webkit-text-fill-color:#475569;">ถูกปฏิเสธ</div>
+      </div>
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;
+                  padding:12px 18px;flex:1;text-align:center;">
+        <div style="font-size:1.4rem;font-weight:800;color:#1E293B;
+                    -webkit-text-fill-color:#1E293B;">{len(all_items)}</div>
+        <div style="font-size:0.78rem;color:#64748B;
+                    -webkit-text-fill-color:#64748B;">ทั้งหมด</div>
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    if not filtered:
+        st.info("ไม่พบรายการที่ตรงกับเงื่อนไข")
+        return
+
+    st.caption(f"แสดง {len(filtered)} รายการ")
+
+    import html
+    for idx, item in enumerate(filtered):
+        status_cfg = {
+            'pending':  ("#FFF9E6", "#92400E", "⏳ รอตรวจสอบ"),
+            'Real':     ("#F0FDF4", "#166534", "✅ Real"),
+            'Fake':     ("#FFF5F5", "#991B1B", "❌ Fake"),
+            'Ignored':  ("#F1F5F9", "#475569", "🗑️ Ignored"),
+        }.get(item.get('status','pending'), ("#F1F5F9","#475569","—"))
+
+        ttl = (item['title'][:55]+"…") if item['title'] and len(item['title'])>55 else (item['title'] or "No Title")
+
+        with st.expander(f"📰 {ttl}", expanded=(item.get('status')=='pending')):
+            fid = item['feedback_id'] if item['feedback_id'] is not None else idx
+
+            st.markdown(f"""
+    <span style="background:{status_cfg[0]};color:{status_cfg[1]};
+                 -webkit-text-fill-color:{status_cfg[1]};
+                 font-size:0.75rem;font-weight:700;padding:3px 10px;
+                 border-radius:99px;">{status_cfg[2]}</span>
+    """, unsafe_allow_html=True)
+
+            c1, c2 = st.columns([3,2])
+            with c1:
+                st.markdown("**เนื้อหาข่าว**")
+                # ✅ light bg
+                st.markdown(f"""
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;
+                padding:13px 15px;font-size:0.9rem;line-height:1.6;
+                color:#334155;-webkit-text-fill-color:#334155;
+                max-height:300px;overflow-y:auto;">
+                {html.escape(str(item['text']))}
+                </div>""", unsafe_allow_html=True)
+                st.caption(f"📅 {item['timestamp']}")
+
+            with c2:
+                ai_b = status_badge(item['ai_result']) if item['ai_result'] in ('Real','Fake','Unverified') else item['ai_result']
+                fb = item.get('user_report') or ''
+
+                # ✅ สีชัดบน light bg
+                fb_html = {
+                    "Correct": "<span style='background:#DCFCE7;color:#166534;"
+                               "-webkit-text-fill-color:#166534;padding:3px 10px;"
+                               "border-radius:99px;font-weight:700;font-size:0.82rem;'>"
+                               "👍 AI ทายถูก</span>",
+                    "Incorrect": "<span style='background:#FEE2E2;color:#991B1B;"
+                                 "-webkit-text-fill-color:#991B1B;padding:3px 10px;"
+                                 "border-radius:99px;font-weight:700;font-size:0.82rem;'>"
+                                 "👎 AI ทายผิด</span>"
+                }.get(fb, "<span style='color:#64748B;-webkit-text-fill-color:#64748B;"
+                          "font-size:0.88rem;'>— ยังไม่มี Feedback</span>")
+
+                try:
+                    conf_display = f"{float(item['ai_confidence']):.2f}%"
+                except:
+                    conf_display = f"{item['ai_confidence']}%"
+
+                # ✅ light theme cards
+                st.markdown(f"""
+            <div style="display:flex;flex-direction:column;gap:9px;margin-top:2px;">
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;
+                  border-radius:8px;padding:11px 13px;">
+                <div style="font-size:0.72rem;color:#1148A8;-webkit-text-fill-color:#1148A8;
+                    font-weight:700;text-transform:uppercase;margin-bottom:5px;">AI PREDICTION</div>
+                {ai_b}&nbsp;
+                <span style="font-size:0.83rem;color:#334155;-webkit-text-fill-color:#334155;
+                font-weight:600;">{conf_display}</span>
+            </div>
+            <div style="background:#FFFBEB;border:1px solid #FDE68A;
+                  border-radius:8px;padding:11px 13px;">
+                <div style="font-size:0.72rem;color:#92400E;-webkit-text-fill-color:#92400E;
+                    font-weight:700;text-transform:uppercase;margin-bottom:4px;">💬 USER SAYS</div>
+                {fb_html}
+            </div>
+            </div>""", unsafe_allow_html=True)
+
+                st.markdown(
+                    "<div style='margin:14px 0 8px;font-weight:700;font-size:0.88rem;"
+                    "color:#1E293B;-webkit-text-fill-color:#1E293B;'>👨‍⚖️ Admin Decision</div>",
+                    unsafe_allow_html=True
+                )
+
+                CATEGORIES = [
+                    "นโยบายรัฐบาล-ข่าวสาร", "ผลิตภัณฑ์สุขภาพ", "การเงิน-หุ้น", "ภัยพิบัติ",
+                    "ความสงบและความมั่นคง", "ข่าวอื่นๆ", "เศรษฐกิจ", "ยาเสพติด",
+                ]
+                cur_cat = item.get('category') or 'ข่าวอื่นๆ'
+                if cur_cat not in CATEGORIES:
+                    cur_cat = 'ข่าวอื่นๆ'
+
+                st.markdown(f"""
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;
+                            padding:10px 13px;margin-bottom:10px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#64748B;
+                            -webkit-text-fill-color:#64748B;
+                            text-transform:uppercase;margin-bottom:6px;">
+                    📂 หมวดหมู่ปัจจุบัน
+                </div>
+                <span style="background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;
+                            font-size:0.82rem;font-weight:700;padding:3px 12px;
+                            border-radius:99px;border:1px solid #BFDBFE;">{cur_cat}</span>
+                </div>""", unsafe_allow_html=True)
+
+                new_cat = st.selectbox(
+                    "แก้หมวดหมู่ (ถ้าต้องการ)",
+                    CATEGORIES,
+                    index=CATEGORIES.index(cur_cat),
+                    key=f"cat_edit_{fid}_{idx}"
+                )
+
+                if new_cat != cur_cat:
+                    if st.button(
+                        f"💾 บันทึกหมวดหมู่ → {new_cat}",
+                        key=f"save_cat_{fid}_{idx}",
+                        type="primary",
+                        use_container_width=True
+                    ):
+                        if db.update_prediction_category(item['prediction_id'], new_cat):
+                            db.log_system_event(
+                                user_id=st.session_state.get('user_id'),
+                                action="UPDATE_CATEGORY",
+                                details=f"prediction_id={item['prediction_id']} "
+                                        f"{cur_cat} → {new_cat}",
+                                level="INFO"
+                            )
+                            st.success(f"✅ เปลี่ยนหมวดหมู่เป็น {new_cat} แล้ว")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error("บันทึกไม่สำเร็จ")
+
+                st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+                b1, b2, b3 = st.columns(3)
+                with b1:
+                    if st.button("✅ Real", key=f"real_{fid}_{idx}", type="primary", width="stretch"):
+                        if item['feedback_id'] is not None:
+                            db.update_feedback_status(item['feedback_id'], 'Real')
+                            db.log_system_event(user_id=st.session_state.get('user_id'),
+                                        action="REVIEW_FEEDBACK",
+                                        details=f"feedback_id={fid} → Real", level="WARNING")
+                            st.rerun()
+                with b2:
+                    if st.button("❌ Fake", key=f"fake_{fid}_{idx}", type="primary", width="stretch"):
+                        if item['feedback_id'] is not None:
+                            db.update_feedback_status(item['feedback_id'], 'Fake')
+                            db.log_system_event(user_id=st.session_state.get('user_id'),
+                                        action="REVIEW_FEEDBACK",
+                                        details=f"feedback_id={fid} → Fake", level="WARNING")
+                            st.rerun()
+                with b3:
+                    if st.button("🗑️ Ignore", key=f"del_{fid}_{idx}", width="stretch"):
+                        if item['feedback_id'] is not None:
+                            db.update_feedback_status(item['feedback_id'], 'Ignored')
+                            db.log_system_event(user_id=st.session_state.get('user_id'),
+                                        action="REVIEW_FEEDBACK",
+                                        details=f"feedback_id={fid} → Ignored", level="WARNING")
+                            st.rerun()
+    all_items = db.get_pending_feedbacks()
+
     # ✅ filter bar — แสดงเสมอ ไม่ early return
     col_f, col_s, col_t = st.columns([2, 1, 1])
     with col_f:
@@ -889,6 +1310,7 @@ def show_feedback_review():
         ttl = (item['title'][:55]+"…") if item['title'] and len(item['title'])>55 else (item['title'] or "No Title")
 
         with st.expander(f"📰 {ttl}", expanded=(item.get('status')=='pending')):
+            fid = item['feedback_id'] if item['feedback_id'] is not None else idx
             st.markdown(f"""
     <span style="background:{status_cfg[0]};color:{status_cfg[1]};
                  font-size:0.75rem;font-weight:700;padding:3px 10px;
@@ -899,9 +1321,9 @@ def show_feedback_review():
             with c1:
                 st.markdown("**เนื้อหาข่าว**")
                 st.markdown(f"""
-                <div style="background:#1E293B;border:1px solid #334155;border-radius:8px;
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;
                 padding:13px 15px;font-size:0.9rem;line-height:1.6;
-                color:#E2E8F0;max-height:300px;overflow-y:auto;">
+                color:#334155;-webkit-text-fill-color:#334155;max-height:300px;overflow-y:auto;">
                 {html.escape(str(item['text']))}
                 </div>""", unsafe_allow_html=True)
                 st.caption(f"📅 {item['timestamp']}")
@@ -912,9 +1334,8 @@ def show_feedback_review():
                 fb_html = {
                     "Correct": "<span style='background:#DCFCE7;color:#166534;-webkit-text-fill-color:#166534;padding:3px 10px;border-radius:99px;font-weight:700;font-size:0.82rem;'>👍 AI ทายถูก</span>",
                     "Incorrect": "<span style='background:#FEE2E2;color:#991B1B;-webkit-text-fill-color:#991B1B;padding:3px 10px;border-radius:99px;font-weight:700;font-size:0.82rem;'>👎 AI ทายผิด</span>"
-                }.get(fb, "<span style='color:#94A3B8;-webkit-text-fill-color:#94A3B8;font-size:0.88rem;'>— ยังไม่มี Feedback</span>")
-
-    # ✅ แปลง confidence เป็น float และปัดทศนิยม 2 ตำแหน่ง
+                }.get(fb, "<span style='color:#64748B;-webkit-text-fill-color:#64748B;font-size:0.88rem;'>— ยังไม่มี Feedback</span>")
+            # ✅ แปลง confidence เป็น float และปัดทศนิยม 2 ตำแหน่ง
                 try:
                     conf_display = f"{float(item['ai_confidence']):.2f}%"
                 except:
@@ -922,25 +1343,82 @@ def show_feedback_review():
 
                 st.markdown(f"""
             <div style="display:flex;flex-direction:column;gap:9px;margin-top:2px;">
-            <div style="background:#2D3F55;border:1px solid #3D5068;
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;
                   border-radius:8px;padding:11px 13px;">
-                <div style="font-size:0.72rem;color:#93C5FD;font-weight:700;
-                    text-transform:uppercase;margin-bottom:5px;">AI PREDICTION</div>
+                <div style="font-size:0.72rem;color:#1148A8;-webkit-text-fill-color:#1148A8;
+                    font-weight:700;text-transform:uppercase;margin-bottom:5px;">AI PREDICTION</div>
                 {ai_b}&nbsp;
-                <span style="font-size:0.83rem;color:#E2E8F0;font-weight:600;">
-                {conf_display}
-                </span>
+                <span style="font-size:0.83rem;color:#334155;-webkit-text-fill-color:#334155;
+                font-weight:600;">{conf_display}</span>
             </div>
-            <div style="background:#2D3320;border:1px solid #4A3B10;
+            <div style="background:#FFFBEB;border:1px solid #FDE68A;
                   border-radius:8px;padding:11px 13px;">
-                <div style="font-size:0.72rem;color:#FCD34D;font-weight:700;
-                    text-transform:uppercase;margin-bottom:4px;">💬 USER SAYS</div>
+                <div style="font-size:0.72rem;color:#92400E;-webkit-text-fill-color:#92400E;
+                    font-weight:700;text-transform:uppercase;margin-bottom:4px;">💬 USER SAYS</div>
                 {fb_html}
             </div>
             </div>""", unsafe_allow_html=True)
 
                 st.markdown("<div style='margin:14px 0 8px;font-weight:700;font-size:0.88rem;color:#1E293B;'>👨‍⚖️ Admin Decision</div>", unsafe_allow_html=True)
-                fid = item['feedback_id'] if item['feedback_id'] is not None else idx
+                # ✅ แสดง category ปัจจุบัน + แก้ไขได้
+                CATEGORIES = [
+                    "นโยบายรัฐบาล-ข่าวสาร", "ผลิตภัณฑ์สุขภาพ", "การเงิน-หุ้น", "ภัยพิบัติ",
+                    "ความสงบและความมั่นคง", "ข่าวอื่นๆ", "เศรษฐกิจ", "ยาเสพติด",
+                ]
+
+                cur_cat = item.get('category') or 'ข่าวอื่นๆ'
+
+                # normalize ถ้าหมวดหมู่เดิมไม่อยู่ใน list
+                if cur_cat not in CATEGORIES:
+                    cur_cat = 'ข่าวอื่นๆ'
+
+                st.markdown(f"""
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;
+                            padding:10px 13px;margin-bottom:10px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#64748B;
+                            -webkit-text-fill-color:#64748B;
+                            text-transform:uppercase;margin-bottom:6px;">
+                    📂 หมวดหมู่ปัจจุบัน
+                </div>
+                <span style="background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;
+                            font-size:0.82rem;font-weight:700;padding:3px 12px;
+                            border-radius:99px;border:1px solid #BFDBFE;">{cur_cat}</span>
+                </div>""", unsafe_allow_html=True)
+
+                # dropdown แก้หมวดหมู่
+                new_cat = st.selectbox(
+                    "แก้หมวดหมู่ (ถ้าต้องการ)",
+                    CATEGORIES,
+                    index=CATEGORIES.index(cur_cat),
+                    key=f"cat_edit_{fid}_{idx}"
+                )
+
+                # ✅ ถ้าเปลี่ยนหมวดหมู่ — แสดงปุ่มบันทึก
+                if new_cat != cur_cat:
+                    if st.button(
+                        f"💾 บันทึกหมวดหมู่ → {new_cat}",
+                        key=f"save_cat_{fid}_{idx}",
+                        type="primary",
+                        use_container_width=True
+                    ):
+                        if db.update_prediction_category(item['prediction_id'], new_cat):
+                            db.log_system_event(
+                                user_id=st.session_state.get('user_id'),
+                                action="UPDATE_CATEGORY",
+                                details=f"prediction_id={item['prediction_id']} "
+                                        f"{cur_cat} → {new_cat}",
+                                level="INFO"
+                            )
+                            st.success(f"✅ เปลี่ยนหมวดหมู่เป็น {new_cat} แล้ว")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error("บันทึกไม่สำเร็จ")
+
+                st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+                # ปุ่ม Real / Fake / Ignore เดิม
+                
                 b1, b2, b3 = st.columns(3)
                 with b1:
                         if st.button("✅ Real", key=f"real_{fid}_{idx}", type="primary", width="stretch"):
@@ -1502,15 +1980,17 @@ def show_system_analytics():
             )
             st.plotly_chart(fig_st, use_container_width=True, key="fb_status_pie")
 
-        # ── กราฟ 3: แนวโน้ม Feedback รายวัน ──
+        # ── กราฟ 3: แนวโน้ม Feedback ทั้งหมด (ไม่จำกัด 7 วัน) ──
         st.markdown("""<div style="font-size:0.84rem;font-weight:700;
         color:#334155;margin-top:8px;margin-bottom:8px;">
-        📈 แนวโน้ม Feedback รายวัน (7 วันล่าสุด)</div>""",
+        📈 แนวโน้ม Feedback ทั้งหมด (รายวัน)</div>""",
         unsafe_allow_html=True)
 
         df_fb_stats['date'] = df_fb_stats['timestamp'].dt.date
-        last7 = [(now_bkk() - timedelta(days=i)).date() for i in range(6, -1, -1)]
-        df_date = pd.DataFrame({'date': last7})
+
+        # ✅ ดึงทุกวันที่มีข้อมูล ไม่จำกัด 7 วัน
+        all_dates = sorted(df_fb_stats['date'].unique())
+        df_date = pd.DataFrame({'date': all_dates})
 
         correct_by_date   = df_fb_stats[df_fb_stats['user_report'] == 'Correct'] \
                                 .groupby('date').size()
@@ -1531,18 +2011,34 @@ def show_system_analytics():
             labels={'value': 'จำนวน', 'date': 'วันที่', 'variable': 'ประเภท'}
         )
         fig_trend.update_layout(
-            plot_bgcolor='white', paper_bgcolor='white',
-            font_color='#334155',
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            font=dict(color='#1E293B', size=12),          # ✅ สีฟอนต์เข้ม
             margin=dict(l=0, r=0, t=10, b=0),
-            xaxis_title="วันที่",
-            yaxis_title="จำนวน Feedback",
-            legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"),
+            xaxis=dict(
+                title="วันที่",
+                tickfont=dict(color='#1E293B', size=11),   # ✅ แกน X ชัดเจน
+                title_font=dict(color='#1E293B'),
+                tickangle=-30,                              # ✅ เอียงตัวเลขป้องกันทับกัน
+                showgrid=True,
+                gridcolor='#F1F5F9'
+            ),
+            yaxis=dict(
+                title="จำนวน Feedback",
+                tickfont=dict(color='#1E293B', size=11),   # ✅ แกน Y ชัดเจน
+                title_font=dict(color='#1E293B'),
+                showgrid=True,
+                gridcolor='#F1F5F9',
+                rangemode='tozero'
+            ),
+            legend=dict(
+                orientation="h", y=-0.35, x=0.5,
+                xanchor="center",
+                font=dict(color='#1E293B', size=12)        # ✅ legend ชัดเจน
+            ),
             legend_title_text=''
         )
         st.plotly_chart(fig_trend, use_container_width=True, key="fb_trend")
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ═══════════════════════════════════════════════════════
 #  ADMIN: Manage Users
@@ -2069,140 +2565,181 @@ else:
 
             st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
             if st.button("🚀  วิเคราะห์ข่าวนี้", type="primary", width="stretch"):
+                # ✅ ล้างผลเก่าก่อนเริ่มวิเคราะห์ใหม่
+                for k in ['current_result','current_pred_id','feedback_given','current_text']:
+                    st.session_state.pop(k, None)
+
                 clean = ""
-                if check_mode=="🔗  URL ลิงก์ข่าว":
+                if check_mode == "🔗  URL ลิงก์ข่าว":
                     if not input_url: st.warning("กรุณาวาง URL ก่อนกด"); st.stop()
                     with st.spinner("กำลังดึงข้อมูลจากลิงก์..."):
                         db.log_system_event(user_id=st.session_state.get('user_id'), action="URL_FETCH",
-                        details=f"Fetched: {input_url}", level="INFO")
-                        title,content=get_content_from_url(input_url)
+                            details=f"Fetched: {input_url}", level="INFO")
+                        title, content = get_content_from_url(input_url)
                     if title and not str(content).startswith("Error"):
-                        clean=f"{title}\n\n{content}"
+                        clean = f"{title}\n\n{content}"
                     else:
                         st.error(f"ดึงข้อมูลไม่ได้: {content}")
-                        db.log_system_event(user_id=st.session_state.get('user_id'),action="API_ERROR",
-                                            details=f"URL fetch failed: {input_url}",level="ERROR"); st.stop()
+                        db.log_system_event(user_id=st.session_state.get('user_id'), action="API_ERROR",
+                            details=f"URL fetch failed: {input_url}", level="ERROR")
+                        st.stop()
                 else:
-                    clean=str(input_text).strip()
+                    clean = str(input_text).strip()
                     if not clean: st.warning("กรุณาใส่เนื้อหาข่าว"); st.stop()
 
                 with st.spinner("🧠 AI กำลังวิเคราะห์..."):
                     try:
-            # ✅ โหลด pipeline ก่อน แล้วส่งเข้าไปด้วย
                         pipeline = ai.get_pipeline()
-                        result = ai.predict_news(re.sub(r'\s+',' ', clean).strip(), pipeline)
-            
+                        result   = ai.predict_news(re.sub(r'\s+', ' ', clean).strip(), pipeline)
                         if result:
                             time.sleep(0.35)
-                            rl, rc = result.get('result'), result.get('confidence')
+                            rl    = result.get('result')
+                            rc    = result.get('confidence')
                             uname = st.session_state.get('username', 'Unknown')
-                            db.log_system_event(user_id=st.session_state.get('user_id'), action="PREDICT",
-                            details=f"[{uname}] ทำนาย: '{clean[:50]}' → {rl} ({rc}%)", level="INFO")
-                            pid = db.create_prediction(st.session_state.get('user_id'), clean[:50]+"…",
-                                                    clean, input_url or None, rl, rc)
-                            st.session_state.update({'current_result': result, 'current_pred_id': pid, 'feedback_given': False,'current_text':  clean})
+                            db.log_system_event(
+                                user_id=st.session_state.get('user_id'), action="PREDICT",
+                                details=f"[{uname}] ทำนาย: '{clean[:50]}' → {rl} ({rc}%)",
+                                level="INFO"
+                            )
+                            pid = db.create_prediction(
+                                st.session_state.get('user_id'),
+                                clean[:50] + "…", clean,
+                                input_url or None, rl, rc,
+                                result.get('category', '')
+                            )
+                            st.session_state.update({
+                                'current_result':  result,
+                                'current_pred_id': pid,
+                                'feedback_given':  False,
+                                'current_text':    clean,
+                            })
                             st.rerun()
                         else:
                             st.error("AI ไม่ตอบสนอง")
-                            db.log_system_event(user_id=st.session_state.get('user_id'), action="API_ERROR",
-                                    details="None result", level="ERROR")
+                            db.log_system_event(user_id=st.session_state.get('user_id'),
+                                action="API_ERROR", details="None result", level="ERROR")
                     except Exception as e:
                         st.error(f"เกิดข้อผิดพลาด: {e}")
 
-            # Result
-            if 'current_result' in st.session_state:
+            # ═══════════════════════════════
+            # ✅ Result — แสดงเสมอจนกดวิเคราะห์ใหม่
+            # ═══════════════════════════════
+            if st.session_state.get('current_result'):
                 res   = st.session_state['current_result']
                 label = res['result']
                 conf  = float(res['confidence'])
                 cat   = res.get('category', 'ไม่ระบุ')
 
-                # ✅ ดึงจาก current_text แทน input_text
                 raw_text = st.session_state.get('current_text', '')
                 preview  = re.sub(r'\s+', ' ', str(raw_text)).strip()[:150]
                 preview  = (preview + "…") if len(str(raw_text)) > 150 else preview
 
                 if conf < 70:
                     cfg = dict(bg="#FFFBEB", border="#F59E0B", bc="#92400E", bbg="#FEF3C7",
-                            icon="⚠️", verdict="UNVERIFIED", bar="#F59E0B",
-                            desc="AI ยังไม่มีความมั่นใจเพียงพอ — ข้อมูลอาจไม่ครบถ้วน ควรตรวจสอบจากแหล่งอื่นด้วย")
+                               icon="⚠️", verdict="UNVERIFIED", bar="#F59E0B",
+                               desc="AI ยังไม่มีความมั่นใจเพียงพอ — ควรตรวจสอบจากแหล่งอื่นด้วย")
                 elif label == "Fake":
                     cfg = dict(bg="#FFF5F5", border="#EF4444", bc="#991B1B", bbg="#FEE2E2",
-                            icon="🚨", verdict="FAKE NEWS", bar="#EF4444",
-                            desc="เนื้อหานี้มีลักษณะเป็นข่าวปลอมหรือข้อมูลบิดเบือน — กรุณาตรวจสอบแหล่งที่มาก่อนแชร์")
+                               icon="🚨", verdict="FAKE NEWS", bar="#EF4444",
+                               desc="เนื้อหานี้มีลักษณะเป็นข่าวปลอมหรือข้อมูลบิดเบือน — กรุณาตรวจสอบแหล่งที่มาก่อนแชร์")
                 else:
                     cfg = dict(bg="#F0FDF4", border="#22C55E", bc="#14532D", bbg="#DCFCE7",
-                            icon="✅", verdict="REAL NEWS", bar="#22C55E",
-                            desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ")
+                               icon="✅", verdict="REAL NEWS", bar="#22C55E",
+                               desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ")
 
                 st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
-
                 st.markdown(f"""
-            <div style="background:{cfg['bg']};border:1.5px solid {cfg['border']};
-                        border-radius:16px;padding:26px 28px;
-                        box-shadow:0 4px 20px rgba(0,0,0,0.06);">
-            <div style="display:flex;align-items:flex-start;gap:15px;margin-bottom:18px;">
-                <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
-                <div style="flex:1;">
-                <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
-                            font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
-                            font-size:1.15rem;padding:5px 16px;border-radius:8px;
-                            letter-spacing:-0.2px;">{cfg['verdict']}</span>
-                <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
-                    {cfg['desc']}
-                </div>
-                </div>
-            </div>
-            
-            {'<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px 16px;margin-bottom:14px;"><div style="font-size:0.72rem;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📄 จากเนื้อหาข่าว</div><div style="font-size:0.88rem;color:#334155;line-height:1.6;font-style:italic;">&quot;' + preview + '&quot;</div></div>' if preview else ''}
-            <div style="margin-bottom:14px;">
-                <span style="font-size:0.75rem;font-weight:600;color:#64748B;">📂 หมวดหมู่ข่าว</span>
-                &nbsp;
-                <span style="background:#EFF6FF;color:#1148A8;font-size:0.82rem;font-weight:700;
-                            padding:4px 12px;border-radius:99px;border:1px solid #BFDBFE;">
-                {cat}
-                </span>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-                <span style="font-size:0.8rem;font-weight:600;color:#64748B;">AI Confidence</span>
-                <span style="font-size:0.88rem;font-weight:800;color:{cfg['bc']};">{conf:.1f}%</span>
-                </div>
-                <div style="background:rgba(0,0,0,0.07);border-radius:99px;height:7px;overflow:hidden;">
-                <div style="width:{conf}%;height:100%;background:{cfg['bar']};
-                            border-radius:99px;"></div>
-                </div>
-            </div>
-            </div>""", unsafe_allow_html=True)
+                <div style="background:{cfg['bg']};border:1.5px solid {cfg['border']};
+                            border-radius:16px;padding:26px 28px;
+                            box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+                  <div style="display:flex;align-items:flex-start;gap:15px;margin-bottom:18px;">
+                    <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
+                    <div style="flex:1;">
+                      <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
+                                   font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
+                                   font-size:1.15rem;padding:5px 16px;border-radius:8px;">
+                        {cfg['verdict']}
+                      </span>
+                      <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
+                        {cfg['desc']}
+                      </div>
+                    </div>
+                  </div>
+                  {'<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px 16px;margin-bottom:14px;"><div style="font-size:0.72rem;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📄 จากเนื้อหาข่าว</div><div style="font-size:0.88rem;color:#334155;line-height:1.6;font-style:italic;">&quot;' + preview + '&quot;</div></div>' if preview else ''}
+                  <div style="margin-bottom:14px;">
+                    <span style="font-size:0.75rem;font-weight:600;color:#64748B;">📂 หมวดหมู่ข่าว</span>&nbsp;
+                    <span style="background:#EFF6FF;color:#1148A8;font-size:0.82rem;font-weight:700;
+                                 padding:4px 12px;border-radius:99px;border:1px solid #BFDBFE;">
+                      {cat}
+                    </span>
+                  </div>
+                  <div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                      <span style="font-size:0.8rem;font-weight:600;color:#64748B;">AI Confidence</span>
+                      <span style="font-size:0.88rem;font-weight:800;color:{cfg['bc']};">{conf:.1f}%</span>
+                    </div>
+                    <div style="background:rgba(0,0,0,0.07);border-radius:99px;height:7px;overflow:hidden;">
+                      <div style="width:{conf}%;height:100%;background:{cfg['bar']};border-radius:99px;"></div>
+                    </div>
+                  </div>
+                </div>""", unsafe_allow_html=True)
 
-    # Feedback
+                # ── Feedback ──
                 st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-                st.markdown("""
-                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;
-                padding:18px 20px 10px;">
-    <div style="font-weight:700;font-size:0.9rem;color:#1E293B;">
-        💬 AI ทายถูกหรือเปล่า?
-    </div>
-    <div style="font-size:0.8rem;color:#94A3B8;margin:3px 0 12px;">
-        Feedback ของคุณช่วยให้ AI แม่นยำขึ้น
-    </div>
-    </div>""", unsafe_allow_html=True)
-                if not st.session_state.get('feedback_given'):
-                    fc1,fc2=st.columns(2)
-                    with fc1:
-                        if st.button("👍  ถูกต้อง — AI ทายถูก",type="primary",width="stretch"):
-                            db.save_feedback(st.session_state['current_pred_id'], "Correct")
-                            db.log_system_event(user_id=st.session_state.get('user_id'), action="FEEDBACK",
-                            details=f"[{st.session_state.get('username')}] Feedback: Correct (pred_id: {st.session_state['current_pred_id']})", level="INFO")
 
-                            st.session_state['feedback_given']=True; st.toast("ขอบคุณ!"); time.sleep(0.7); st.rerun()
+                if not st.session_state.get('feedback_given'):
+                    st.markdown("""
+                    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;
+                                padding:16px 20px 8px;">
+                      <div style="font-weight:700;font-size:0.9rem;color:#1E293B;">
+                        💬 AI ทายถูกหรือเปล่า?
+                      </div>
+                      <div style="font-size:0.8rem;color:#94A3B8;margin:3px 0 10px;">
+                        Feedback ของคุณช่วยให้ AI แม่นยำขึ้น
+                      </div>
+                    </div>""", unsafe_allow_html=True)
+
+                    fc1, fc2, fc3 = st.columns([2, 2, 1])
+                    with fc1:
+                        if st.button("👍  ถูกต้อง — AI ทายถูก", type="primary", width="stretch"):
+                            db.save_feedback(st.session_state['current_pred_id'], "Correct")
+                            db.log_system_event(
+                                user_id=st.session_state.get('user_id'), action="FEEDBACK",
+                                details=f"[{st.session_state.get('username')}] Correct "
+                                        f"(pred_id: {st.session_state['current_pred_id']})",
+                                level="INFO"
+                            )
+                            st.session_state['feedback_given'] = True
+                            st.toast("ขอบคุณ!"); time.sleep(0.7); st.rerun()
                     with fc2:
-                        if st.button("👎  ไม่ถูกต้อง — AI ทายผิด",width="stretch"):
-                            db.save_feedback(st.session_state['current_pred_id'],"Incorrect")
-                            db.log_system_event(user_id=st.session_state.get('user_id'), action="FEEDBACK",
-                            details=f"[{st.session_state.get('username')}] Feedback: Incorrect (pred_id: {st.session_state['current_pred_id']})", level="INFO")
-                            st.session_state['feedback_given']=True; st.toast("ขอบคุณ! เราจะนำไปปรับปรุง"); time.sleep(0.7); st.rerun()
+                        if st.button("👎  ไม่ถูกต้อง — AI ทายผิด", width="stretch"):
+                            db.save_feedback(st.session_state['current_pred_id'], "Incorrect")
+                            db.log_system_event(
+                                user_id=st.session_state.get('user_id'), action="FEEDBACK",
+                                details=f"[{st.session_state.get('username')}] Incorrect "
+                                        f"(pred_id: {st.session_state['current_pred_id']})",
+                                level="INFO"
+                            )
+                            st.session_state['feedback_given'] = True
+                            st.toast("ขอบคุณ! เราจะนำไปปรับปรุง"); time.sleep(0.7); st.rerun()
+                    with fc3:
+                        # ✅ ปุ่มล้างผลลัพธ์ manually
+                        if st.button("🗑️ ล้างผล", width="stretch"):
+                            for k in ['current_result','current_pred_id',
+                                      'feedback_given','current_text']:
+                                st.session_state.pop(k, None)
+                            st.rerun()
                 else:
-                    st.success("✅ ส่ง Feedback แล้ว — ขอบคุณที่ช่วยพัฒนา AI!")
+                    rc1, rc2 = st.columns([3, 1])
+                    with rc1:
+                        st.success("✅ ส่ง Feedback แล้ว — ขอบคุณที่ช่วยพัฒนา AI!")
+                    with rc2:
+                        # ✅ ปุ่มล้างผลหลังส่ง feedback
+                        if st.button("🗑️ ล้างผล", width="stretch"):
+                            for k in ['current_result','current_pred_id',
+                                      'feedback_given','current_text']:
+                                st.session_state.pop(k, None)
+                            st.rerun()
 
         # ══════════════════════════════════════
         # 📜 HISTORY

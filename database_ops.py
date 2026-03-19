@@ -134,16 +134,17 @@ def authenticate_user(username, password) -> Optional[Tuple[int, str, str]]:
 # ==========================================
 # 🤖 2. PREDICTIONS (AI SCAN)
 # ==========================================
-def create_prediction(user_id, title, text, url, result, confidence) -> Optional[int]:
+def create_prediction(user_id, title, text, url, result, confidence, category="") -> Optional[int]:
     supabase = get_supabase()
     payload = {
-        "user_id": user_id,
-        "title": title,
-        "text": text,
-        "url": url,
-        "result": result,
+        "user_id":    user_id,
+        "title":      title,
+        "text":       text,
+        "url":        url,
+        "result":     result,
         "confidence": confidence,
-        "timestamp": datetime.now().isoformat()
+        "category":   category,   # ✅ เพิ่ม
+        "timestamp":  datetime.now().isoformat()
     }
     try:
         response = supabase.table("predictions").insert(payload).execute()
@@ -221,6 +222,7 @@ def get_pending_feedbacks():
             fb  = fb_map.get(pid)
             if fb is None or fb.get('id') is None: continue
 
+            # หาบรรทัด select predictions
             result_list.append({
                 'feedback_id':   fb.get('id'),
                 'prediction_id': pid,
@@ -228,10 +230,11 @@ def get_pending_feedbacks():
                 'text':          pred.get('text', ''),
                 'ai_result':     pred.get('result', 'Unknown'),
                 'ai_confidence': pred.get('confidence', 0),
+                'category':      pred.get('category', 'ไม่ระบุ'),  # ✅ เพิ่ม
                 'user_report':   fb.get('user_report', None),
                 'user_comment':  fb.get('comment', ''),
                 'timestamp':     pred.get('timestamp'),
-                'status':        fb.get('status', 'pending'),  # ✅ เพิ่ม status
+                'status':        fb.get('status', 'pending'),
                 'has_feedback':  True,
             })
 
@@ -815,3 +818,16 @@ def get_feedback_stats():
     except Exception as e:
         print(f"❌ Feedback Stats Error: {e}")
         return pd.DataFrame()
+    
+def update_prediction_category(prediction_id, new_category) -> bool:
+    """Admin แก้ไขหมวดหมู่ของ prediction"""
+    supabase = get_supabase()
+    try:
+        supabase.table('predictions') \
+                .update({'category': new_category}) \
+                .eq('id', prediction_id) \
+                .execute()
+        return True
+    except Exception as e:
+        print(f"❌ Update Category Error: {e}")
+        return False
