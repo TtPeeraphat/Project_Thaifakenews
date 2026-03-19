@@ -1695,7 +1695,7 @@ elif not st.session_state['logged_in']:
 else:
  # ── Mobile sidebar toggle (เฉพาะผู้ล็อกอินแล้ว) ──
         st.markdown("""
-            <button 
+        <button 
             id="mobileSidebarBtn"
             class="mobile-menu-btn"
             onclick="
