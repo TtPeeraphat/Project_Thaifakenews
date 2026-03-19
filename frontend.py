@@ -808,11 +808,13 @@ def show_feedback_review():
     all_items = db.get_pending_feedbacks()
 
     # ✅ filter bar — แสดงเสมอ ไม่ early return
-    col_f, col_s = st.columns([2, 1])
+    col_f, col_s, col_t = st.columns([2, 1, 1])
     with col_f:
         search_q = st.text_input("🔍 ค้นหา", placeholder="พิมพ์คำค้นหา...", label_visibility="collapsed")
     with col_s:
         filter_status = st.selectbox("สถานะ", ["ทั้งหมด", "pending", "Real", "Fake", "Ignored"], label_visibility="collapsed")
+    with col_t:
+        sort_order = st.selectbox("เรียงตาม", ["🕐 ล่าสุดก่อน", "🕰️ เก่าสุดก่อน"], label_visibility="collapsed")
 
     # filter
     filtered = all_items
@@ -821,6 +823,11 @@ def show_feedback_review():
     if search_q:
         filtered = [i for i in filtered if search_q.lower() in str(i.get('title','')).lower()
                     or search_q.lower() in str(i.get('text','')).lower()]
+    filtered = sorted(
+    filtered,
+    key=lambda x: str(x.get('timestamp') or ''),
+    reverse=(sort_order == "🕐 ล่าสุดก่อน")
+    )
 
     # summary cards
     n_pending  = sum(1 for i in all_items if i.get('status') == 'pending')
@@ -1385,6 +1392,156 @@ def show_system_analytics():
     </div>""", unsafe_allow_html=True)
         else: st.info("ยังไม่มี log")
     st.markdown("</div>",unsafe_allow_html=True)
+    # ══════════════════════════════
+    # User Feedback Frequency
+    # ══════════════════════════════
+    st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
+    padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+    <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;
+    font-size:0.95rem;color:#1E293B;">💬 ความถี่การแนะนำข่าวจากผู้ใช้</div>
+    <div style="font-size:0.79rem;color:#94A3B8;margin-bottom:16px;">
+    จำนวนครั้งที่ผู้ใช้แนะนำว่าเป็นข่าวจริงหรือข่าวเท็จ</div>
+    """, unsafe_allow_html=True)
+
+    df_fb_stats = db.get_feedback_stats()
+
+    if df_fb_stats.empty:
+        st.info("ยังไม่มีข้อมูล Feedback")
+    else:
+        # ── แถวบน: KPI cards ──
+        n_correct   = len(df_fb_stats[df_fb_stats['user_report'] == 'Correct'])
+        n_incorrect = len(df_fb_stats[df_fb_stats['user_report'] == 'Incorrect'])
+        n_real      = len(df_fb_stats[df_fb_stats['status'] == 'Real'])
+        n_fake      = len(df_fb_stats[df_fb_stats['status'] == 'Fake'])
+        n_pending   = len(df_fb_stats[df_fb_stats['status'] == 'pending'])
+        n_total     = len(df_fb_stats)
+
+        fb_c1, fb_c2, fb_c3, fb_c4, fb_c5 = st.columns(5)
+        with fb_c1: kpi_card("📊", "ทั้งหมด",      f"{n_total:,}")
+        with fb_c2: kpi_card("👍", "AI ถูก",        f"{n_correct:,}",   f"{n_correct/n_total*100:.1f}%" if n_total else "", True)
+        with fb_c3: kpi_card("👎", "AI ผิด",        f"{n_incorrect:,}", f"{n_incorrect/n_total*100:.1f}%" if n_total else "", False)
+        with fb_c4: kpi_card("✅", "ยืนยันข่าวจริง", f"{n_real:,}",      f"{n_real/n_total*100:.1f}%" if n_total else "", True)
+        with fb_c5: kpi_card("🚨", "ยืนยันข่าวปลอม", f"{n_fake:,}",      f"{n_fake/n_total*100:.1f}%" if n_total else "", False)
+
+        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+
+        chart_c1, chart_c2 = st.columns(2)
+
+        # ── กราฟ 1: User Report (Correct/Incorrect) ──
+        with chart_c1:
+            st.markdown("""<div style="font-size:0.84rem;font-weight:700;
+            color:#334155;margin-bottom:8px;">👤 ผู้ใช้บอกว่า AI ทายถูก/ผิด</div>""",
+            unsafe_allow_html=True)
+
+            df_ur = df_fb_stats['user_report'] \
+                        .value_counts().reset_index()
+            df_ur.columns = ['ประเภท', 'จำนวน']
+            df_ur['ประเภท'] = df_ur['ประเภท'].replace({
+                'Correct':   '👍 AI ทายถูก',
+                'Incorrect': '👎 AI ทายผิด'
+            })
+            fig_ur = px.bar(
+                df_ur, x='ประเภท', y='จำนวน',
+                color='ประเภท',
+                color_discrete_map={
+                    '👍 AI ทายถูก': '#16A34A',
+                    '👎 AI ทายผิด': '#DC2626'
+                },
+                text='จำนวน'
+            )
+            fig_ur.update_traces(textposition='outside', textfont_size=13)
+            fig_ur.update_layout(
+                showlegend=False,
+                plot_bgcolor='white', paper_bgcolor='white',
+                font_color='#334155',
+                margin=dict(l=0, r=0, t=10, b=0),
+                xaxis_title="", yaxis_title="จำนวน (ครั้ง)",
+                bargap=0.4
+            )
+            st.plotly_chart(fig_ur, use_container_width=True, key="fb_user_report")
+
+        # ── กราฟ 2: Admin Status (Real/Fake/pending) ──
+        with chart_c2:
+            st.markdown("""<div style="font-size:0.84rem;font-weight:700;
+            color:#334155;margin-bottom:8px;">🏷️ ผลการตรวจสอบจาก Admin</div>""",
+            unsafe_allow_html=True)
+
+            df_st = df_fb_stats['status'] \
+                        .value_counts().reset_index()
+            df_st.columns = ['สถานะ', 'จำนวน']
+            df_st['สถานะ'] = df_st['สถานะ'].replace({
+                'Real':    '✅ ข่าวจริง',
+                'Fake':    '🚨 ข่าวปลอม',
+                'Ignored': '🗑️ ปฏิเสธ',
+                'pending': '⏳ รอตรวจสอบ'
+            })
+            color_map = {
+                '✅ ข่าวจริง':    '#16A34A',
+                '🚨 ข่าวปลอม':   '#DC2626',
+                '🗑️ ปฏิเสธ':     '#94A3B8',
+                '⏳ รอตรวจสอบ':  '#F59E0B'
+            }
+            fig_st = px.pie(
+                df_st, values='จำนวน', names='สถานะ',
+                hole=0.45,
+                color='สถานะ',
+                color_discrete_map=color_map
+            )
+            fig_st.update_traces(
+                textposition='outside',
+                textinfo='percent+label',
+                textfont_size=10
+            )
+            fig_st.update_layout(
+                showlegend=False,
+                paper_bgcolor='white',
+                font_color='#334155',
+                margin=dict(l=10, r=10, t=10, b=10)
+            )
+            st.plotly_chart(fig_st, use_container_width=True, key="fb_status_pie")
+
+        # ── กราฟ 3: แนวโน้ม Feedback รายวัน ──
+        st.markdown("""<div style="font-size:0.84rem;font-weight:700;
+        color:#334155;margin-top:8px;margin-bottom:8px;">
+        📈 แนวโน้ม Feedback รายวัน (7 วันล่าสุด)</div>""",
+        unsafe_allow_html=True)
+
+        df_fb_stats['date'] = df_fb_stats['timestamp'].dt.date
+        last7 = [(now_bkk() - timedelta(days=i)).date() for i in range(6, -1, -1)]
+        df_date = pd.DataFrame({'date': last7})
+
+        correct_by_date   = df_fb_stats[df_fb_stats['user_report'] == 'Correct'] \
+                                .groupby('date').size()
+        incorrect_by_date = df_fb_stats[df_fb_stats['user_report'] == 'Incorrect'] \
+                                .groupby('date').size()
+
+        df_date['AI ทายถูก'] = df_date['date'].map(correct_by_date).fillna(0).astype(int)
+        df_date['AI ทายผิด'] = df_date['date'].map(incorrect_by_date).fillna(0).astype(int)
+        df_date['date'] = pd.to_datetime(df_date['date']).dt.strftime('%b %d')
+
+        fig_trend = px.line(
+            df_date, x='date', y=['AI ทายถูก', 'AI ทายผิด'],
+            markers=True,
+            color_discrete_map={
+                'AI ทายถูก': '#16A34A',
+                'AI ทายผิด': '#DC2626'
+            },
+            labels={'value': 'จำนวน', 'date': 'วันที่', 'variable': 'ประเภท'}
+        )
+        fig_trend.update_layout(
+            plot_bgcolor='white', paper_bgcolor='white',
+            font_color='#334155',
+            margin=dict(l=0, r=0, t=10, b=0),
+            xaxis_title="วันที่",
+            yaxis_title="จำนวน Feedback",
+            legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"),
+            legend_title_text=''
+        )
+        st.plotly_chart(fig_trend, use_container_width=True, key="fb_trend")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════

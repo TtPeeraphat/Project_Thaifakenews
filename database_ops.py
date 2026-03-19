@@ -798,3 +798,20 @@ def upload_image_to_supabase(file_bytes: bytes, filename: str) -> str:
     except Exception as e:
         print(f"❌ Upload Error: {e}")
         return ""
+
+def get_feedback_stats():
+    """ดึงสถิติ feedback ที่ user แนะนำว่าเป็นข่าวจริง/เท็จ"""
+    supabase = get_supabase()
+    try:
+        res = supabase.table('feedbacks') \
+                      .select('user_report, status, timestamp') \
+                      .execute()
+        if not res.data:
+            return pd.DataFrame()
+        df = pd.DataFrame(res.data)
+        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True) \
+                            .dt.tz_convert("Asia/Bangkok")
+        return df
+    except Exception as e:
+        print(f"❌ Feedback Stats Error: {e}")
+        return pd.DataFrame()
