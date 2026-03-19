@@ -1740,6 +1740,29 @@ else:
             })();
             </script>
             """, unsafe_allow_html=True)
+        components.html("""
+        <script>
+        (function() {
+            function initSidebar() {
+                var sb = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                if (!sb) { setTimeout(initSidebar, 200); return; }
+                if (window.parent.innerWidth <= 768) {
+                    var wasOpen = sb.getAttribute('data-open') === '1';
+                    sb.style.setProperty('transition', 'transform 0.3s ease', 'important');
+                    sb.style.setProperty('position', 'fixed', 'important');
+                    sb.style.setProperty('z-index', '999', 'important');
+                    sb.style.setProperty('height', '100vh', 'important');
+                    if (!wasOpen) {
+                        sb.style.setProperty('transform', 'translateX(-100%)', 'important');
+                    }
+                }
+            }
+            initSidebar();
+            var obs = new MutationObserver(initSidebar);
+            obs.observe(window.parent.document.body, { childList: true, subtree: false });
+        })();
+        </script>
+        """, height=0)
     
         if 'active_menu' not in st.session_state:
             st.session_state.active_menu="🏠 หน้าหลัก"
