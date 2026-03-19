@@ -134,7 +134,7 @@ def authenticate_user(username, password) -> Optional[Tuple[int, str, str]]:
 # ==========================================
 # 🤖 2. PREDICTIONS (AI SCAN)
 # ==========================================
-def create_prediction(user_id, title, text, url, result, confidence, category="") -> Optional[int]:
+def create_prediction(user_id, title, text, url, result, confidence, category=""):
     supabase = get_supabase()
     payload = {
         "user_id":    user_id,

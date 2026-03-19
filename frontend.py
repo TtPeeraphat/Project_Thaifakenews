@@ -2769,7 +2769,6 @@ colorObs.observe(window.parent.document.body,
                                 st.session_state.get('user_id'),
                                 clean[:50] + "…", clean,
                                 input_url or None, rl, rc,
-                                result.get('category', '')
                             )
                             db.save_feedback(pid, None) # สร้าง record เปล่าสำหรับ feedback ไว้ก่อน
                             st.session_state.update({
