@@ -58,19 +58,29 @@ class DatabaseConfig:
 
 @dataclass
 class EmailConfig:
+    """Email configuration for notifications and OTP."""
+
+    # ✅ ให้มี field ปกติไว้ก่อน แล้วค่อย override ใน __post_init__
+    sender_email:    str = ""
+    sender_password: str = ""
+    smtp_host:       str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port:       int = int(os.getenv("SMTP_PORT", "587"))
+
     def __post_init__(self):
+        # ลอง st.secrets ก่อน ถ้าไม่ได้ค่อย fallback ไป os.getenv
         try:
             import streamlit as st
-            self.sender_email    = st.secrets.get("GMAIL_EMAIL", os.getenv("GMAIL_EMAIL", ""))
-            self.sender_password = st.secrets.get("GMAIL_APP_PASSWORD", os.getenv("GMAIL_APP_PASSWORD", ""))
+            self.sender_email    = st.secrets.get("GMAIL_EMAIL", "") or os.getenv("GMAIL_EMAIL", "")
+            self.sender_password = st.secrets.get("GMAIL_APP_PASSWORD", "") or os.getenv("GMAIL_APP_PASSWORD", "")
         except Exception:
             self.sender_email    = os.getenv("GMAIL_EMAIL", "")
             self.sender_password = os.getenv("GMAIL_APP_PASSWORD", "")
 
-    sender_email:     str = ""
-    sender_password:  str = ""
-    smtp_host:        str = "smtp.gmail.com"
-    smtp_port:        int = 587
+    def validate(self) -> bool:
+        if not self.sender_email or not self.sender_password:
+            logging.warning("Email configuration incomplete")
+            return False
+        return True
 
 
 @dataclass
