@@ -1108,7 +1108,7 @@ def show_category_analysis():
 
             # ── ตัวอย่าง prediction ที่น่าสงสัย ──
             st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-            section_title("🔍 ตัวอย่าง Prediction ที่ category = หมวดหมู่บ่อยสุด",
+            section_title("🔍 ตัวอย่าง Prediction ที่ category ที่ทำนายหมวดหมู่บ่อยสุด",
                         "ตรวจสอบว่า AI classify ถูกไหม")
 
             df_top = df[df['category'] == top_cat].head(10).copy()
@@ -1148,7 +1148,78 @@ def show_category_analysis():
                 df_sample['timestamp'] = pd.to_datetime(
                     df_sample['timestamp'], utc=True
                 ).dt.tz_convert("Asia/Bangkok").dt.strftime('%d/%m %H:%M')
+                # เพิ่มฟังก์ชันนี้ก่อน for loop ใน show_category_analysis()
+                def guess_category(text: str) -> str:
+                    rules = {
+                        "นโยบายรัฐบาล-ข่าวสาร": ["รัฐบาล","ครม.","นายกฯ","กระทรวง","นโยบาย","รัฐสภา","พรรค"],
+                        "ผลิตภัณฑ์สุขภาพ":      ["ยา","อาหารเสริม","สุขภาพ","รักษา","โรค","หมอ","โรงพยาบาล"],
+                        "การเงิน-หุ้น":          ["หุ้น","ตลาด","ลงทุน","เงิน","ธนาคาร","บาท","กำไร","ขาดทุน"],
+                        "ภัยพิบัติ":             ["น้ำท่วม","แผ่นดินไหว","พายุ","ไฟไหม้","ภัย","อพยพ"],
+                        "ความสงบและความมั่นคง":  ["ตำรวจ","ทหาร","จับกุม","ความมั่นคง","อาชญากรรม","ยิง"],
+                        "เศรษฐกิจ":              ["เศรษฐกิจ","GDP","เงินเฟ้อ","ส่งออก","นำเข้า","การค้า"],
+                        "ยาเสพติด":              ["ยาเสพติด","ยาบ้า","โคเคน","จับยา","ปราบปราม"],
+                    }
+                    scores: dict[str, int] = {
+                        cat: sum(1 for kw in kws if kw in text)
+                        for cat, kws in rules.items()
+                    }
+                    best = max(scores.items(), key=lambda x: x[1])
+                    return best[0] if best[1] > 0 else "ข่าวอื่นๆ"
 
+                # แก้ตรงส่วนแสดง category ใน card
+                for _, r in df_sample.iterrows():
+                    result_cfg = {
+                        'Real': ("#DCFCE7", "#166534"),
+                        'Fake': ("#FEE2E2", "#991B1B"),
+                    }.get(str(r.get('result', '')), ("#F1F5F9", "#475569"))
+
+                    preview_text = str(r.get('text') or r.get('title') or '').strip()
+                    preview_text = preview_text[:200] + "…" if len(preview_text) > 200 else preview_text
+                    preview_text = preview_text.replace('\n', ' ').replace('\r', '')
+
+                    # ✅ ถ้า category ว่าง/ไม่ระบุ → ใช้ keyword แทน
+                    raw_cat = str(r.get('category') or '').strip()
+                    if raw_cat in ('', 'None', 'ไม่ระบุ'):
+                        display_cat  = guess_category(preview_text)
+                        cat_badge_bg = "#FEF3C7"
+                        cat_badge_c  = "#92400E"
+                        cat_note     = "🔍"   # บอกว่าเป็นการเดาจาก keyword
+                    else:
+                        display_cat  = raw_cat
+                        cat_badge_bg = "#EFF6FF"
+                        cat_badge_c  = "#1148A8"
+                        cat_note     = "📂"
+
+                    st.markdown(f"""
+                    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;
+                                padding:14px 16px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;
+                                align-items:center;margin-bottom:8px;">
+                        <span style="font-size:0.8rem;font-weight:700;color:#1E293B;">
+                        {str(r.get('title', ''))[:60]}
+                        </span>
+                        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                        <span style="background:{cat_badge_bg};color:{cat_badge_c};
+                                    font-size:0.7rem;font-weight:700;padding:2px 8px;
+                                    border-radius:99px;border:1px solid {cat_badge_bg};">
+                            {cat_note} {display_cat}
+                        </span>
+                        <span style="background:{result_cfg[0]};color:{result_cfg[1]};
+                                    font-size:0.7rem;font-weight:800;padding:2px 8px;
+                                    border-radius:99px;">{r.get('result', '')}</span>
+                        <span style="font-size:0.75rem;color:#64748B;">
+                            {r.get('confidence', 0):.1f}%
+                        </span>
+                        <span style="font-size:0.72rem;color:#94A3B8;">
+                            {r.get('timestamp', '')}
+                        </span>
+                        </div>
+                    </div>
+                    <div style="font-size:0.83rem;color:#475569;line-height:1.55;
+                                background:#F8FAFC;border-radius:6px;padding:8px 10px;">
+                        {preview_text}
+                    </div>
+                    </div>""", unsafe_allow_html=True)
                 # ✅ แสดงแบบ card — เห็น text จริงๆ
                 for _, r in df_sample.iterrows():
                     result_cfg = {
@@ -1169,14 +1240,11 @@ def show_category_analysis():
                         {str(r.get('title',''))[:60]}
                         </span>
                         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
-                        
-                        
                         <span style="background:#EFF6FF;color:#1148A8;
                                     font-size:0.7rem;font-weight:700;padding:2px 8px;
                                     border-radius:99px;border:1px solid #BFDBFE;">
                             📂 {str(r.get('category') or 'ไม่ระบุ')}
                         </span>
-
                         <span style="background:{result_cfg[0]};color:{result_cfg[1]};
                                     font-size:0.7rem;font-weight:800;padding:2px 8px;
                                     border-radius:99px;">{r.get('result','')}</span>
