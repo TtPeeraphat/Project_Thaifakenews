@@ -2662,10 +2662,19 @@ def show_system_analytics():
             fig_ur.update_layout(
                 showlegend=False,
                 plot_bgcolor='white', paper_bgcolor='white',
-                font_color="#000000",
+                font_color='#1E293B',
                 margin=dict(l=0, r=0, t=10, b=0),
                 xaxis_title="", yaxis_title="จำนวน (ครั้ง)",
-                bargap=0.4
+                bargap=0.4,
+                # ✅ เพิ่ม 4 บรรทัดนี้
+                xaxis=dict(
+                    tickfont=dict(color='#1E293B', size=12),
+                    title_font=dict(color='#1E293B'),
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='#1E293B', size=12),
+                    title_font=dict(color='#1E293B'),
+                ),
             )
             st.plotly_chart(fig_ur, width='stretch', key="fb_user_report")
 
