@@ -1082,7 +1082,15 @@ def show_category_analysis():
                     xaxis_title="จำนวน prediction",
                     yaxis_title="",
                     coloraxis_showscale=False,
-                    yaxis=dict(autorange='reversed')
+                    xaxis=dict(
+                        tickfont=dict(color='#1E293B', size=12),
+                        title_font=dict(color='#1E293B'),
+                    ),
+                    yaxis=dict(
+                        autorange='reversed',
+                        tickfont=dict(color='#1E293B', size=12),
+                        title_font=dict(color='#1E293B'),
+                    ),
                 )
                 st.plotly_chart(fig, width='stretch', key="cat_dist_chart")
 
@@ -2515,6 +2523,14 @@ def show_system_analytics():
                 paper_bgcolor='white',
                 font_color='#1E293B',        # ✅ เข้มขึ้น
                 font=dict(size=12),
+                xaxis=dict(
+                    tickfont=dict(color='#1E293B', size=12),
+                    title_font=dict(color='#1E293B'),
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='#1E293B', size=12),
+                    title_font=dict(color='#1E293B'),
+                ),
             )
             st.plotly_chart(fig2,width="stretch",key="pie_chart")
         else: st.info("ยังไม่มีข้อมูลเพียงพอ")
