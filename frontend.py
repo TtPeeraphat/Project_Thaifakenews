@@ -1117,147 +1117,126 @@ def show_category_analysis():
             section_title("🔍 ตัวอย่าง Prediction ที่ category ที่ทำนายหมวดหมู่บ่อยสุด",
                         "ตรวจสอบว่า AI classify ถูกไหม")
 
-            df_top = df[df['category'] == top_cat].head(10).copy()
-            if 'timestamp' in df_top.columns:
-                df_top['timestamp'] = pd.to_datetime(
-                    df_top['timestamp'], utc=True
-                ).dt.tz_convert("Asia/Bangkok").dt.strftime('%d/%m %H:%M')
+            # ── Filter หมวดหมู่ ──────────────────────────────────────
+            all_cats = sorted(df['category'].dropna().unique().tolist())
+            col_filter, col_result_filter = st.columns([2, 1])
+            with col_filter:
+                selected_cat = st.selectbox(
+                    "🔎 เลือกหมวดหมู่",
+                    ["ทั้งหมด"] + all_cats,
+                    key="cat_analysis_filter"
+                )
+            with col_result_filter:
+                selected_result = st.selectbox(
+                    "📊 ผลลัพธ์",
+                    ["ทั้งหมด", "Real", "Fake"],
+                    key="cat_result_filter"
+                )
 
-            # แก้ query ให้ดึง text ด้วย
-            res2 = supabase.table('predictions') \
-                        .select('title, text, category, result, confidence, timestamp') \
-                        .eq('category', top_cat) \
-                        .order('timestamp', desc=True) \
-                        .limit(10) \
-                        .execute()
-                        # แทนที่แค่ 5 บรรทัดนี้
-            # ✅ แก้ — ดึงทั้งหมดแล้วกรองฝั่ง Python แทน
+            # ── ดึงข้อมูลตาม filter ──────────────────────────────────
             res2 = supabase.table('predictions') \
                         .select('title, text, category, result, confidence, timestamp') \
                         .order('timestamp', desc=True) \
-                        .limit(100) \
+                        .limit(200) \
                         .execute()
 
             if res2.data:
-                if top_cat in ("ไม่ระบุ", "", None):
+                # กรองตาม category
+                if selected_cat == "ทั้งหมด":
+                    filtered_data = res2.data
+                elif selected_cat in ("ไม่ระบุ", "", None):
                     filtered_data = [
                         r for r in res2.data
                         if not r.get('category') or r.get('category') in ('', 'None', 'ไม่ระบุ')
-                    ][:10]
+                    ]
                 else:
                     filtered_data = [
                         r for r in res2.data
-                        if r.get('category') == top_cat
-                    ][:10]
-                res2_data = filtered_data
-            else:
-                res2_data = []
+                        if r.get('category') == selected_cat
+                    ]
 
-            if res2.data:
-                df_sample = pd.DataFrame(res2.data)
-                df_sample['confidence'] = pd.to_numeric(
-                    df_sample['confidence'], errors='coerce'
-                ).round(1)
-                df_sample['timestamp'] = pd.to_datetime(
-                    df_sample['timestamp'], utc=True
-                ).dt.tz_convert("Asia/Bangkok").dt.strftime('%d/%m %H:%M')
-                
-                # แก้ตรงส่วนแสดง category ใน card
-                for _, r in df_sample.iterrows():
-                    result_cfg = {
-                        'Real': ("#DCFCE7", "#166534"),
-                        'Fake': ("#FEE2E2", "#991B1B"),
-                    }.get(str(r.get('result', '')), ("#F1F5F9", "#475569"))
+                # กรองตาม result
+                if selected_result != "ทั้งหมด":
+                    filtered_data = [
+                        r for r in filtered_data
+                        if str(r.get('result', '')) == selected_result
+                    ]
 
-                    preview_text = str(r.get('text') or r.get('title') or '').strip()
-                    preview_text = preview_text[:200] + "…" if len(preview_text) > 200 else preview_text
-                    preview_text = preview_text.replace('\n', ' ').replace('\r', '')
+                st.caption(f"พบ {len(filtered_data)} รายการ")
 
-                    # ✅ ถ้า category ว่าง/ไม่ระบุ → ใช้ keyword แทน
-                    raw_cat = str(r.get('category') or '').strip()
-                    if raw_cat in ('', 'None', 'ไม่ระบุ'):
-                        display_cat  = guess_category(preview_text)
-                        cat_badge_bg = "#FEF3C7"
-                        cat_badge_c  = "#92400E"
-                        cat_note     = "🔍"   # บอกว่าเป็นการเดาจาก keyword
-                    else:
-                        display_cat  = raw_cat
-                        cat_badge_bg = "#EFF6FF"
-                        cat_badge_c  = "#1148A8"
-                        cat_note     = "📂"
+                if not filtered_data:
+                    st.info("ไม่พบข้อมูลที่ตรงกับเงื่อนไข")
+                else:
+                    df_sample = pd.DataFrame(filtered_data)
+                    df_sample['confidence'] = pd.to_numeric(
+                        df_sample['confidence'], errors='coerce'
+                    ).round(1)
+                    df_sample['timestamp'] = pd.to_datetime(
+                        df_sample['timestamp'], utc=True
+                    ).dt.tz_convert("Asia/Bangkok").dt.strftime('%d/%m %H:%M')
 
-                    st.markdown(f"""
-                    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;
-                                padding:14px 16px;margin-bottom:8px;">
-                    <div style="display:flex;justify-content:space-between;
-                                align-items:center;margin-bottom:8px;">
-                        <span style="font-size:0.8rem;font-weight:700;color:#1E293B;">
-                        {str(r.get('title', ''))[:60]}
-                        </span>
-                        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
-                        <span style="background:{cat_badge_bg};color:{cat_badge_c};
-                                    font-size:0.7rem;font-weight:700;padding:2px 8px;
-                                    border-radius:99px;border:1px solid {cat_badge_bg};">
-                            {cat_note} {display_cat}
-                        </span>
-                        <span style="background:{result_cfg[0]};color:{result_cfg[1]};
-                                    font-size:0.7rem;font-weight:800;padding:2px 8px;
-                                    border-radius:99px;">{r.get('result', '')}</span>
-                        <span style="font-size:0.75rem;color:#64748B;">
-                            {r.get('confidence', 0):.1f}%
-                        </span>
-                        <span style="font-size:0.72rem;color:#94A3B8;">
-                            {r.get('timestamp', '')}
-                        </span>
+                    # ── Scrollable container ──────────────────────────
+                    scroll_html = ""
+                    for _, r in df_sample.iterrows():
+                        result_cfg = {
+                            'Real': ("#DCFCE7", "#166534"),
+                            'Fake': ("#FEE2E2", "#991B1B"),
+                        }.get(str(r.get('result', '')), ("#F1F5F9", "#475569"))
+
+                        preview_text = str(r.get('text') or r.get('title') or '').strip()
+                        preview_text = preview_text[:200] + "…" if len(preview_text) > 200 else preview_text
+                        preview_text = preview_text.replace('\n', ' ').replace('\r', '')
+                        import html as html_lib
+                        preview_text = html_lib.escape(preview_text)
+
+                        raw_cat = str(r.get('category') or '').strip()
+                        if raw_cat in ('', 'None', 'ไม่ระบุ'):
+                            display_cat  = guess_category(preview_text)
+                            cat_badge_bg = "#FEF3C7"
+                            cat_badge_c  = "#92400E"
+                            cat_note     = "🔍"
+                        else:
+                            display_cat  = raw_cat
+                            cat_badge_bg = "#EFF6FF"
+                            cat_badge_c  = "#1148A8"
+                            cat_note     = "📂"
+
+                        scroll_html += f"""
+                        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;
+                                    padding:14px 16px;margin-bottom:8px;">
+                        <div style="display:flex;justify-content:space-between;
+                                    align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+                            <span style="font-size:0.82rem;font-weight:700;color:#1E293B;flex:1;min-width:0;
+                                        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            {html_lib.escape(str(r.get('title', ''))[:60])}
+                            </span>
+                            <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                            <span style="background:{cat_badge_bg};color:{cat_badge_c};
+                                        font-size:0.7rem;font-weight:700;padding:2px 8px;
+                                        border-radius:99px;border:1px solid {cat_badge_bg};">
+                                {cat_note} {display_cat}
+                            </span>
+                            <span style="background:{result_cfg[0]};color:{result_cfg[1]};
+                                        font-size:0.7rem;font-weight:800;padding:2px 8px;
+                                        border-radius:99px;">{r.get('result', '')}</span>
+                            <span style="font-size:0.75rem;color:#64748B;">{r.get('confidence', 0):.1f}%</span>
+                            <span style="font-size:0.72rem;color:#94A3B8;">{r.get('timestamp', '')}</span>
+                            </div>
                         </div>
-                    </div>
-                    <div style="font-size:0.83rem;color:#475569;line-height:1.55;
-                                background:#F8FAFC;border-radius:6px;padding:8px 10px;">
-                        {preview_text}
-                    </div>
-                    </div>""", unsafe_allow_html=True)
-                # ✅ แสดงแบบ card — เห็น text จริงๆ
-                for _, r in df_sample.iterrows():
-                    result_cfg = {
-                        'Real': ("#DCFCE7", "#166534"),
-                        'Fake': ("#FEE2E2", "#991B1B"),
-                    }.get(str(r.get('result','')), ("#F1F5F9","#475569"))
-
-                    preview_text = str(r.get('text') or r.get('title') or '').strip()
-                    preview_text = preview_text[:200] + "…" if len(preview_text) > 200 else preview_text
-                    preview_text = preview_text.replace('\n', ' ').replace('\r', '')
-
-                    st.markdown(f"""
-                    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;
-                                padding:14px 16px;margin-bottom:8px;">
-                    <div style="display:flex;justify-content:space-between;
-                                align-items:center;margin-bottom:8px;">
-                        <span style="font-size:0.8rem;font-weight:700;color:#1E293B;">
-                        {str(r.get('title',''))[:60]}
-                        </span>
-                        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
-                        <span style="background:#EFF6FF;color:#1148A8;
-                                    font-size:0.7rem;font-weight:700;padding:2px 8px;
-                                    border-radius:99px;border:1px solid #BFDBFE;">
-                            📂 {str(r.get('category') or 'ไม่ระบุ')}
-                        </span>
-                        <span style="background:{result_cfg[0]};color:{result_cfg[1]};
-                                    font-size:0.7rem;font-weight:800;padding:2px 8px;
-                                    border-radius:99px;">{r.get('result','')}</span>
-                        <span style="font-size:0.75rem;color:#64748B;">
-                            {r.get('confidence',0):.1f}%
-                        </span>
-                        <span style="font-size:0.72rem;color:#94A3B8;">
-                            {r.get('timestamp','')}
-                        </span>
+                        <div style="font-size:0.83rem;color:#475569;line-height:1.55;
+                                    background:#F8FAFC;border-radius:6px;padding:8px 10px;">
+                            {preview_text}
                         </div>
-                    </div>
-                    <div style="font-size:0.83rem;color:#475569;line-height:1.55;
-                                background:#F8FAFC;border-radius:6px;padding:8px 10px;">
-                        {preview_text}
-                    </div>
-                    </div>""", unsafe_allow_html=True)
+                        </div>"""
 
+                    # ── Wrap ใน scroll container ──
+                    st.markdown(f"""
+                    <div style="height:500px;overflow-y:auto;padding-right:6px;
+                                border:1px solid #E2E8F0;border-radius:12px;padding:12px;">
+                    {scroll_html}
+                    </div>""", unsafe_allow_html=True)
+                            # ✅ แสดงแบบ card — เห็น text จริงๆ
+                            
         except Exception as e:
             st.error(f"โหลดข้อมูลไม่ได้: {e}")
             db.log_system_event(
