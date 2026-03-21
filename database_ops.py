@@ -247,7 +247,19 @@ def create_prediction(user_id, title, text, url, result, confidence, category=""
         logger.error("Create Prediction Error: %s", e)
         return None
 
-
+def update_prediction_url(prediction_id: int, new_url: str) -> bool:
+    """อัปเดต URL ของ prediction"""
+    supabase = get_supabase()
+    try:
+        supabase.table("predictions") \
+            .update({"url": new_url.strip() if new_url else None}) \
+            .eq("id", prediction_id) \
+            .execute()
+        return True
+    except Exception as e:
+        logger.error("update_prediction_url error: %s", e)
+        return False
+    
 def get_user_history(user_id: Any, limit: int = 50):
     supabase = get_supabase()
     try:

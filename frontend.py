@@ -1886,31 +1886,94 @@ def show_feedback_review():
                 {html.escape(str(item['text']))}
                 </div>""", unsafe_allow_html=True)
 
-                # ── แสดง URL ถ้ามี ──────────────────────────────
-                item_url = str(item.get('url') or '').strip()
-                if item_url and item_url != 'None':
-                    st.markdown(f"""
-                    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;
-                                background:#F0F6FF;border:1px solid #BFDBFE;
-                                border-radius:8px;padding:9px 13px;">
-                    <span style="font-size:0.8rem;font-weight:700;color:#1148A8;
-                                -webkit-text-fill-color:#1148A8;white-space:nowrap;">
-                        🔗 แหล่งที่มา
-                    </span>
-                    <a href="{item_url}" target="_blank"
-                        style="font-size:0.8rem;color:#1565C0;
-                                -webkit-text-fill-color:#1565C0;
-                                text-decoration:none;word-break:break-all;
-                                overflow:hidden;text-overflow:ellipsis;
-                                display:-webkit-box;-webkit-line-clamp:1;
-                                -webkit-box-orient:vertical;">
-                        {item_url}
-                    </a>
-                    <span style="font-size:0.75rem;color:#64748B;
-                                -webkit-text-fill-color:#64748B;
-                                white-space:nowrap;">↗</span>
-                    </div>""", unsafe_allow_html=True)
+               
+                # ── แสดง + แก้ไข URL ──────────────────────────────
+            item_url = str(item.get('url') or '').strip()
+            if item_url and item_url not in ('None', ''):
+                st.markdown(f"""
+                <div style="margin-top:8px;display:flex;align-items:center;gap:8px;
+                            background:#F0F6FF;border:1px solid #BFDBFE;
+                            border-radius:8px;padding:9px 13px;">
+                <span style="font-size:0.8rem;font-weight:700;color:#1148A8;
+                            -webkit-text-fill-color:#1148A8;white-space:nowrap;">
+                    🔗 แหล่งที่มา
+                </span>
+                <a href="{item_url}" target="_blank"
+                    style="font-size:0.8rem;color:#1565C0;
+                            -webkit-text-fill-color:#1565C0;
+                            text-decoration:none;word-break:break-all;
+                            overflow:hidden;text-overflow:ellipsis;
+                            display:-webkit-box;-webkit-line-clamp:1;
+                            -webkit-box-orient:vertical;">
+                    {item_url}
+                </a>
+                <span style="font-size:0.75rem;color:#64748B;
+                            -webkit-text-fill-color:#64748B;
+                            white-space:nowrap;">↗</span>
+                </div>""", unsafe_allow_html=True)
 
+            # ── ปุ่มแก้ไข / เพิ่ม URL ──────────────────────────
+            url_key = f"url_edit_{fid}_{idx}"
+            if url_key not in st.session_state:
+                st.session_state[url_key] = False
+
+            if not st.session_state[url_key]:
+                btn_label = "✏️ แก้ไข URL" \
+                    if item_url and item_url not in ('None', '') \
+                    else "🔗 เพิ่ม URL"
+                if st.button(btn_label,
+                            key=f"url_btn_{fid}_{idx}",
+                            width='stretch'):
+                    st.session_state[url_key] = True
+                    st.rerun()
+            else:
+                new_url = st.text_input(
+                    "URL ข่าวต้นฉบับ",
+                    value=item_url if item_url not in ('None', '') else "",
+                    placeholder="https://www.example.com/news/...",
+                    key=f"url_input_{fid}_{idx}",
+                    label_visibility="collapsed"
+                )
+                u1, u2 = st.columns(2)
+                with u1:
+                    if st.button("💾 บันทึก URL",
+                                key=f"url_save_{fid}_{idx}",
+                                type="primary",
+                                width='stretch'):
+                        if new_url.strip():
+                            url_check = InputValidator.validate_url(new_url.strip())
+                            if not url_check.is_valid:
+                                st.warning(f"URL ไม่ถูกต้อง: {url_check.error_message}")
+                            else:
+                                if db.update_prediction_url(
+                                    item['prediction_id'], new_url.strip()
+                                ):
+                                    db.log_system_event(
+                                        user_id=st.session_state.get('user_id'),
+                                        action="UPDATE_URL",
+                                        details=(
+                                            f"prediction_id={item['prediction_id']} "
+                                            f"url={new_url.strip()[:80]}"
+                                        ),
+                                        level="INFO"
+                                    )
+                                    st.session_state[url_key] = False
+                                    st.success("✅ บันทึก URL แล้ว")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("บันทึกไม่สำเร็จ")
+                        else:
+                            # ถ้าลบ URL ออก → บันทึกเป็น null
+                            if db.update_prediction_url(item['prediction_id'], ""):
+                                st.session_state[url_key] = False
+                                st.rerun()
+                with u2:
+                    if st.button("✕ ยกเลิก",
+                                key=f"url_cancel_{fid}_{idx}",
+                                width='stretch'):
+                        st.session_state[url_key] = False
+                        st.rerun()
                 st.caption(f"📅 {item['timestamp']}")
 
             with c2:
@@ -2499,7 +2562,15 @@ def show_system_analytics():
             xaxis_title="วันที่",        # ✅ เพิ่ม
             yaxis_title="จำนวน (ครั้ง)", # ✅ เพิ่ม
             legend=dict(orientation="h", y=-0.35, x=0.5, xanchor="center"),
-            legend_title_text=''
+            legend_title_text='',
+            xaxis=dict(
+                    tickfont=dict(color='#1E293B', size=12),
+                    title_font=dict(color='#1E293B'),
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='#1E293B', size=12),
+                    title_font=dict(color='#1E293B'),
+                ),
         )
         st.plotly_chart(fig1, width="stretch", key="trend_chart")
         st.markdown("</div>",unsafe_allow_html=True)
