@@ -1,154 +1,110 @@
-# ✅ REFACTORED: Model Caching & Loading
-# Location: ai_cache.py
-# This file fixes Issue 2.1 (No Model Caching) and Issue 2.2 (Thread Safety)
-
 import sys
-
-import torch
-import numpy as np
+import os
 import pickle
+import logging
+from collections import Counter          # ✅ Counter จาก collections
+from typing import Dict, Any, Optional   # ✅ ลบ Counter ออกจาก typing
+
+import numpy as np
+import torch
+import torch.nn.functional as F          # ✅ เพิ่ม F
 import streamlit as st
+from torch_geometric.data import Data
 from transformers import AutoTokenizer, AutoModel
 from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import normalize
-import logging
-from typing import Counter, Dict, Any
-from text_preprocessor import TextPreprocessor
+
+from model_def import GCNNet             # ✅ import จาก model_def
+from text_preprocessor import TextPreprocessor   # ✅ import class
 from embed_utils import embed_text
 
-__all__ = [
-    "get_pipeline",
-    "predict_news", 
-    "load_model_pipeline",
-    "cleanup_gpu",
-    "GCNNet",
-]
+logger = logging.getLogger(__name__)
 
-
-logger = logging.getLogger(__name__) 
-
-# Model configuration
 BERT_MODEL_NAME = "airesearch/wangchanberta-base-att-spm-uncased"
-MODEL_PATH = "best_model.pth"
-ARTIFACTS_PATH = "artifacts.pkl"
-pred_category: str = "ข่าวอื่นๆ"
+MODEL_PATH      = "best_model.pth"
+ARTIFACTS_PATH  = "artifacts.pkl"
+
+CATEGORY_RULES: Dict[str, list] = {
+    "นโยบายรัฐบาล-ข่าวสาร": ["รัฐบาล","ครม.","นายกฯ","กระทรวง","นโยบาย","รัฐสภา","พรรค"],
+    "ผลิตภัณฑ์สุขภาพ":      ["ยา","อาหารเสริม","สุขภาพ","รักษา","โรค","หมอ","โรงพยาบาล"],
+    "การเงิน-หุ้น":          ["หุ้น","ตลาด","ลงทุน","เงิน","ธนาคาร","บาท","กำไร","ขาดทุน"],
+    "ภัยพิบัติ":             ["น้ำท่วม","แผ่นดินไหว","พายุ","ไฟไหม้","ภัย","อพยพ"],
+    "ความสงบและความมั่นคง":  ["ตำรวจ","ทหาร","จับกุม","ความมั่นคง","อาชญากรรม","ยิง"],
+    "เศรษฐกิจ":              ["เศรษฐกิจ","GDP","เงินเฟ้อ","ส่งออก","นำเข้า","การค้า"],
+    "ยาเสพติด":              ["ยาเสพติด","ยาบ้า","โคเคน","จับยา","ปราบปราม"],
+}
+
 
 def classify_category_by_keyword(text: str) -> str:
-    rules = {
-        "นโยบายรัฐบาล-ข่าวสาร": ["รัฐบาล","ครม.","นายกฯ","กระทรวง","นโยบาย","รัฐสภา","พรรค"],
-        "ผลิตภัณฑ์สุขภาพ":      ["ยา","อาหารเสริม","สุขภาพ","รักษา","โรค","หมอ","โรงพยาบาล"],
-        "การเงิน-หุ้น":          ["หุ้น","ตลาด","ลงทุน","เงิน","ธนาคาร","บาท","กำไร","ขาดทุน"],
-        "ภัยพิบัติ":             ["น้ำท่วม","แผ่นดินไหว","พายุ","ไฟไหม้","ภัย","อพยพ"],
-        "ความสงบและความมั่นคง":  ["ตำรวจ","ทหาร","จับกุม","ความมั่นคง","อาชญากรรม","ยิง"],
-        "เศรษฐกิจ":              ["เศรษฐกิจ","GDP","เงินเฟ้อ","ส่งออก","นำเข้า","การค้า"],
-        "ยาเสพติด":              ["ยาเสพติด","ยาบ้า","โคเคน","จับยา","ปราบปราม"],
-    }
-   
-    scores: dict[str, int] = {
+    scores = {
         cat: sum(1 for kw in kws if kw in text)
-        for cat, kws in rules.items()
+        for cat, kws in CATEGORY_RULES.items()
     }
     best = max(scores.items(), key=lambda x: x[1])
     return best[0] if best[1] > 0 else "ข่าวอื่นๆ"
-    
-# ============================================================================
-# 1. GCN MODEL DEFINITION (same as before)
-# ============================================================================
-import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
 
-class GCNNet(torch.nn.Module):
-    """Graph Convolutional Network for news classification."""
-    def __init__(self, in_channels=768, hidden_channels=256, out_channels=2):
-        super(GCNNet, self).__init__()
-        self.conv1 = GCNConv(in_channels, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, out_channels)
 
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-        edge_weight = getattr(data, 'edge_attr', None)
-        
-        x = self.conv1(x, edge_index, edge_weight=edge_weight)
-        x = F.relu(x)
-        x = F.dropout(x, p=0.4, training=self.training)
-        x = self.conv2(x, edge_index, edge_weight=edge_weight)
-        return x
-
-        
-# ============================================================================
-# 2. ✅ CRITICAL FIX: Model Caching with @st.cache_resource
-# ============================================================================
-
+# ============================================================
+# ✅ load_model_pipeline — มีเพียงตัวเดียวเท่านั้น
+# ============================================================
 @st.cache_resource
 def load_model_pipeline() -> Dict[str, Any]:
+    artifacts: Dict[str, Any] = {}
     try:
-        logger.info("🔄 Loading ML Pipeline (First time only)...")
-        
+        logger.info("🔄 Loading ML Pipeline...")
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        logger.info(f"📍 Using device: {device}")
-        
-        # 1. Load artifacts (kNN database)
-        logger.info("📂 Loading artifacts...")
 
-        # ✅ แก้ปัญหา GCNNet ไม่เจอตอน pickle.load
-        setattr(sys.modules['__main__'], 'GCNNet', GCNNet)
+        if not os.path.exists(ARTIFACTS_PATH):
+            raise FileNotFoundError(f"ไม่พบ: {ARTIFACTS_PATH}")
 
         with open(ARTIFACTS_PATH, 'rb') as f:
             artifacts = pickle.load(f)
-        
-        x_database = artifacts['x_np']
-        id2label = artifacts['id2label']
-        id2cat      = artifacts.get('id2cat')       # ✅ เพิ่ม
-        y_cat_np    = artifacts.get('y_cat_np')     # ✅ เพิ่ม
-        k_neighbors = artifacts.get('k', 10)
-        logger.info(f"✅ Loaded {len(x_database)} news vectors for kNN")
-        
-        # 2. Load kNN searcher
-        logger.info("🔍 Setting up kNN searcher...")
-        nbrs = NearestNeighbors(n_neighbors=k_neighbors, metric='cosine').fit(x_database)
-        
-        # 3. Load BERT tokenizer & model
-        logger.info("🤖 Loading BERT tokenizer...")
-        tokenizer = AutoTokenizer.from_pretrained(BERT_MODEL_NAME)
-        
-        logger.info("🧠 Loading BERT model...")
-        bert_model = AutoModel.from_pretrained(BERT_MODEL_NAME).to(device).eval()
-        
-        # 4. Load GCN model
-        logger.info("📊 Loading GCN model...")
-        model = GCNNet(hidden_channels=256).to(device)
+
+        x_database:  np.ndarray          = artifacts['x_np']
+        id2label:    Dict[int, str]       = artifacts['id2label']
+        id2cat:      Optional[Dict]       = artifacts.get('id2cat')
+        y_cat_np:    Optional[np.ndarray] = artifacts.get('y_cat_np')
+        k_neighbors: int                  = int(artifacts.get('k', 10))
+
+        nbrs = NearestNeighbors(
+            n_neighbors=k_neighbors, metric='cosine'
+        ).fit(x_database)
+
+        tokenizer  = AutoTokenizer.from_pretrained(BERT_MODEL_NAME)
+        bert_model = AutoModel.from_pretrained(
+            BERT_MODEL_NAME
+        ).to(device).eval()
+
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(f"ไม่พบ: {MODEL_PATH}")
+
+        model = GCNNet(
+            in_channels=768, hidden_channels=256,
+            out_channels=2, dropout_rate=0.4
+        ).to(device)
         model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
         model.eval()
-        
-        logger.info("✅ All models loaded successfully!")
-        
-        # Return immutable pipeline dictionary
+
+        # ✅ return อยู่ใน try — Pylance เห็น return ทุก path
         return {
-            'model': model,
-            'tokenizer': tokenizer,
-            'bert_model': bert_model,
-            'nbrs': nbrs,
-            'x_database': x_database,
-            'id2label': id2label,
-            'device': device,
+            'model':       model,
+            'tokenizer':   tokenizer,
+            'bert_model':  bert_model,
+            'nbrs':        nbrs,
+            'x_database':  x_database,
+            'id2label':    id2label,
+            'device':      device,
             'k_neighbors': k_neighbors,
-            'id2cat':      id2cat,       # ✅ เพิ่ม
-            'y_cat_np':    y_cat_np,     # ✅ เพิ่ม
+            'id2cat':      id2cat,
+            'y_cat_np':    y_cat_np,
         }
-    
+
     except Exception as e:
-        logger.error(f"❌ Failed to load pipeline: {e}", exc_info=True)
-        raise RuntimeError(f"Model loading failed: {str(e)}")
+        logger.error("❌ โหลด pipeline ล้มเหลว: %s", e, exc_info=True)
+        # ✅ raise ทุก path — Pylance รู้ว่าไม่มีทาง return None
+        raise RuntimeError(f"Model loading failed: {str(e)}") from e
 
 
-# ============================================================================
-# 3. GET PIPELINE (for use in frontend)
-# ============================================================================
 def get_pipeline() -> Dict[str, Any]:
-    """
-    Get cached pipeline. Safe to call multiple times.
-    Streamlit handles caching automatically.
-    """
     return load_model_pipeline()
 
 
@@ -221,30 +177,60 @@ def predict_news(text: str, pipeline: Dict[str, Any]) -> Dict[str, Any]:
  
         # D. สร้าง graph
         logger.debug("Building computation graph...")
-        x_features = np.vstack([emb, x_database[idxs]])
-        x_tensor   = torch.tensor(x_features, dtype=torch.float).to(device)
- 
-        center     = 0
-        neighbors  = np.arange(1, k_neighbors + 1)
-        edge_index = torch.tensor(
-            np.concatenate([
-                np.stack([np.full(k_neighbors, center), neighbors]),
-                np.stack([neighbors, np.full(k_neighbors, center)])
-            ], axis=1),
-            dtype=torch.long
+
+        # รวม embedding ของ query กับ neighbor
+        x_features: np.ndarray = np.vstack(
+            [emb, x_database[idxs]]
+        )  # shape: (k+1, 768)
+        x_tensor = torch.tensor(
+            x_features, dtype=torch.float
         ).to(device)
- 
-        weights   = np.concatenate([1 - dists[0], 1 - dists[0]])
-        edge_attr = torch.tensor(weights, dtype=torch.float).to(device)
- 
+
+        center_node = 0
+        neighbor_nodes = np.arange(1, k_neighbors + 1)
+
+        # Bidirectional edges: center↔neighbor
+        forward_edges  = np.stack(
+            [np.full(k_neighbors, center_node), neighbor_nodes]
+        )
+        backward_edges = np.stack(
+            [neighbor_nodes, np.full(k_neighbors, center_node)]
+        )
+
+        # ✅ เพิ่ม self-loop สำหรับ center node
+        self_loop = np.array([[center_node], [center_node]])
+
+        edge_index_np = np.concatenate(
+            [forward_edges, backward_edges, self_loop], axis=1
+        )
+        graph_edge_index = torch.tensor(
+            edge_index_np, dtype=torch.long
+        ).to(device)
+
+        # Edge weights
+        edge_weights_np = np.concatenate(
+            [1 - dists[0], 1 - dists[0], np.array([1.0])]
+        )
+        graph_edge_attr = torch.tensor(
+            edge_weights_np, dtype=torch.float
+        ).to(device)
+
         # E. GCN predict
         logger.debug("Running GCN inference...")
-        data = Data(x=x_tensor, edge_index=edge_index, edge_attr=edge_attr).to(device)
- 
+
+        # ✅ ใช้ชื่อ graph_data แทน data เพื่อไม่ชนกับตัวแปรอื่น
+        graph_data = Data(
+            x=x_tensor,
+            edge_index=graph_edge_index,
+            edge_attr=graph_edge_attr
+        ).to(device)
+
         with torch.no_grad():
-            out      = model(data)
-            probs    = F.softmax(out[0, :], dim=0)
-            pred_idx = int(torch.argmax(probs).item())
+            out: torch.Tensor = model(graph_data)
+            # out shape: (k+1, num_classes) — เอาเฉพาะ node 0 (query)
+            query_logits: torch.Tensor = out[0, :]
+            probs = F.softmax(query_logits, dim=0)
+            pred_idx    = int(torch.argmax(probs).item())
             confidence  = float(probs[pred_idx].item()) * 100
             label       = id2label[pred_idx]
             result_text = "Real" if pred_idx == 0 else "Fake"
@@ -284,19 +270,4 @@ def cleanup_gpu():
         logger.info("✅ GPU memory cleared")
 
 # เพิ่มฟังก์ชันนี้ก่อน for loop ใน show_category_analysis()
-def guess_category(text: str) -> str:
-    rules = {
-        "นโยบายรัฐบาล-ข่าวสาร": ["รัฐบาล","ครม.","นายกฯ","กระทรวง","นโยบาย","รัฐสภา","พรรค"],
-        "ผลิตภัณฑ์สุขภาพ":      ["ยา","อาหารเสริม","สุขภาพ","รักษา","โรค","หมอ","โรงพยาบาล"],
-        "การเงิน-หุ้น":          ["หุ้น","ตลาด","ลงทุน","เงิน","ธนาคาร","บาท","กำไร","ขาดทุน"],
-        "ภัยพิบัติ":             ["น้ำท่วม","แผ่นดินไหว","พายุ","ไฟไหม้","ภัย","อพยพ"],
-        "ความสงบและความมั่นคง":  ["ตำรวจ","ทหาร","จับกุม","ความมั่นคง","อาชญากรรม","ยิง"],
-        "เศรษฐกิจ":              ["เศรษฐกิจ","GDP","เงินเฟ้อ","ส่งออก","นำเข้า","การค้า"],
-        "ยาเสพติด":              ["ยาเสพติด","ยาบ้า","โคเคน","จับยา","ปราบปราม"],
-    }
-    scores: dict[str, int] = {
-        cat: sum(1 for kw in kws if kw in text)
-        for cat, kws in rules.items()
-    }
-    best = max(scores.items(), key=lambda x: x[1])
-    return best[0] if best[1] > 0 else "ข่าวอื่นๆ"
+

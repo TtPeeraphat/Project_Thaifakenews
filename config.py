@@ -22,37 +22,34 @@ load_dotenv(dotenv_path=env_path)
 # ============================================================================
 @dataclass
 class DatabaseConfig:
-    """Database configuration (from environment variables)."""
-    
-    # ✅ FIXED Issue 6.1: Moved from database_ops.py
-    # แก้ในไฟล์ config.py ตรงบรรทัด supabase_url ให้ออกมาหน้าตาแบบนี้ครับ
-    supabase_url: str = os.getenv(
-        "SUPABASE_URL",
-        "https://orxtfxdernqmpkfmsijj.supabase.co"
-    ).strip().strip('"').strip("'")  # ✅ เพิ่ม .strip() เพื่อล้างช่องว่างและเครื่องหมายคำพูดทิ้ง
-    supabase_key: str = os.getenv("SUPABASE_KEY", "")  # Must be set in .env
-    
-    # These are fallback values (Streamlit secrets are preferred)
-    db_host: str = os.getenv("DB_HOST", "localhost")
-    db_port: int = int(os.getenv("DB_PORT", "5432"))
-    db_name: str = os.getenv("DB_NAME", "fakenews")
-    db_user: str = os.getenv("DB_USER", "")
+    # ✅ ลบ hardcode URL ออก
+    supabase_url: str = os.getenv("SUPABASE_URL", "").strip().strip('"').strip("'")
+    supabase_key: str = os.getenv("SUPABASE_KEY", "")
+
+    db_host:     str = os.getenv("DB_HOST", "localhost")
+    db_port:     int = int(os.getenv("DB_PORT", "5432"))
+    db_name:     str = os.getenv("DB_NAME", "fakenews")
+    db_user:     str = os.getenv("DB_USER", "")
     db_password: str = os.getenv("DB_PASSWORD", "")
-    
+
+    # ✅ validate ตัวเดียว — รวมการตรวจสอบทั้งหมด
     def validate(self) -> bool:
-        """Check if critical credentials are set."""
-        warnings = []
-        
+        warnings_list = []
+
+        if not self.supabase_url:
+            warnings_list.append("⚠️  SUPABASE_URL ไม่ได้ตั้งค่า")
+
         if not self.supabase_key or len(self.supabase_key) < 20:
-            warnings.append("⚠️  SUPABASE_KEY not properly configured")
-        
+            warnings_list.append("⚠️  SUPABASE_KEY ไม่ได้ตั้งค่าหรือสั้นเกินไป")
+
         if not self.db_password:
-            warnings.append("⚠️  DB_PASSWORD not set")
-        
-        if warnings:
-            logging.warning(f"Configuration warnings: {', '.join(warnings)}")
+            warnings_list.append("⚠️  DB_PASSWORD not set")
+
+        if warnings_list:
+            logging.warning(
+                "Configuration warnings: %s", ", ".join(warnings_list)
+            )
             return False
-        
         return True
 
 

@@ -6,12 +6,12 @@ Fixes:
 - Issue 5.1: No input validation
 - Issue 6.2: Log injection risk
 """
-
+from collections import Counter 
 import re
 import html
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Dict, Any, Optional  
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -164,16 +164,20 @@ class InputValidator:
         # Character repetition
         # -------------------------
 
-        for char in set(text):
+        # validators.py — O(N) ด้วย Counter
+            from collections import Counter
 
-            count = text.count(char)
-            ratio = count / len(text)
+            # แทนที่ loop เดิมด้วย
+            char_counts = Counter(text)          # O(N) ครั้งเดียว
+            text_len    = len(text)
 
-            if ratio > 0.5 and char not in " \n\t-:,.":
-                return ValidationResult(
-                    False,
-                    f"Excessive repeated character '{char}'"
-                )
+            for char, count in char_counts.items():
+                ratio = count / text_len
+                if ratio > 0.5 and char not in " \n\t-:,.":
+                    return ValidationResult(
+                        False,
+                        f"ตัวอักษร '{char}' ซ้ำกันมากเกินไป (สัดส่วน {ratio:.0%})"
+                    )
 
         # -------------------------
         # Suspicious patterns
@@ -366,8 +370,97 @@ class InputValidator:
 
         return ValidationResult(True, warning_message=warning.strip())
 
-def check_rate_limit() -> tuple[bool, str]:
+# validators.py — rate limit เก็บใน Supabase (เลี่ยงไม่ได้)
+from database_ops import get_supabase
+import logging
+
+logger = logging.getLogger(__name__)
+
+RATE_LIMIT_PER_MINUTE = 5
+RATE_LIMIT_PER_HOUR   = 30
+COOLDOWN_SECONDS      = 3
+
+
+def check_rate_limit(user_id: int) -> tuple[bool, str]:
+    """
+    ตรวจสอบ rate limit โดยใช้ user_id จาก database
+    ทำงานได้แม้ผู้ใช้เปิด tab ใหม่หรือ refresh
+
+    Args:
+        user_id: ID ของ user จาก Supabase (ต้อง login ก่อน)
+    """
     now = datetime.now(tz=TZ_BKK)
+
+    try:
+        supabase = get_supabase()
+
+        # ดึง timestamp ทั้งหมดของ user ใน 1 ชั่วโมงที่ผ่านมา
+        one_hour_ago = (now - timedelta(hours=1)).isoformat()
+
+        response = supabase.table("predictions") \
+            .select("created_at") \
+            .eq("user_id", user_id) \
+            .gte("created_at", one_hour_ago) \
+            .order("created_at", desc=True) \
+            .execute()
+
+        timestamps: list[datetime] = []
+
+        for row in (response.data or []):
+            # ✅ cast เป็น Dict ก่อน — Pylance รู้ type แล้ว subscript ได้
+            row_dict: Dict[str, Any] = row if isinstance(row, dict) else {}
+            raw_ts: Any = row_dict.get("created_at")
+
+            # ✅ ตรวจสอบก่อนเรียก .replace() — ป้องกัน None/non-string
+            if not isinstance(raw_ts, str) or not raw_ts:
+                continue
+
+            try:
+                ts = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+                timestamps.append(ts)
+            except ValueError:
+                continue
+
+        # ตรวจ cooldown (ครั้งล่าสุด)
+        if timestamps:
+            latest = max(timestamps)
+            # แปลงให้ตรง timezone
+            if latest.tzinfo is None:
+                latest = latest.replace(tzinfo=TZ_BKK)
+            elapsed = (now - latest).total_seconds()
+            if elapsed < COOLDOWN_SECONDS:
+                wait = COOLDOWN_SECONDS - int(elapsed)
+                return False, f"⏳ กรุณารอ {wait} วินาทีก่อนวิเคราะห์ใหม่"
+
+        # ตรวจ hourly limit
+        if len(timestamps) >= RATE_LIMIT_PER_HOUR:
+            return False, f"⚠️ คุณวิเคราะห์ครบ {RATE_LIMIT_PER_HOUR} ครั้ง/ชั่วโมงแล้ว"
+
+        # ตรวจ per-minute limit
+        one_minute_ago = now - timedelta(minutes=1)
+        recent = [t for t in timestamps
+                  if t.replace(tzinfo=TZ_BKK) > one_minute_ago
+                  if t.tzinfo is None]
+        recent_aware = [t for t in timestamps if t > one_minute_ago]
+
+        if len(recent_aware) >= RATE_LIMIT_PER_MINUTE:
+            return False, "⚠️ วิเคราะห์เร็วเกินไป กรุณารอสักครู่"
+
+        return True, ""
+
+    except Exception as e:
+        logger.warning(f"Rate limit check failed (DB error): {e}")
+        # ถ้า DB error ให้ผ่านไปก่อน (fail open) แต่ log ไว้
+        return True, ""
+
+
+def check_rate_limit_fallback() -> tuple[bool, str]:
+    """
+    Fallback สำหรับผู้ใช้ที่ไม่ได้ login
+    ใช้ session state เหมือนเดิม (ความปลอดภัยต่ำกว่า)
+    """
+    now = datetime.now(tz=TZ_BKK)
+
     if "rate_timestamps" not in st.session_state:
         st.session_state["rate_timestamps"] = []
     if "last_predict_time" not in st.session_state:
@@ -378,29 +471,33 @@ def check_rate_limit() -> tuple[bool, str]:
         elapsed = (now - last).total_seconds()
         if elapsed < COOLDOWN_SECONDS:
             wait = COOLDOWN_SECONDS - int(elapsed)
-            return False, f"⏳ กรุณารอ {wait} วินาทีก่อนวิเคราะห์ใหม่"
+            return False, f"⏳ กรุณารอ {wait} วินาที"
 
-    cutoff_hour   = now - timedelta(hours=1)
+    cutoff_hour = now - timedelta(hours=1)
     cutoff_minute = now - timedelta(minutes=1)
-    timestamps = [t for t in st.session_state["rate_timestamps"] if t > cutoff_hour]
+    timestamps = [t for t in st.session_state["rate_timestamps"]
+                  if t > cutoff_hour]
     st.session_state["rate_timestamps"] = timestamps
 
     if len(timestamps) >= RATE_LIMIT_PER_HOUR:
-        return False, f"⚠️ คุณวิเคราะห์ครบ {RATE_LIMIT_PER_HOUR} ครั้งต่อชั่วโมงแล้ว — กรุณารอสักครู่"
+        return False, f"⚠️ ครบ {RATE_LIMIT_PER_HOUR} ครั้ง/ชั่วโมง"
 
     recent = [t for t in timestamps if t > cutoff_minute]
     if len(recent) >= RATE_LIMIT_PER_MINUTE:
-        return False, f"⚠️ คุณวิเคราะห์เร็วเกินไป — กรุณารอสักครู่"
+        return False, "⚠️ วิเคราะห์เร็วเกินไป"
 
     return True, ""
 
 
 def record_prediction_timestamp():
+    """บันทึก timestamp (fallback สำหรับ session state)"""
     now = datetime.now(tz=TZ_BKK)
     if "rate_timestamps" not in st.session_state:
         st.session_state["rate_timestamps"] = []
     st.session_state["rate_timestamps"].append(now)
     st.session_state["last_predict_time"] = now
+
+
 # =========================================================
 # TEST
 # =========================================================

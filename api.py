@@ -1,173 +1,184 @@
-# api.py
-import sys
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import pickle
+# api.py — แก้ทุก error
 import os
-from torch_geometric.data import Data
-from torch_geometric.nn import GCNConv
-from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import normalize
+import sys
+import pickle
+import logging
 from collections import Counter
-from embed_utils import embed_text
+from typing import Dict, Any, Optional
 
-# --- 🔥 เปลี่ยน: ใช้ Transformers แทน SentenceTransformer ---
+import numpy as np
+import torch
+import torch.nn.functional as F
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, field_validator
+from torch_geometric.data import Data
+from sklearn.neighbors import NearestNeighbors
 from transformers import AutoTokenizer, AutoModel
 
-# ==========================================
-# 1. Config & Model Architecture
-# ==========================================
-app = FastAPI(title="Fake News Detection API (WangchanBERTa)")
+# ✅ import GCNNet จาก model_def — ไม่นิยามซ้ำ
+from model_def import GCNNet
+from embed_utils import embed_text
+from validators import InputValidator
+from text_preprocessor import TextPreprocessor
+
+logger = logging.getLogger(__name__)
+
+app    = FastAPI(title="Fake News Detection API (WangchanBERTa)")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class GCNNet(nn.Module):
-    def __init__(self, num_node_features, num_classes, hidden_channels=256, dropout_rate=0.4):
-        super().__init__()
-        self.conv1 = GCNConv(num_node_features, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, num_classes)
-        self.dropout_rate = dropout_rate
+# ============================================================
+# ✅ นิยาม NewsRequest ครั้งเดียว — ลบตัวซ้ำออก
+# ============================================================
+class NewsRequest(BaseModel):
+    text: str
 
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-        edge_weight = getattr(data, 'edge_attr', None)
-        
-        x = self.conv1(x, edge_index, edge_weight=edge_weight)
-        x = F.relu(x)
-        x = F.dropout(x, p=self.dropout_rate, training=self.training)
-        x = self.conv2(x, edge_index, edge_weight=edge_weight)
-        return x
+    @field_validator('text')
+    @classmethod
+    def text_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("ข้อความต้องไม่ว่างเปล่า")
+        return v.strip()
 
-# ==========================================
-# 2. Global Resources (Load Once at Startup)
-# ==========================================
+
+# ============================================================
+# ✅ นิยาม resources และ artifacts ก่อน try block
+# ============================================================
+resources: Dict[str, Any] = {}
+artifacts: Dict[str, Any] = {}
+
+MODEL_NAME = "airesearch/wangchanberta-base-att-spm-uncased"
+
 print("⏳ Loading Models & Artifacts...")
-
-resources = {}
-
 try:
-    # 2.1 Load Artifacts
     if not os.path.exists('artifacts.pkl'):
-        raise FileNotFoundError("❌ ไม่พบไฟล์ artifacts.pkl")
+        raise FileNotFoundError("ไม่พบ artifacts.pkl")
 
-    # ✅ บอก pickle ว่า GCNNet อยู่ที่นี่ก่อน load
-    setattr(sys.modules['__main__'], 'GCNNet', GCNNet)
-
-    
     with open('artifacts.pkl', 'rb') as f:
         artifacts = pickle.load(f)
-        resources['artifacts'] = artifacts
 
-    # 2.2 Build KNN Engine
+    resources['artifacts'] = artifacts
+
+    # kNN
     k = min(10, len(artifacts['x_np']))
-    resources['nbrs_engine'] = NearestNeighbors(n_neighbors=k, metric='cosine').fit(artifacts['x_np'])
+    resources['nbrs_engine'] = NearestNeighbors(
+        n_neighbors=k, metric='cosine'
+    ).fit(artifacts['x_np'])
 
-    # 2.3 Load WangchanBERTa 
-    print("   ... Loading WangchanBERTa Model")
-    MODEL_NAME = "airesearch/wangchanberta-base-att-spm-uncased"
-    resources['tokenizer'] = AutoTokenizer.from_pretrained(MODEL_NAME)
+    # BERT
+    resources['tokenizer']  = AutoTokenizer.from_pretrained(MODEL_NAME)
     resources['bert_model'] = AutoModel.from_pretrained(MODEL_NAME).to(device)
 
-    # 2.4 Load GCN Model
-    model = GCNNet(num_node_features=artifacts['x_np'].shape[1], num_classes=2).to(device)
-    if os.path.exists('best_model.pth'):
-        model.load_state_dict(torch.load('best_model.pth', map_location=device))
-        model.eval() # Set eval mode
-        resources['model_gnn'] = model
-        print("✅ Models Loaded Successfully!")
-    else:
-        raise FileNotFoundError("❌ ไม่พบไฟล์ best_model.pth")
+    # ✅ GCN — ใช้ parameter ที่ถูกต้องจาก model_def.py
+    if not os.path.exists('best_model.pth'):
+        raise FileNotFoundError("ไม่พบ best_model.pth")
+
+    model = GCNNet(
+        in_channels=int(artifacts['x_np'].shape[1]),  # ✅ ถูก parameter
+        hidden_channels=256,
+        out_channels=2,
+        dropout_rate=0.4
+    ).to(device)
+    model.load_state_dict(
+        torch.load('best_model.pth', map_location=device)
+    )
+    model.eval()
+    resources['model_gnn'] = model
+    print("✅ Models Loaded Successfully!")
 
 except Exception as e:
     print(f"🔥 Error loading resources: {e}")
 
-# ==========================================
-# 3. Define Input/Output Format
-# ==========================================
-class NewsRequest(BaseModel):
-    text: str
 
-# ==========================================
-# 4. API Endpoints
-# ==========================================
+# ============================================================
+# Endpoints
+# ============================================================
 @app.get("/")
-def home():
-    return {"message": "Fake News Detection API (WangchanBERTa) is Running"}
+def home() -> Dict[str, str]:
+    return {"message": "Fake News Detection API is Running"}
+
 
 @app.post("/predict")
-def predict(req: NewsRequest):
-    try:
-        content = req.text
-        topn = 10
-        
-        # ดึงของจาก Global Resources
-        tokenizer = resources['tokenizer']
-        bert_model = resources['bert_model']
-        nbrs = resources['nbrs_engine']
-        model_gnn = resources['model_gnn']
-        artifacts = resources['artifacts']
-        
-        x_np = artifacts['x_np']
-        id2label = artifacts['id2label']
-        id2cat = artifacts['id2cat']
-        y_cat_np = artifacts.get('y_cat_np')
+def predict(req: NewsRequest) -> Dict[str, Any]:
+    # ✅ Validate
+    validation = InputValidator.validate_text(req.text, require_thai=True)
+    if not validation.is_valid:
+        raise HTTPException(status_code=422, detail=validation.error_message)
 
-# --- 1) Embedding with WangchanBERTa (Updated: Match Training Logic) ---
-        
-        # 1.1 แก้ Max Length เป็น 256 (เพื่อให้โมเดลอ่านข่าวความยาวเท่าตอนเทรน)
+    # ✅ Preprocess — ใช้ method ที่ถูกต้อง
+    cleaned, is_valid, reason = TextPreprocessor.preprocess(req.text)
+    if not is_valid:
+        raise HTTPException(status_code=422, detail=reason)
+
+    content = cleaned
+
+    try:
+        tokenizer:  Any          = resources['tokenizer']
+        bert_model: Any          = resources['bert_model']
+        nbrs:       Any          = resources['nbrs_engine']
+        model_gnn:  GCNNet       = resources['model_gnn']
+        arts:       Dict[str, Any] = resources['artifacts']
+
+        x_np:     np.ndarray    = arts['x_np']
+        id2label: Dict[int,str] = arts['id2label']
+        id2cat:   Optional[Dict] = arts.get('id2cat')
+        y_cat_np: Optional[np.ndarray] = arts.get('y_cat_np')
+        topn = 10
+
         emb = embed_text(content, tokenizer, bert_model, device)
-        
-        # --- 2) KNN Search (เหมือนเดิม) ---
-        dists, idxs = nbrs.kneighbors(emb.reshape(1, -1), n_neighbors=topn)
-        idxs = idxs[0]
-        
-        # Find Category Neighbors
-        neighbor_cats = []
+        dists, idxs_2d = nbrs.kneighbors(
+            emb.reshape(1, -1), n_neighbors=topn
+        )
+        idxs: np.ndarray = idxs_2d[0]
+
         pred_category = "ไม่ระบุ"
+        neighbor_cats: list = []
         if y_cat_np is not None and id2cat is not None:
             neighbor_cat_ids = y_cat_np[idxs]
-            neighbor_cats = [id2cat[cid] for cid in neighbor_cat_ids]
+            neighbor_cats = [id2cat[int(cid)] for cid in neighbor_cat_ids]
             most_common = Counter(neighbor_cats).most_common(1)
             if most_common:
                 pred_category = most_common[0][0]
 
-        # --- 3) Build Graph ---
-        X_new = np.vstack([emb, x_np[idxs]])
-        center = 0
-        neighbors = np.arange(1, topn + 1)
-        
-        edge_index_new = np.concatenate([
-            np.stack([np.full(topn, center), neighbors]),
-            np.stack([neighbors, np.full(topn, center)])
-        ], axis=1)
-        
-        edge_weight_new = np.concatenate([1 - dists[0], 1 - dists[0]])
+        # Build graph + self-loop
+        X_new        = np.vstack([emb, x_np[idxs]])
+        center_node  = 0
+        nbr_nodes    = np.arange(1, topn + 1)
+        self_loop_np = np.array([[center_node], [center_node]])
 
-        data_new = Data(
-            x=torch.tensor(X_new, dtype=torch.float, device=device),
-            edge_index=torch.tensor(edge_index_new, dtype=torch.long, device=device),
-            edge_attr=torch.tensor(edge_weight_new, dtype=torch.float, device=device),
+        edge_index_np = np.concatenate([
+            np.stack([np.full(topn, center_node), nbr_nodes]),
+            np.stack([nbr_nodes, np.full(topn, center_node)]),
+            self_loop_np
+        ], axis=1)
+
+        edge_w = np.concatenate(
+            [1 - dists[0], 1 - dists[0], np.array([1.0])]
         )
 
-        # --- 4) Predict Real/Fake ---
-        with torch.no_grad():
-            logits = model_gnn(data_new)
-            probas = torch.softmax(logits, dim=1)[0].cpu().numpy()
-            pred_id = int(np.argmax(probas)) 
-            label_pred = id2label[pred_id]
+        graph_data = Data(
+            x=torch.tensor(X_new, dtype=torch.float, device=device),
+            edge_index=torch.tensor(
+                edge_index_np, dtype=torch.long, device=device
+            ),
+            edge_attr=torch.tensor(edge_w, dtype=torch.float, device=device),
+        )
 
-        # ส่งผลลัพธ์กลับเป็น JSON
+        with torch.no_grad():
+            logits: torch.Tensor = model_gnn(graph_data)
+            probas = torch.softmax(logits, dim=1)[0].cpu().numpy()
+            pred_id   = int(np.argmax(probas))
+            label_out = id2label[pred_id]
+
         return {
-            "status": "success",
-            "label": label_pred,
-            "probability": float(probas[pred_id]),
-            "category": pred_category,
+            "status":        "success",
+            "label":         label_out,
+            "probability":   float(probas[pred_id]),
+            "category":      pred_category,
             "neighbor_cats": neighbor_cats,
-            "pred_id": pred_id
+            "pred_id":       pred_id,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

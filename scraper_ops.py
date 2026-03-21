@@ -5,6 +5,7 @@ import logging
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from apify_client import ApifyClient
+from text_preprocessor import TextPreprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -142,13 +143,14 @@ def get_content_from_url(url):
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        og_title = soup.find("meta", property="og:title")
-        if og_title and og_title.get("content"):
-            title = og_title["content"]
-        elif soup.find("h1"):
-            title = soup.find("h1").get_text(strip=True)
+        # ✅ og_title
+        og_title_tag = soup.find("meta", property="og:title")
+        if og_title_tag is not None:
+            og_content = og_title_tag.get("content")       # คืน str | list | None
+            title = str(og_content) if og_content else "ไม่พบหัวข้อข่าว"
         else:
-            title = "ไม่พบหัวข้อข่าว"
+            h1_tag = soup.find("h1")
+            title = h1_tag.get_text(strip=True) if h1_tag is not None else "ไม่พบหัวข้อข่าว"
 
         article_body = soup.find("article")
         paragraphs = article_body.find_all("p") if article_body else soup.find_all("p")

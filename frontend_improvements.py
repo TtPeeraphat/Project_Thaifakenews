@@ -1,3 +1,4 @@
+from altair.datasets import url
 import streamlit as st
 import logging
 import time
@@ -6,6 +7,9 @@ from text_preprocessor import TextPreprocessor
 from validators import InputValidator
 from ai_engine import get_pipeline, predict_news
 import database_ops as db
+from scraper_ops import get_content_from_url
+
+title, content = get_content_from_url(url)
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +125,9 @@ def show_home_improved():
 
             progress.progress(10)
 
-            from scraper_ops import ContentFetcher
+            
 
-            title, content = ContentFetcher.extract_content(input_url)
+            title, content = get_content_from_url(input_url)
 
             if not title:
                 st.error("ไม่สามารถดึงข่าวจาก URL")
