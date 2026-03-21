@@ -19,7 +19,7 @@ import streamlit.components.v1 as components
 import html  
 from validators import InputValidator
 from validators import check_rate_limit, record_prediction_timestamp
-from ai_engine import classify_category_by_keyword as guess_category
+from ai_engine import classify_category_by_keyword as guess_category, classify_category_by_keyword
 
 
 if sys.platform == 'win32':
@@ -3714,6 +3714,20 @@ colorObs.observe(window.parent.document.body,
                         df = df[df['title'].str.contains(sq, case=False, na=False)]
                     if filter_result != "ทั้งหมด":
                         df = df[df['result'] == filter_result]
+
+                    # ✅ fill_category อยู่ตรงนี้ — หลัง filter bar, ก่อน filter_cat
+                    if 'category' in df.columns:
+                        def fill_category(row):
+                            cat = str(row['category'] if pd.notna(row['category']) else '').strip()
+                            if cat in ('', 'None', 'nan', '—'):
+                                text_for_guess = ' '.join(filter(None, [
+                                    str(row['title']) if pd.notna(row.get('title', '')) else '',
+                                    str(row['text'])  if pd.notna(row.get('text', ''))  else '',
+                                ]))
+                                return classify_category_by_keyword(text_for_guess)
+                            return cat
+                        df['category'] = df.apply(fill_category, axis=1)
+
                     if filter_cat != "ทุกหมวดหมู่" and 'category' in df.columns:
                         df = df[df['category'] == filter_cat]
 
