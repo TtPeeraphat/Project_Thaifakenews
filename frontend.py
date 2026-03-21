@@ -2639,7 +2639,7 @@ def show_system_analytics():
         # ── กราฟ 1: User Report (Correct/Incorrect) ──
         with chart_c1:
             st.markdown("""<div style="font-size:0.84rem;font-weight:700;
-            color:#334155;margin-bottom:8px;">👤 ผู้ใช้บอกว่า AI ทายถูก/ผิด</div>""",
+            color:#000000;margin-bottom:8px;">👤 ผู้ใช้บอกว่า AI ทายถูก/ผิด</div>""",
             unsafe_allow_html=True)
 
             df_ur = df_fb_stats['user_report'] \
@@ -2662,7 +2662,7 @@ def show_system_analytics():
             fig_ur.update_layout(
                 showlegend=False,
                 plot_bgcolor='white', paper_bgcolor='white',
-                font_color='#334155',
+                font_color="#000000",
                 margin=dict(l=0, r=0, t=10, b=0),
                 xaxis_title="", yaxis_title="จำนวน (ครั้ง)",
                 bargap=0.4
