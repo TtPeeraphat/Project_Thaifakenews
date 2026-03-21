@@ -3324,22 +3324,51 @@ colorObs.observe(window.parent.document.body,
         if menu == "🏠 หน้าหลัก":
             page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI ")
 
-            # แก้ Warning: ใส่ข้อความลงใน label แต่สั่งซ่อนไว้
             check_mode = st.radio(
-                label="เลือกโหมดการตรวจสอบ", 
+                label="เลือกโหมดการตรวจสอบ",
                 options=["📝  พิมพ์ / วางเนื้อหา   ", "🔗  URL ลิงก์ข่าว"],
                 horizontal=True,
                 label_visibility="collapsed"
             )
-            st.markdown("<div style='height:6px;'></div>",unsafe_allow_html=True)
+            st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
 
-            input_url = ""
+            input_url  = ""
             input_text = ""
 
+            # ══════════════════════════════════════
+            # โหมด URL
+            # ══════════════════════════════════════
             if check_mode == "🔗  URL ลิงก์ข่าว":
-                # initialise session state key for URL
                 if 'input_url' not in st.session_state:
                     st.session_state['input_url'] = ""
+
+                with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
+                    m1, m2 = st.columns(2)
+                    df_trending = db.get_all_trending()
+                    with m1:
+                        if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake_url", width='stretch'):
+                            if not df_trending.empty:
+                                fake_news = df_trending[
+                                    (df_trending['label'] == 'Fake') &
+                                    (df_trending['source_url'].notna()) &
+                                    (df_trending['source_url'] != '')
+                                ]
+                                if not fake_news.empty:
+                                    st.session_state['input_url'] = str(fake_news.sample(1).iloc[0]['source_url'])
+                                else:
+                                    st.warning("ยังไม่มีข่าวปลอมที่มี URL ใน DB")
+                    with m2:
+                        if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real_url", width='stretch'):
+                            if not df_trending.empty:
+                                real_news = df_trending[
+                                    (df_trending['label'] == 'Real') &
+                                    (df_trending['source_url'].notna()) &
+                                    (df_trending['source_url'] != '')
+                                ]
+                                if not real_news.empty:
+                                    st.session_state['input_url'] = str(real_news.sample(1).iloc[0]['source_url'])
+                                else:
+                                    st.warning("ยังไม่มีข่าวจริงที่มี URL ใน DB")
 
                 _url_col, _clr_url_col = st.columns([5, 1])
                 with _url_col:
@@ -3353,13 +3382,14 @@ colorObs.observe(window.parent.document.body,
                     st.button("🗑️ ล้างข้อความ", type="secondary",
                             on_click=clear_url, width='stretch')
                 input_url = st.session_state['input_url']
+
+            # ══════════════════════════════════════
+            # โหมดข้อความ
+            # ══════════════════════════════════════
             else:
                 with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
                     m1, m2 = st.columns(2)
-
-                    # ✅ ดึงข่าวจาก DB มาสุ่ม
                     df_trending = db.get_all_trending()
-
                     with m1:
                         if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake", width='stretch'):
                             if not df_trending.empty:
@@ -3368,31 +3398,26 @@ colorObs.observe(window.parent.document.body,
                                     picked = fake_news.sample(1).iloc[0]
                                     st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
                                 else:
-                                    # fallback ถ้าไม่มีใน DB
                                     st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท"
                             else:
                                 st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท"
-
                     with m2:
-                        if st.button("✅ ตัวอย่างข่าวจริง", width='stretch', key="demo_real"):
+                        if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real", width='stretch'):
                             if not df_trending.empty:
                                 real_news = df_trending[df_trending['label'] == 'Real']
                                 if not real_news.empty:
                                     picked = real_news.sample(1).iloc[0]
                                     st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
                                 else:
-                                    # fallback ถ้าไม่มีใน DB
                                     st.session_state['input_text'] = "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูง"
                             else:
-                                st.session_state['input_text'] = "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูง"
+                                st.session_state['input_text'] = "ชาวฮ่องกงเแห่ขับรถไปเติมน้ำมันที่จีนเแผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูง"
 
-                # ปุ่มล้างข้อความ อยู่นอก expander
                 _, _clr_col = st.columns([5, 1])
                 with _clr_col:
-                    st.button("🗑️ ล้างข้อความ", type="secondary", on_click=clear_text,
-                            width='stretch')
+                    st.button("🗑️ ล้างข้อความ", type="secondary",
+                            on_click=clear_text, width='stretch')
 
-                # เพิ่มกล่องพิมพ์ข้อความ
                 st.text_area(
                     label="กรอกเนื้อหาข่าว",
                     height=180,
@@ -3400,10 +3425,13 @@ colorObs.observe(window.parent.document.body,
                     label_visibility="collapsed",
                     key="input_text"
                 )
-                # ดึงข้อความจากหน้าเว็บมาเก็บในตัวแปร เพื่อเตรียมส่งให้ AI ตรวจสอบ
                 input_text = st.session_state['input_text']
 
             st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+            # ══════════════════════════════════════
+            # ปุ่มวิเคราะห์
+            # ══════════════════════════════════════
             if st.button("🚀  วิเคราะห์ข่าวนี้", type="primary", width="stretch"):
                 allowed, msg = check_rate_limit()
                 if not allowed:
@@ -3417,14 +3445,10 @@ colorObs.observe(window.parent.document.body,
                     if not input_url:
                         st.warning("กรุณาวาง URL ก่อนกด")
                         st.stop()
-
-                    # ✅ validate ก่อน
                     result = InputValidator.validate_url(input_url)
                     if not result.is_valid:
                         st.warning(result.error_message)
                         st.stop()
-
-                    # ✅ fetch อยู่นอก if not valid (indent ระดับเดียวกับ validate)
                     with st.spinner("กำลังดึงข้อมูลจากลิงก์..."):
                         try:
                             db.log_system_event(
@@ -3444,7 +3468,6 @@ colorObs.observe(window.parent.document.body,
                                 level="ERROR"
                             )
                             st.stop()
-
                     if title and not str(content).startswith("Error"):
                         clean = f"{title}\n\n{content}"
                         db.log_system_event(
@@ -3462,17 +3485,15 @@ colorObs.observe(window.parent.document.body,
                         )
                         st.error(f"ดึงข้อมูลไม่ได้: {content}")
                         st.stop()
-
                 else:
                     clean = str(input_text).strip()
                     if not clean:
                         st.warning("กรุณาใส่เนื้อหาข่าว")
                         st.stop()
-                        # ✅ เพิ่มแค่ 3 บรรทัดนี้ต่อจาก if not clean:
-                        text_check = InputValidator.validate_text(clean)
-                        if not text_check.is_valid:
-                            st.warning(text_check.error_message)
-                            st.stop()
+                    text_check = InputValidator.validate_text(clean)
+                    if not text_check.is_valid:
+                        st.warning(text_check.error_message)
+                        st.stop()
 
                 with st.spinner("🧠 AI กำลังวิเคราะห์..."):
                     try:
@@ -3921,6 +3942,15 @@ colorObs.observe(window.parent.document.body,
                                 f'margin-bottom:14px;display:block;" />'
                             )
 
+                        # ✅ คำนวณ source_html ก่อน st.markdown
+                        source_url = str(row.get("source_url") or "").strip()
+                        source_html = ""
+                        if source_url and source_url not in ("None", "null", ""):
+                            source_html = f"""<a href="{source_url}" target="_blank"
+                            style="font-size:0.76rem;color:#1565C0;-webkit-text-fill-color:#1565C0;
+                                    text-decoration:none;display:inline-flex;align-items:center;
+                                    gap:4px;margin-top:6px;">🔗 ดูข่าวต้นฉบับ ↗</a>"""
+
                         st.markdown(f"""
                         <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
                                     padding:20px 24px;margin-bottom:12px;
@@ -3950,7 +3980,9 @@ colorObs.observe(window.parent.document.body,
                             {safe_content}
                         </div>
                         <div style="font-size:0.76rem;color:#94A3B8;">🕒 อัปเดตเมื่อ {ts}</div>
+                        {source_html}
                         </div>""", unsafe_allow_html=True)
+                       
         # ══════════════════════════════════════
         # 👤 PROFILE
         # ══════════════════════════════════════
