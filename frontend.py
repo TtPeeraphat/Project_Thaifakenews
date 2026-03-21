@@ -1177,6 +1177,7 @@ def show_category_analysis():
                     ).dt.tz_convert("Asia/Bangkok").dt.strftime('%d/%m %H:%M')
 
                     # ── Scrollable container ──────────────────────────
+                    import html as html_lib
                     scroll_html = ""
                     for _, r in df_sample.iterrows():
                         result_cfg = {
@@ -1187,8 +1188,13 @@ def show_category_analysis():
                         preview_text = str(r.get('text') or r.get('title') or '').strip()
                         preview_text = preview_text[:200] + "…" if len(preview_text) > 200 else preview_text
                         preview_text = preview_text.replace('\n', ' ').replace('\r', '')
-                        import html as html_lib
                         preview_text = html_lib.escape(preview_text)
+
+                        # ✅ แก้ confidence NaN
+                        try:
+                            conf_display = f"{float(r.get('confidence', 0)):.1f}%"
+                        except (TypeError, ValueError):
+                            conf_display = "—"
 
                         raw_cat = str(r.get('category') or '').strip()
                         if raw_cat in ('', 'None', 'ไม่ระบุ'):
@@ -1220,7 +1226,7 @@ def show_category_analysis():
                             <span style="background:{result_cfg[0]};color:{result_cfg[1]};
                                         font-size:0.7rem;font-weight:800;padding:2px 8px;
                                         border-radius:99px;">{r.get('result', '')}</span>
-                            <span style="font-size:0.75rem;color:#64748B;">{r.get('confidence', 0):.1f}%</span>
+                            <span style="font-size:0.75rem;color:#64748B;">{conf_display}</span>
                             <span style="font-size:0.72rem;color:#94A3B8;">{r.get('timestamp', '')}</span>
                             </div>
                         </div>
@@ -1230,9 +1236,8 @@ def show_category_analysis():
                         </div>
                         </div>"""
 
-                    # ── Wrap ใน scroll container ──
                     st.markdown(f"""
-                    <div style="height:500px;overflow-y:auto;padding-right:6px;
+                    <div style="height:500px;overflow-y:auto;
                                 border:1px solid #E2E8F0;border-radius:12px;padding:12px;">
                     {scroll_html}
                     </div>""", unsafe_allow_html=True)
