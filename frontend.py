@@ -1242,6 +1242,163 @@ def show_category_analysis():
                 action="CATEGORY_ANALYSIS_ERROR",
                 details=str(e), level="ERROR"
             )
+def show_error_monitor():
+    """แสดงกราฟ Error Monitor จาก system_logs"""
+    st.markdown("""
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;
+    padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-top:14px;">
+    <div style="font-family:'IBM Plex Sans Thai',sans-serif;font-weight:700;
+    font-size:0.95rem;color:#1E293B;">🚨 Error Monitor</div>
+    <div style="font-size:0.79rem;color:#94A3B8;margin-bottom:16px;">
+    ติดตาม Error และ Warning ที่เกิดขึ้นในระบบ</div>
+    """, unsafe_allow_html=True)
+
+    supabase = db.get_supabase()
+    try:
+        # ดึง logs เฉพาะ ERROR และ WARNING
+        res = supabase.table("system_logs") \
+            .select("timestamp, action, details, level, user_id") \
+            .in_("level", ["ERROR", "WARNING"]) \
+            .order("timestamp", desc=True) \
+            .limit(500) \
+            .execute()
+
+        if not res.data:
+            st.info("ยังไม่มี Error/Warning ในระบบ 🎉")
+            st.markdown("</div>", unsafe_allow_html=True)
+            return
+
+        df_err = pd.DataFrame(res.data)
+        df_err['timestamp'] = pd.to_datetime(df_err['timestamp'], utc=True) \
+                                .dt.tz_convert("Asia/Bangkok")
+        df_err['date'] = df_err['timestamp'].dt.date
+        df_err['hour'] = df_err['timestamp'].dt.hour
+
+        # ── KPI ──────────────────────────────────────────────
+        n_error   = len(df_err[df_err['level'] == 'ERROR'])
+        n_warning = len(df_err[df_err['level'] == 'WARNING'])
+        n_total   = len(df_err)
+
+        # Error rate (เทียบกับ 7 วัน)
+        days_span = max((df_err['date'].max() - df_err['date'].min()).days, 1)
+        avg_per_day = round(n_total / days_span, 1)
+
+        is_normal = avg_per_day < 10  # threshold ปกติ
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: kpi_card("🚨", "Total Errors",   f"{n_error:,}",   "", False)
+        with c2: kpi_card("⚠️", "Total Warnings", f"{n_warning:,}", "", n_warning < 20)
+        with c3: kpi_card("📈", "Avg Error/Day",  f"{avg_per_day}",
+                          "✅ ปกติ" if is_normal else "⚠️ สูงกว่าปกติ", is_normal)
+        with c4: kpi_card("📋", "Total (500 ล่าสุด)", f"{n_total:,}")
+
+        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+
+        # ── กราฟ 1: Error/Warning รายวัน ──────────────────────
+        with col1:
+            st.markdown("""<div style="font-size:0.84rem;font-weight:700;
+            color:#334155;margin-bottom:8px;">📅 Error & Warning รายวัน</div>""",
+            unsafe_allow_html=True)
+
+            all_dates = sorted(df_err['date'].unique())
+            df_daily  = pd.DataFrame({'date': all_dates})
+
+            err_by_date  = df_err[df_err['level']=='ERROR'].groupby('date').size()
+            warn_by_date = df_err[df_err['level']=='WARNING'].groupby('date').size()
+
+            df_daily['Error']   = df_daily['date'].map(err_by_date).fillna(0).astype(int)
+            df_daily['Warning'] = df_daily['date'].map(warn_by_date).fillna(0).astype(int)
+            df_daily['date']    = pd.to_datetime(df_daily['date']).dt.strftime('%b %d')
+
+            fig1 = px.bar(
+                df_daily, x='date', y=['Error', 'Warning'],
+                barmode='stack',
+                color_discrete_map={'Error': '#DC2626', 'Warning': '#F59E0B'},
+                labels={'value': 'จำนวน', 'date': 'วันที่', 'variable': 'ประเภท'}
+            )
+            fig1.update_layout(
+                plot_bgcolor='white', paper_bgcolor='white',
+                font_color='#1E293B',
+                margin=dict(l=0, r=0, t=10, b=0),
+                xaxis=dict(tickfont=dict(color='#1E293B', size=10),
+                           title_font=dict(color='#1E293B'), tickangle=-30),
+                yaxis=dict(tickfont=dict(color='#1E293B', size=10),
+                           title="จำนวน", title_font=dict(color='#1E293B')),
+                legend=dict(orientation="h", y=-0.4, x=0.5, xanchor="center",
+                            font=dict(color='#1E293B')),
+                legend_title_text='', bargap=0.3
+            )
+            st.plotly_chart(fig1, width='stretch', key="err_daily")
+
+        # ── กราฟ 2: Error แยกตาม Action ──────────────────────
+        with col2:
+            st.markdown("""<div style="font-size:0.84rem;font-weight:700;
+            color:#334155;margin-bottom:8px;">🔍 Error แยกตามประเภท</div>""",
+            unsafe_allow_html=True)
+
+            df_action = df_err.groupby(['action', 'level']).size().reset_index(name='count')
+            df_action = df_action.sort_values('count', ascending=True)
+
+            color_map = {'ERROR': '#DC2626', 'WARNING': '#F59E0B'}
+            fig2 = px.bar(
+                df_action, x='count', y='action',
+                color='level', orientation='h',
+                color_discrete_map=color_map,
+                labels={'count': 'จำนวน', 'action': 'Action', 'level': 'ระดับ'},
+                text='count'
+            )
+            fig2.update_traces(textposition='outside', textfont_size=10)
+            fig2.update_layout(
+                plot_bgcolor='white', paper_bgcolor='white',
+                font_color='#1E293B',
+                margin=dict(l=0, r=30, t=10, b=0),
+                xaxis=dict(tickfont=dict(color='#1E293B', size=10),
+                           title_font=dict(color='#1E293B')),
+                yaxis=dict(tickfont=dict(color='#1E293B', size=10), title=""),
+                legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center",
+                            font=dict(color='#1E293B')),
+                legend_title_text=''
+            )
+            st.plotly_chart(fig2, width='stretch', key="err_by_action")
+
+        # ── ตาราง Error ล่าสุด ────────────────────────────────
+        st.markdown("""<div style="font-size:0.84rem;font-weight:700;
+        color:#334155;margin:12px 0 8px;">🕐 Error/Warning ล่าสุด</div>""",
+        unsafe_allow_html=True)
+
+        # Filter level
+        col_f1, col_f2 = st.columns([1, 3])
+        with col_f1:
+            lvl_filter = st.selectbox(
+                "ระดับ", ["ทั้งหมด", "ERROR", "WARNING"],
+                key="err_level_filter"
+            )
+
+        df_show = df_err.copy()
+        if lvl_filter != "ทั้งหมด":
+            df_show = df_show[df_show['level'] == lvl_filter]
+
+        df_show['timestamp'] = df_show['timestamp'].dt.strftime('%d/%m %H:%M')
+        df_show = df_show[['timestamp', 'level', 'action', 'details']].head(50)
+        df_show.columns = ['เวลา', 'ระดับ', 'Action', 'รายละเอียด']
+        df_show = df_show.reset_index(drop=True)
+        df_show.index += 1
+
+        st.dataframe(
+            df_show, width="stretch",
+            column_config={
+                'ระดับ': st.column_config.TextColumn('ระดับ', width='small'),
+                'Action': st.column_config.TextColumn('Action', width='medium'),
+                'รายละเอียด': st.column_config.TextColumn('รายละเอียด', width='large'),
+            }
+        )
+
+    except Exception as e:
+        st.error(f"โหลดข้อมูลไม่ได้: {e}")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 def show_model_performance():
     df_all = db.get_model_performance_data()
@@ -2611,6 +2768,7 @@ def show_system_analytics():
             legend_title_text=''
         )
         st.plotly_chart(fig_trend, width='stretch', key="fb_trend")
+        show_error_monitor()
 
 # ═══════════════════════════════════════════════════════
 #  ADMIN: Manage Users
