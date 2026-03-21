@@ -2202,7 +2202,6 @@ def manage_trending_news():
                         random_state=42
                     )
                 except ValueError:
-                    # ข้อมูลน้อยเกินไปสำหรับ stratify → split แบบธรรมดา
                     train_df, test_df = train_test_split(
                         df_final, test_size=0.2,
                         random_state=42
@@ -2217,7 +2216,6 @@ def manage_trending_news():
             total_after   = len(df_final)
             total_removed = total_before - total_after
 
-            # ── Summary card ──
             st.markdown(f"""
             <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;
                         padding:14px 18px;margin-bottom:10px;">
@@ -2304,7 +2302,6 @@ def manage_trending_news():
                     st.session_state[ekey] = False
                 ts = str(row.get('updated_at', '-')).replace("T", " ")[:16]
 
-                # ✅ ถ้ามีข่าวกำลัง edit อยู่ — ซ่อนข่าวอื่นทั้งหมด
                 if editing_id is not None and row['id'] != editing_id:
                     continue
 
@@ -2315,14 +2312,11 @@ def manage_trending_news():
                         "Unverified": ("#FEF3C7", "#92400E", "#F59E0B"),
                     }.get(row['label'], ("#F1F5F9", "#475569", "#CBD5E1"))
 
-                    # ✅ สร้าง image HTML ถ้ามีรูป
-                    
-                    # แก้ img_html ในส่วน view mode
                     img_html = ""
                     image_url = str(row.get("image_url") or "").strip()
                     if image_url and image_url != "None":
                         img_html = f'<img src="{image_url}" style="width:100%;height:220px;object-fit:contain;background:#F1F5F9;border-radius:10px;margin-bottom:14px;display:block;" />'
-                    # ✅ สร้าง category badge
+
                     cat = row.get('category') or 'ข่าวอื่นๆ'
 
                     st.markdown(f"""
@@ -2362,14 +2356,24 @@ def manage_trending_news():
                                 db.log_system_event(
                                     user_id=st.session_state.get('user_id'),
                                     action="DELETE_DATA",
-                                    details=f"Deleted trending ID {row['id']}",
+                                    details=(
+                                        f"ลบข่าวสำเร็จ id={row['id']} | "
+                                        f"headline='{str(row.get('headline',''))[:60]}' | "
+                                        f"label={row.get('label','')} | "
+                                        f"category={row.get('category','')}"
+                                    ),
                                     level="WARNING"
                                 )
                                 st.rerun()
+                            else:
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="DELETE_DATA_FAILED",
+                                    details=f"ลบข่าวล้มเหลว id={row['id']}",
+                                    level="ERROR"
+                                )
 
-    # ── Edit mode ──
                 else:
-                    # ✅ แสดง banner บอกว่ากำลัง edit ข่าวไหน
                     st.markdown(f"""
                     <div style="background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;
                                 padding:10px 14px;margin-bottom:12px;
@@ -2380,7 +2384,6 @@ def manage_trending_news():
 
                     eh = st.text_input("หัวข้อข่าว", value=row['headline'], key=f"h_{row['id']}")
                     ec = st.text_area("เนื้อหา", value=row['content'], height=120, key=f"c_{row['id']}")
-                    # ← เพิ่ม
                     e_url = st.text_input(
                         "🔗 ลิงค์แหล่งที่มา",
                         value=str(row.get('source_url') or ''),
@@ -2395,17 +2398,15 @@ def manage_trending_news():
                                         index=opts.index(row['label']) if row['label'] in opts else 0,
                                         key=f"l_{row['id']}")
                     with col2:
-                        # ✅ เพิ่ม category dropdown
                         CATEGORIES = [
-                    "นโยบายรัฐบาล-ข่าวสาร","ผลิตภัณฑ์สุขภาพ","การเงิน-หุ้น","ภัยพิบัติ",
-                    "ความสงบและความมั่นคง","ข่าวอื่นๆ","เศรษฐกิจ","ยาเสพติด",  
+                            "นโยบายรัฐบาล-ข่าวสาร","ผลิตภัณฑ์สุขภาพ","การเงิน-หุ้น","ภัยพิบัติ",
+                            "ความสงบและความมั่นคง","ข่าวอื่นๆ","เศรษฐกิจ","ยาเสพติด",
                         ]
                         cur_cat = row.get('category') or 'นโยบายรัฐบาล-ข่าวสาร'
                         edit_cat = st.selectbox("หมวดหมู่", CATEGORIES,
                                                 index=CATEGORIES.index(cur_cat) if cur_cat in CATEGORIES else 0,
                                                 key=f"cat_{row['id']}")
 
-                    # ✅ เพิ่ม upload รูปใหม่
                     if row.get('image_url'):
                         st.image(row['image_url'], width=150, caption="รูปปัจจุบัน")
                     edit_file = st.file_uploader("เปลี่ยนรูปภาพ (ถ้าต้องการ)",
@@ -2424,17 +2425,83 @@ def manage_trending_news():
                                         new_image_url = db.upload_image_to_supabase(
                                             edit_file.read(), edit_file.name
                                         )
+                                        if new_image_url:
+                                            db.log_system_event(
+                                                user_id=st.session_state.get('user_id'),
+                                                action="IMAGE_UPLOAD",
+                                                details=(
+                                                    f"อัปโหลดรูปสำเร็จ | "
+                                                    f"trending_id={row['id']} | "
+                                                    f"file={edit_file.name}"
+                                                ),
+                                                level="INFO"
+                                            )
+                                        else:
+                                            db.log_system_event(
+                                                user_id=st.session_state.get('user_id'),
+                                                action="IMAGE_UPLOAD_FAILED",
+                                                details=(
+                                                    f"อัปโหลดรูปล้มเหลว | "
+                                                    f"trending_id={row['id']} | "
+                                                    f"file={edit_file.name}"
+                                                ),
+                                                level="ERROR"
+                                            )
+
                                 db.update_trending(
                                     row['id'], eh, ec, el, edit_cat,
                                     new_image_url,
-                                    e_url.strip()   # ← เพิ่ม
+                                    e_url.strip()
                                 )
+
+                                # ✅ เปรียบเทียบว่าแก้ไขอะไรบ้าง
+                                changed = []
+                                if eh != row['headline']:
+                                    changed.append("headline")
+                                if ec != row['content']:
+                                    changed.append("content")
+                                if el != row['label']:
+                                    changed.append(f"label: {row['label']}→{el}")
+                                if edit_cat != (row.get('category') or ''):
+                                    changed.append(f"category: {row.get('category')}→{edit_cat}")
+                                if e_url.strip() != str(row.get('source_url') or ''):
+                                    changed.append("url")
+                                if new_image_url:
+                                    changed.append("image")
+
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="UPDATE_TRENDING",
+                                    details=(
+                                        f"แก้ไขข่าวสำเร็จ | "
+                                        f"id={row['id']} | "
+                                        f"headline='{eh[:40]}' | "
+                                        f"แก้ไข: {', '.join(changed) if changed else 'ไม่มีการเปลี่ยนแปลง'}"
+                                    ),
+                                    level="INFO"
+                                )
+
                                 st.session_state[ekey] = False
                                 st.rerun()
                             else:
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="UPDATE_TRENDING_FAILED",
+                                    details=(
+                                        f"บันทึกข่าวล้มเหลว — ข้อมูลไม่ครบ | "
+                                        f"id={row['id']}"
+                                    ),
+                                    level="WARNING"
+                                )
                                 st.warning("กรุณากรอกข้อมูลให้ครบ")
                     with sb:
                         if st.button("✕ ยกเลิก", key=f"x_{row['id']}", width='stretch'):
+                            db.log_system_event(
+                                user_id=st.session_state.get('user_id'),
+                                action="CANCEL_EDIT_TRENDING",
+                                details=f"ยกเลิกการแก้ไขข่าว id={row['id']}",
+                                level="INFO"
+                            )
                             st.session_state[ekey] = False
                             st.rerun()
 
@@ -2447,8 +2514,7 @@ def manage_trending_news():
         with st.form(f"add_news_{st.session_state['form_key']}", clear_on_submit=True):
             nh = st.text_input("หัวข้อข่าว", placeholder="พิมพ์พาดหัวข่าว...")
             nc = st.text_area("เนื้อหา", placeholder="รายละเอียดข่าวโดยย่อ...", height=120)
-            
-            # ← เพิ่ม URL field
+
             ns_url = st.text_input(
                 "🔗 ลิงค์แหล่งที่มา (ถ้ามี)",
                 placeholder="https://www.example.com/news/..."
@@ -2482,20 +2548,65 @@ def manage_trending_news():
                             image_url = db.upload_image_to_supabase(
                                 uploaded_file.read(), uploaded_file.name
                             )
+                            if image_url:
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="IMAGE_UPLOAD",
+                                    details=(
+                                        f"อัปโหลดรูปสำเร็จ (ข่าวใหม่) | "
+                                        f"file={uploaded_file.name}"
+                                    ),
+                                    level="INFO"
+                                )
+                            else:
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="IMAGE_UPLOAD_FAILED",
+                                    details=(
+                                        f"อัปโหลดรูปล้มเหลว (ข่าวใหม่) | "
+                                        f"file={uploaded_file.name}"
+                                    ),
+                                    level="ERROR"
+                                )
+
                     if db.create_trending(nh, nc, nl, nc_cat, image_url, ns_url.strip()):
+                        db.log_system_event(
+                            user_id=st.session_state.get('user_id'),
+                            action="CREATE_TRENDING",
+                            details=(
+                                f"เพิ่มข่าวใหม่สำเร็จ | "
+                                f"headline='{nh[:60]}' | "
+                                f"label={nl} | "
+                                f"category={nc_cat} | "
+                                f"has_url={'yes' if ns_url.strip() else 'no'} | "
+                                f"has_image={'yes' if image_url else 'no'}"
+                            ),
+                            level="INFO"
+                        )
                         st.success("✅ เพิ่มข่าวเรียบร้อย")
                         st.session_state['form_key'] += 1
                         time.sleep(0.7)
                         st.rerun()
                     else:
+                        db.log_system_event(
+                            user_id=st.session_state.get('user_id'),
+                            action="CREATE_TRENDING_FAILED",
+                            details=f"เพิ่มข่าวล้มเหลว | headline='{nh[:60]}'",
+                            level="ERROR"
+                        )
                         st.error("เกิดข้อผิดพลาด")
                 else:
+                    db.log_system_event(
+                        user_id=st.session_state.get('user_id'),
+                        action="CREATE_TRENDING_FAILED",
+                        details="เพิ่มข่าวล้มเหลว — ไม่กรอกหัวข้อหรือเนื้อหา",
+                        level="WARNING"
+                    )
                     st.markdown("""
                     <div style="background:#FFF5F5;border:1px solid #FCA5A5;border-radius:8px;
                                 padding:10px 14px;color:#991B1B;font-weight:600;font-size:0.88rem;">
                     ⚠️ กรุณากรอกหัวข้อและเนื้อหาให้ครบ
                     </div>""", unsafe_allow_html=True)
-
 # ═══════════════════════════════════════════════════════
 #  ADMIN: System Analytics
 # ═══════════════════════════════════════════════════════
@@ -2937,10 +3048,22 @@ def manage_users_page():
                     with c3:
                         st.write(""); st.write("")
                         if st.button("💾 บันทึก",type="primary"):
-                            if db.update_user_role_status(sid,nr,ns):
-                                db.log_system_event(user_id=st.session_state.get('user_id'),action="ROLE_UPDATE",details=f"User {sid}: role→{nr}, status→{ns}",level="WARNING")
+                            if db.update_user_role_status(sid, nr, ns):
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="ROLE_UPDATE",
+                                    details=f"User {sid}: role→{nr}, status→{ns}",
+                                    level="WARNING"
+                                )
                                 st.success("อัปเดตสำเร็จ!"); time.sleep(0.7); st.rerun()
-                            else: st.error("เกิดข้อผิดพลาด")
+                            else:
+                                db.log_system_event(
+                                    user_id=st.session_state.get('user_id'),
+                                    action="ROLE_UPDATE_FAILED",
+                                    details=f"แก้สิทธิ์ล้มเหลว user_id={sid} role={nr} status={ns}",
+                                    level="ERROR"
+                                )
+                                st.error("เกิดข้อผิดพลาด")
 
 
 # ═══════════════════════════════════════════════════════
@@ -2971,12 +3094,21 @@ if st.session_state['reset_mode']:
             with c1:
                 if st.button("ส่ง OTP",type="primary",width="stretch"):
                     if ei:
-                        with st.spinner("กำลังส่ง..."): ok,msg=db.send_otp_email(ei)
-                        if ok: 
+                        with st.spinner("กำลังส่ง..."): ok, msg = db.send_otp_email(ei)
+                        if ok:
+                            db.log_system_event(
+                                user_id=None, action="OTP_SENT",
+                                details=f"OTP ส่งสำเร็จ → {ei}", level="INFO"
+                            )
                             st.success(msg)
                             st.session_state.update({'otp_sent': True, 'reset_email_temp': ei})
-                            st.rerun()  # ✅ เพิ่มบรรทัดนี้
-                        else: st.error(msg)
+                            st.rerun()
+                        else:
+                            db.log_system_event(
+                                user_id=None, action="OTP_SEND_FAILED",
+                                details=f"ส่ง OTP ล้มเหลว → {ei} | {msg}", level="ERROR"
+                            )
+                            st.error(msg)
                     else: st.warning("กรุณากรอกอีเมล")
             with c2:
                 if st.button("← กลับ",width="stretch"):
@@ -3024,10 +3156,20 @@ if st.session_state['reset_mode']:
                         ok, msg = db.verify_otp_and_reset(
                             st.session_state['reset_email_temp'], oi, np)
                         if ok:
+                            db.log_system_event(
+                                user_id=None, action="PASSWORD_RESET_SUCCESS",
+                                details=f"รีเซ็ตรหัสผ่านสำเร็จ → {st.session_state['reset_email_temp']}",
+                                level="INFO"
+                            )
                             st.balloons(); st.success(msg); time.sleep(2)
                             st.session_state.update({'reset_mode': False, 'otp_sent': False})
                             st.rerun()
                         else:
+                            db.log_system_event(
+                                user_id=None, action="PASSWORD_RESET_FAILED",
+                                details=f"OTP ผิดหรือหมดอายุ → {st.session_state['reset_email_temp']} | {msg}",
+                                level="WARNING"
+                            )
                             st.error(msg)
             with c2:
                 if st.button("← ย้อนกลับ",width="stretch"):
@@ -3087,12 +3229,19 @@ elif st.session_state['register_mode']:
                     st.error("รหัสผ่านต้องมีตัวพิมพ์ใหญ่อย่างน้อย 1 ตัว")
                 elif not any(c.isdigit() for c in np):
                     st.error("รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว")
-                elif db.create_user(nu,np,ne):
-                    db.log_system_event(user_id=None, action="USER_REGISTER",
-                        details=f"New user registered: {nu} ({ne})", level="INFO")
+                elif db.create_user(nu, np, ne):
+                    db.log_system_event(
+                        user_id=None, action="USER_REGISTER",
+                        details=f"New user registered: {nu} ({ne})", level="INFO"
+                    )
                     st.success("สมัครสำเร็จ!"); time.sleep(1.2)
-                    st.session_state['register_mode']=False; st.rerun()
+                    st.session_state['register_mode'] = False; st.rerun()
                 else:
+                    db.log_system_event(
+                        user_id=None, action="REGISTER_FAILED",
+                        details=f"สมัครไม่ได้ — username/email ซ้ำ: {nu} ({ne})",
+                        level="WARNING"
+                    )
                     st.error("Username หรือ Email นี้มีผู้ใช้งานแล้ว")
         with b2:
             if st.button("← กลับ Login",width="stretch"):
@@ -4136,11 +4285,25 @@ colorObs.observe(window.parent.document.body,
                     st.markdown(f"<div style='font-size:0.92rem;font-weight:600;color:{co};padding:10px 0;'>{v}</div>",unsafe_allow_html=True)
             with eb:
                 if st.session_state.edit_email_mode:
-                    if st.button("Save",key="save_email",type="primary",width="stretch"):
-                        if not new_email.strip(): st.warning("กรุณากรอกอีเมล")
-                        elif db.update_user_email(uid,new_email):
-                            st.session_state.email=new_email; st.session_state.edit_email_mode=False; st.rerun()
-                        else: st.error("บันทึกไม่ได้")
+                    if st.button("Save", key="save_email", type="primary", width="stretch"):
+                        if not new_email.strip():
+                            st.warning("กรุณากรอกอีเมล")
+                        elif db.update_user_email(uid, new_email):
+                            db.log_system_event(
+                                user_id=uid, action="UPDATE_EMAIL",
+                                details=f"เปลี่ยน email → {new_email}",
+                                level="INFO"
+                            )
+                            st.session_state.email = new_email
+                            st.session_state.edit_email_mode = False
+                            st.rerun()
+                        else:
+                            db.log_system_event(
+                                user_id=uid, action="UPDATE_EMAIL_FAILED",
+                                details=f"แก้ email ล้มเหลว → {new_email}",
+                                level="ERROR"
+                            )
+                            st.error("บันทึกไม่ได้")
                     if st.button("✕",key="cancel_email",width="stretch"):
                         st.session_state.edit_email_mode=False; st.rerun()
                 else:
