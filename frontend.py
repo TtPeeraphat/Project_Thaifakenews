@@ -3485,10 +3485,11 @@ colorObs.observe(window.parent.document.body,
                                 level="INFO"
                             )
 
+                            # ✅ แก้ — เพิ่ม cat ตัวสุดท้าย
                             pid = db.create_prediction(
                                 st.session_state.get('user_id'),
                                 clean[:50] + "…", clean,
-                                input_url or None, rl, rc,
+                                input_url or None, rl, rc, cat,
                             )
                             db.save_feedback(pid, None)
                             st.session_state.update({
