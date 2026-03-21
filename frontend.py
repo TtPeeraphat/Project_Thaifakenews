@@ -21,6 +21,7 @@ from validators import InputValidator
 from validators import check_rate_limit, record_prediction_timestamp
 from ai_engine import classify_category_by_keyword as guess_category
 
+
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
