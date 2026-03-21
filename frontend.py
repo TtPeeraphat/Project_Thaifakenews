@@ -3738,27 +3738,23 @@ colorObs.observe(window.parent.document.body,
                             key="hist_filter_result"
                         )
                     with col_c:
-                        if 'category' in df.columns:
-                            # ✅ กรองค่าว่าง None nan ออกก่อนใส่ dropdown
-                            EMPTY_CATS = {"", "None", "nan", "none", "ไม่ระบุ", None}
-                            raw_cats = df['category'].dropna().unique().tolist()
-                            valid_cats = sorted([
-                                c for c in raw_cats
-                                if isinstance(c, str)
-                                and c.strip() != ""
-                                and c.strip() not in EMPTY_CATS
-                            ])
-                            cats = ["ทุกหมวดหมู่"] + valid_cats
-                        else:
-                            cats = ["ทุกหมวดหมู่"]
-
+                        cats = [
+                            "ทุกหมวดหมู่",
+                            "นโยบายรัฐบาล-ข่าวสาร",
+                            "ผลิตภัณฑ์สุขภาพ",
+                            "การเงิน-หุ้น",
+                            "ภัยพิบัติ",
+                            "ความสงบและความมั่นคง",
+                            "เศรษฐกิจ",
+                            "ยาเสพติด",
+                            "ข่าวอื่นๆ",
+                        ]
                         filter_cat = st.selectbox(
                             "หมวดหมู่",
                             cats,
                             label_visibility="collapsed",
                             key="hist_filter_cat"
                         )
-
                     # ── Apply filters ────────────────────────────────
                     if sq:
                         df = df[df['title'].str.contains(sq, case=False, na=False)]
