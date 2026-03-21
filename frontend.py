@@ -977,25 +977,29 @@ def show_admin_dashboard_enhanced():
         if 'timestamp' in df_perf.columns:
             df_perf['timestamp'] = pd.to_datetime(df_perf['timestamp'], utc=True).dt.tz_convert("Asia/Bangkok")
         df_perf = df_perf.sort_values('timestamp')
-        df_perf['cumulative_accuracy'] = df_perf['is_correct'].expanding().mean()*100
-        fig = px.line(df_perf, x='timestamp', y='cumulative_accuracy',
-                    line_shape='spline', color_discrete_sequence=['#1565C0'])
-        fig.update_layout(
-            yaxis_range=[0,100],
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            font_color='#1E293B',        # ✅ เข้มขึ้น
-            font=dict(size=12),
-            margin=dict(l=0,r=0,t=10,b=0),
-            xaxis_title="",
-            yaxis_title="Accuracy (%)",
-            xaxis=dict(tickfont=dict(color='#1E293B', size=11)),
-            yaxis=dict(tickfont=dict(color='#1E293B', size=11),
-                    title_font=dict(color='#1E293B')),
-        )
-        st.plotly_chart(fig, width="stretch")
-    else:
-        st.info("ยังไม่มีข้อมูลที่ผ่านการตรวจสอบ")
+        df_ev = db.get_evaluated_data()
+        if not df_ev.empty and 'status' in df_ev.columns and 'prediction' in df_ev.columns:
+                df_ev = df_ev[df_ev['status'].isin(['Real','Fake'])].copy()
+                if 'timestamp' in df_ev.columns:
+                    df_ev['timestamp'] = pd.to_datetime(df_ev['timestamp'], utc=True).dt.tz_convert("Asia/Bangkok")
+                df_ev = df_ev.sort_values('timestamp')
+                df_ev['is_correct'] = df_ev['status'] == df_ev['prediction']
+                df_ev['cumulative_accuracy'] = df_ev['is_correct'].expanding().mean() * 100
+                fig = px.line(df_ev, x='timestamp', y='cumulative_accuracy',
+                            line_shape='spline', color_discrete_sequence=['#1565C0'])
+                fig.update_layout(
+                    yaxis_range=[0,100],
+                    plot_bgcolor='white', paper_bgcolor='white',
+                    font_color='#1E293B',
+                    margin=dict(l=0,r=0,t=10,b=0),
+                    xaxis_title="", yaxis_title="Accuracy (%)",
+                    xaxis=dict(tickfont=dict(color='#1E293B', size=11)),
+                    yaxis=dict(tickfont=dict(color='#1E293B', size=11),
+                            title_font=dict(color='#1E293B')),
+                )
+                st.plotly_chart(fig, width="stretch")
+        else:
+                st.info("ยังไม่มีข้อมูลที่ Admin ตรวจสอบแล้ว")
         
 def show_category_analysis():
         """วิเคราะห์ความแม่นยำและการกระจายของ Category"""
@@ -1127,20 +1131,27 @@ def show_category_analysis():
                         .limit(10) \
                         .execute()
                         # แทนที่แค่ 5 บรรทัดนี้
-            if top_cat in ("ไม่ระบุ", "", None):
-                res2 = supabase.table('predictions') \
-                            .select('title, text, category, result, confidence, timestamp') \
-                            .or_('category.is.null,category.eq.') \
-                            .order('timestamp', desc=True) \
-                            .limit(10) \
-                            .execute()
+            # ✅ แก้ — ดึงทั้งหมดแล้วกรองฝั่ง Python แทน
+            res2 = supabase.table('predictions') \
+                        .select('title, text, category, result, confidence, timestamp') \
+                        .order('timestamp', desc=True) \
+                        .limit(100) \
+                        .execute()
+
+            if res2.data:
+                if top_cat in ("ไม่ระบุ", "", None):
+                    filtered_data = [
+                        r for r in res2.data
+                        if not r.get('category') or r.get('category') in ('', 'None', 'ไม่ระบุ')
+                    ][:10]
+                else:
+                    filtered_data = [
+                        r for r in res2.data
+                        if r.get('category') == top_cat
+                    ][:10]
+                res2_data = filtered_data
             else:
-                res2 = supabase.table('predictions') \
-                            .select('title, text, category, result, confidence, timestamp') \
-                            .eq('category', top_cat) \
-                            .order('timestamp', desc=True) \
-                            .limit(10) \
-                            .execute()
+                res2_data = []
 
             if res2.data:
                 df_sample = pd.DataFrame(res2.data)
@@ -2338,9 +2349,10 @@ def show_system_analytics():
             labels={'value': 'จำนวน', 'Date': 'วันที่', 'variable': 'ประเภท'})
         # ✅ Daily Usage chart
         fig1.update_layout(
+            
             margin=dict(l=0,r=0,t=0,b=0),
             plot_bgcolor='white', paper_bgcolor='white',
-            font_color='#334155',
+            font_color="#000000",
             xaxis_title="วันที่",        # ✅ เพิ่ม
             yaxis_title="จำนวน (ครั้ง)", # ✅ เพิ่ม
             legend=dict(orientation="h", y=-0.35, x=0.5, xanchor="center"),
@@ -2393,7 +2405,7 @@ def show_system_analytics():
             xaxis_title="ชั่วโมง",         # ✅ เพิ่ม
             yaxis_title="จำนวนการตรวจ",    # ✅ เพิ่ม
             plot_bgcolor='white', paper_bgcolor='white',
-            font_color='#334155', bargap=0.35
+            font_color="#000000", bargap=0.35
         )
     fig3.update_traces(marker_line_width=0)
     st.plotly_chart(fig3,width="stretch",key="hour_chart")
