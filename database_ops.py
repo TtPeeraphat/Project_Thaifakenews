@@ -372,41 +372,27 @@ def get_evaluated_data():
 def get_model_performance_data():
     supabase = get_supabase()
     try:
-        # ✅ ดึงทุก status ที่ไม่ใช่ pending
-        res = supabase.table('feedbacks').select('''
-            user_report, status,
-            predictions!fk_prediction(result, confidence, timestamp)
-        ''').in_('status', ['Real', 'Fake', 'Ignored']).execute()
+        # ✅ ดึงจาก predictions โดยตรง — ไม่ filter ตาม user หรือ feedback status
+        res = supabase.table('predictions') \
+                      .select('result, confidence, timestamp') \
+                      .order('timestamp', desc=True) \
+                      .limit(500) \
+                      .execute()
 
         if not res.data:
             return pd.DataFrame()
 
         processed_data = []
         for item in res.data:
-            pred = item.get('predictions')
-            if not pred: continue
-
-            ai_pred  = str(pred.get('result', '')).capitalize()
-            user_rep = str(item.get('user_report', '')).lower()
-            status   = str(item.get('status', ''))
-
-            # ✅ ใช้ status จาก Admin ถ้ามี ไม่งั้นใช้ user_report
-            if status in ['Real', 'Fake']:
-                true_label = status
-                is_correct = (ai_pred == status)
-            elif user_rep == 'correct':
-                true_label = ai_pred
-                is_correct = True
-            else:
-                true_label = 'Fake' if ai_pred == 'Real' else 'Real'
-                is_correct = False
-
+            ai_pred = str(item.get('result', '')).capitalize()
+            if ai_pred not in ('Real', 'Fake'):
+                continue
             processed_data.append({
-                'timestamp':  pred.get('timestamp'),
+                'timestamp':  item.get('timestamp'),
                 'prediction': ai_pred,
-                'confidence': pred.get('confidence'),
-                'label':      true_label,
-                'is_correct': is_correct
+                'confidence': item.get('confidence'),
+                'label':      ai_pred,   # ยังไม่มี ground truth
+                'is_correct': None       # รอ Admin review
             })
 
         df = pd.DataFrame(processed_data)

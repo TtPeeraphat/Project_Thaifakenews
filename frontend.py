@@ -1169,6 +1169,14 @@ def show_category_analysis():
                         {str(r.get('title',''))[:60]}
                         </span>
                         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                        
+                        <!-- ✅ เพิ่ม category badge -->
+                        <span style="background:#EFF6FF;color:#1148A8;
+                                    font-size:0.7rem;font-weight:700;padding:2px 8px;
+                                    border-radius:99px;border:1px solid #BFDBFE;">
+                            📂 {str(r.get('category') or 'ไม่ระบุ')}
+                        </span>
+
                         <span style="background:{result_cfg[0]};color:{result_cfg[1]};
                                     font-size:0.7rem;font-weight:800;padding:2px 8px;
                                     border-radius:99px;">{r.get('result','')}</span>
@@ -1185,8 +1193,6 @@ def show_category_analysis():
                         {preview_text}
                     </div>
                     </div>""", unsafe_allow_html=True)
-            else:
-                st.info("ไม่มีตัวอย่าง")
 
         except Exception as e:
             st.error(f"โหลดข้อมูลไม่ได้: {e}")
@@ -1207,9 +1213,9 @@ def show_model_performance():
     total = len(df_all)
     if 'confidence' in df_all.columns:
         df_all['confidence'] = pd.to_numeric(df_all['confidence'], errors='coerce')
-    avg_c = df_all['confidence'].mean()
-    fc = len(df_all[df_all['prediction']=='Fake'])
-    rc = len(df_all[df_all['prediction']=='Real'])
+        avg_c = df_all['confidence'].mean()
+        fc    = len(df_all[df_all['prediction'] == 'Fake'])
+        rc    = len(df_all[df_all['prediction'] == 'Real'])
 
 
     c1,c2,c3,c4 = st.columns(4)
