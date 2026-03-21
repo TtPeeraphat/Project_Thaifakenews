@@ -1170,7 +1170,7 @@ def show_category_analysis():
                         </span>
                         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
                         
-                        <!-- ✅ เพิ่ม category badge -->
+                        
                         <span style="background:#EFF6FF;color:#1148A8;
                                     font-size:0.7rem;font-weight:700;padding:2px 8px;
                                     border-radius:99px;border:1px solid #BFDBFE;">
