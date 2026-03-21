@@ -3530,19 +3530,29 @@ colorObs.observe(window.parent.document.body,
                                 df['timestamp']
                             ).dt.strftime('%d %b %Y, %H:%M')
 
+                        # ✅ เพิ่ม category ใน rmap
                         rmap = {
                             'title':      'หัวข้อข่าว',
                             'result':     'ผลลัพธ์',
                             'confidence': 'ความมั่นใจ (%)',
-                            'category':   'หมวดหมู่',
+                            'category':   'หมวดหมู่',       # ✅ เพิ่ม
                             'timestamp':  'วันที่-เวลา',
                         }
                         vc  = [c for c in rmap if c in df.columns]
                         dfd = df[vc].rename(columns=rmap).reset_index(drop=True)
                         dfd.index = dfd.index + 1
 
+                        # ✅ fillna ให้ column หมวดหมู่
+                        if 'หมวดหมู่' in dfd.columns:
+                            dfd['หมวดหมู่'] = dfd['หมวดหมู่'].fillna('ไม่ระบุ')
+
                         st.caption(f"พบ {len(dfd)} รายการ")
-                        st.dataframe(dfd, width="stretch")
+                        st.dataframe(dfd, width="stretch",
+                            column_config={
+                                'หมวดหมู่': st.column_config.TextColumn('หมวดหมู่', width='medium'),
+                                'ความมั่นใจ (%)': st.column_config.NumberColumn('ความมั่นใจ (%)', format="%.2f"),
+                            }
+                        )
                     else:
                         st.warning("ไม่พบผลลัพธ์ที่ตรงกับเงื่อนไข")
                 else:

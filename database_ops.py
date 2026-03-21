@@ -254,7 +254,7 @@ def get_user_history(user_id: Any, limit: int = 50):
         if user_id is None:
             return []
         response = supabase.table("predictions") \
-            .select("id, user_id, title, text, result, confidence, timestamp") \
+            .select("id, user_id, title, text, result, confidence, category, timestamp") \
             .eq("user_id", user_id) \
             .order("timestamp", desc=True) \
             .limit(limit).execute()
