@@ -2540,6 +2540,14 @@ def show_system_analytics():
             yaxis_title="จำนวนการตรวจ",    # ✅ เพิ่ม
             plot_bgcolor='white', paper_bgcolor='white',
             font_color="#000000", bargap=0.35
+            xaxis=dict(
+                    tickfont=dict(color='#1E293B', size=12),
+                    title_font=dict(color='#1E293B'),
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='#1E293B', size=12),
+                    title_font=dict(color='#1E293B'),
+                ),
         )
     fig3.update_traces(marker_line_width=0)
     st.plotly_chart(fig3,width="stretch",key="hour_chart")
