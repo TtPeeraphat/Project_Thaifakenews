@@ -3485,21 +3485,66 @@ colorObs.observe(window.parent.document.body,
             if uid:
                 hist=db.get_user_history(uid)
                 if hist:
-                    df=pd.DataFrame(hist); df.columns=[c.lower() for c in df.columns]
-                    sq = st.text_input("ค้นหาหัวข้อข่าว", "", placeholder="🔍 ค้นหาหัวข้อข่าว...", label_visibility="collapsed")
-                    if sq: df=df[df['title'].str.contains(sq,case=False,na=False)]
+                    df=pd.DataFrame(hist)
+                    df.columns=[c.lower() for c in df.columns]
+
+                    # ── Filter bar ──────────────────────────────────
+                    col_s, col_r, col_c = st.columns([3, 1, 1])
+                    with col_s:
+                        sq = st.text_input("ค้นหาหัวข้อข่าว", "",
+                            placeholder="🔍 ค้นหาหัวข้อข่าว...",
+                            label_visibility="collapsed")
+                    with col_r:
+                        filter_result = st.selectbox(
+                            "ผลลัพธ์",
+                            ["ทั้งหมด", "Real", "Fake"],
+                            label_visibility="collapsed",
+                            key="hist_filter_result"
+                        )
+                    with col_c:
+                        # ดึง category จาก DB ถ้ามี column นั้น
+                        if 'category' in df.columns:
+                            cats = ["ทุกหมวดหมู่"] + sorted(
+                                df['category'].dropna().unique().tolist()
+                            )
+                        else:
+                            cats = ["ทุกหมวดหมู่"]
+                        filter_cat = st.selectbox(
+                            "หมวดหมู่",
+                            cats,
+                            label_visibility="collapsed",
+                            key="hist_filter_cat"
+                        )
+
+                    # ── Apply filters ────────────────────────────────
+                    if sq:
+                        df = df[df['title'].str.contains(sq, case=False, na=False)]
+                    if filter_result != "ทั้งหมด":
+                        df = df[df['result'] == filter_result]
+                    if filter_cat != "ทุกหมวดหมู่" and 'category' in df.columns:
+                        df = df[df['category'] == filter_cat]
+
                     if not df.empty:
                         if 'timestamp' in df.columns:
-                            df['timestamp']=pd.to_datetime(df['timestamp']).dt.strftime('%d %b %Y, %H:%M')
-                        rmap={'title':'หัวข้อข่าว','result':'ผลลัพธ์','confidence':'ความมั่นใจ (%)','timestamp':'วันที่-เวลา'}
-                        vc=[c for c in rmap if c in df.columns]
-                        dfd = df[vc].rename(columns=rmap)
-                        dfd = dfd.reset_index(drop=True)
+                            df['timestamp'] = pd.to_datetime(
+                                df['timestamp']
+                            ).dt.strftime('%d %b %Y, %H:%M')
+
+                        rmap = {
+                            'title':      'หัวข้อข่าว',
+                            'result':     'ผลลัพธ์',
+                            'confidence': 'ความมั่นใจ (%)',
+                            'category':   'หมวดหมู่',
+                            'timestamp':  'วันที่-เวลา',
+                        }
+                        vc  = [c for c in rmap if c in df.columns]
+                        dfd = df[vc].rename(columns=rmap).reset_index(drop=True)
                         dfd.index = dfd.index + 1
+
                         st.caption(f"พบ {len(dfd)} รายการ")
                         st.dataframe(dfd, width="stretch")
                     else:
-                        st.warning(f"ไม่พบผลลัพธ์สำหรับ '{sq}'")
+                        st.warning("ไม่พบผลลัพธ์ที่ตรงกับเงื่อนไข")
                 else:
                     st.markdown("""
                     <div style="text-align:center;padding:64px 20px;">
