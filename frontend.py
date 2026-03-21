@@ -1460,7 +1460,12 @@ def show_model_performance():
     # ── แถว 1: ภาพรวม ──
         section_title("📊 ภาพรวม")
         c1, c2 = st.columns(2)
-        with c1: st.metric("Overall Accuracy", f"{acc*100:.1f}%"); st.progress(sp(acc))
+        with c1:
+            st.metric(
+                label="User Approval Rate",
+                value=f"{acc*100:.1f}%",
+                help="คำนวณจาก feedback ที่ผู้ใช้ให้ — ไม่ใช่ test accuracy จริง"
+            );st.progress(sp(acc))
         with c2: st.metric("F1 Score (Fake)", f"{f1_fake*100:.1f}%"); st.progress(sp(f1_fake))
 
     # ── แถว 2: Fake ──

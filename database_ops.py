@@ -367,44 +367,34 @@ def save_feedback(prediction_id, user_report, comment="") -> bool:
 def get_pending_feedbacks() -> List[dict]:
     supabase = get_supabase()
     try:
-        res_f = supabase.table("feedbacks") \
-                        .select("id, prediction_id, user_report, comment, status, timestamp") \
-                        .execute()
-        feedbacks = res_f.data or []
-        if not feedbacks:
-            return []
-
-        fb_map = {}
-        for fb in feedbacks:
-            if not isinstance(fb, dict) or fb.get("id") is None:
-                continue
-            pid = str(fb.get("prediction_id"))
-            fb_map[pid] = fb
-
-        res_p = supabase.table("predictions").select("*").execute()
-        predictions = res_p.data or []
+        res = supabase.table("feedbacks") \
+            .select(
+                "id, prediction_id, user_report, comment, status, timestamp, "
+                "predictions!fk_prediction(id, title, text, result, confidence, category, url, timestamp)"
+            ) \
+            .order("timestamp", desc=True) \
+            .execute()
 
         result_list = []
-        for pred in predictions:
-            if not isinstance(pred, dict):
+        for item in (res.data or []):
+            if not isinstance(item, dict):
                 continue
-            pid = str(pred.get("id"))
-            fb  = fb_map.get(pid)
-            if fb is None or fb.get("id") is None:
+            pred = item.get("predictions")
+            if not pred or not isinstance(pred, dict):
                 continue
             result_list.append({
-                "feedback_id":   fb.get("id"),
-                "prediction_id": pid,
+                "feedback_id":   item.get("id"),
+                "prediction_id": item.get("prediction_id"),
                 "title":         pred.get("title", "No Title"),
                 "text":          pred.get("text", ""),
                 "ai_result":     pred.get("result", "Unknown"),
                 "ai_confidence": pred.get("confidence", 0),
                 "category":      pred.get("category", "ไม่ระบุ"),
                 "url":           pred.get("url", ""),
-                "user_report":   fb.get("user_report"),
-                "user_comment":  fb.get("comment", ""),
+                "user_report":   item.get("user_report"),
+                "user_comment":  item.get("comment", ""),
                 "timestamp":     pred.get("timestamp"),
-                "status":        fb.get("status", "pending"),
+                "status":        item.get("status", "pending"),
             })
         return result_list
     except Exception as e:
@@ -552,8 +542,29 @@ def upload_image_to_supabase(file_bytes: bytes, filename: str) -> str:
 # ─────────────────────────────────────────────────────────────
 # 🔐 5. PASSWORD RESET OTP
 # ─────────────────────────────────────────────────────────────
+# ---- Rate limit state (in-memory, simple) ----
+_otp_request_log: dict[str, list[datetime]] = {}
+OTP_MAX_REQUESTS_PER_HOUR = 5
+
+def _check_otp_rate_limit(email: str) -> tuple[bool, str]:
+    """ป้องกัน brute-force ขอ OTP ซ้ำเกินไป"""
+    now = datetime.now(timezone.utc)
+    one_hour_ago = now - timedelta(hours=1)
+    timestamps = _otp_request_log.get(email, [])
+    recent = [t for t in timestamps if t > one_hour_ago]
+    _otp_request_log[email] = recent  # prune เก่าออก
+
+    if len(recent) >= OTP_MAX_REQUESTS_PER_HOUR:
+        return False, f"ขอ OTP เกิน {OTP_MAX_REQUESTS_PER_HOUR} ครั้ง/ชม. กรุณารอ"
+    _otp_request_log[email] = recent + [now]
+    return True, ""
 
 def send_otp_email(to_email: str) -> Tuple[bool, str]:
+    # ✅ เพิ่ม: เช็ค rate limit ก่อนทำอะไรทั้งนั้น
+    allowed, rate_msg = _check_otp_rate_limit(to_email)
+    if not allowed:
+        return False, rate_msg
+
     supabase = get_supabase()
     try:
         user_check = supabase.table("users").select("id").eq("email", to_email).execute()
@@ -562,14 +573,16 @@ def send_otp_email(to_email: str) -> Tuple[bool, str]:
     except Exception as e:
         return False, f"Check Email Error: {e}"
 
-    otp = "".join(random.choices(string.digits, k=6))
-
-    # ✅ บันทึก OTP ลง DB ก่อนส่งอีเมล
+    otp        = "".join(random.choices(string.digits, k=6))
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
     try:
-        supabase.table("users").update({"reset_token": otp}).eq("email", to_email).execute()
+        supabase.table("users").update({
+            "reset_token":            otp,
+            "reset_token_expires_at": expires_at,
+            "reset_token_attempts":   0,
+        }).eq("email", to_email).execute()
     except Exception as e:
         return False, f"Database Error: {e}"
-
     try:
         import streamlit as st
         sender_email    = st.secrets.get("GMAIL_EMAIL", "") or str(config.email.sender_email).strip()
@@ -583,7 +596,8 @@ def send_otp_email(to_email: str) -> Tuple[bool, str]:
 
     msg = MIMEText(
         f"รหัส OTP ของคุณคือ: {otp}\n\n"
-        "กรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่",
+        "กรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่\n"
+        "รหัสนี้มีอายุ 15 นาที",   # ✅ เพิ่ม: แจ้ง user ด้วย
         "plain",
         "utf-8"
     )
@@ -591,36 +605,71 @@ def send_otp_email(to_email: str) -> Tuple[bool, str]:
     msg["From"]    = sender_email
     msg["To"]      = to_email
 
+    smtp_host = str(config.email.smtp_host).strip()
+    smtp_port = int(config.email.smtp_port)
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_email, msg.as_string())
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+                server.login(sender_email, sender_password)
+                server.sendmail(sender_email, to_email, msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(sender_email, sender_password)
+                server.sendmail(sender_email, to_email, msg.as_string())
         return True, "✅ ส่งรหัส OTP ไปที่อีเมลแล้ว"
     except Exception as e:
         return False, f"❌ ส่งอีเมลไม่สำเร็จ: {e}"
+
+
+# ✅ ใหม่
+MAX_OTP_ATTEMPTS = 5
 
 def verify_otp_and_reset(email: str, otp: str, new_password: str) -> Tuple[bool, str]:
     supabase = get_supabase()
     try:
         response = supabase.table("users") \
-            .select("id") \
+            .select("id, reset_token, reset_token_expires_at, reset_token_attempts") \
             .eq("email", email) \
-            .eq("reset_token", otp) \
             .execute()
-        if not response.data or len(response.data) == 0:
-            return False, "❌ รหัส OTP ไม่ถูกต้อง หรือหมดอายุ"
 
-        # ✅ bcrypt แทน sha256
+        if not response.data:
+            return False, "❌ ไม่พบอีเมลนี้ในระบบ"
+
+        user       = response.data[0]
+        stored_otp = user.get("reset_token")
+        expires_at = user.get("reset_token_expires_at")
+        attempts   = int(user.get("reset_token_attempts") or 0)
+
+        if attempts >= MAX_OTP_ATTEMPTS:
+            return False, "❌ พยายามกรอก OTP เกิน 5 ครั้ง กรุณาขอรหัสใหม่"
+
+        supabase.table("users").update({"reset_token_attempts": attempts + 1}).eq("email", email).execute()
+
+        if stored_otp != otp:
+            remaining = MAX_OTP_ATTEMPTS - (attempts + 1)
+            return False, f"❌ รหัส OTP ไม่ถูกต้อง (เหลือ {remaining} ครั้ง)"
+
+        if expires_at:
+            try:
+                exp_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) > exp_dt:
+                    return False, "❌ รหัส OTP หมดอายุแล้ว กรุณาขอรหัสใหม่"
+            except ValueError:
+                pass
+
         new_pw_hash = hash_password(new_password)
         supabase.table("users").update({
-            "password_hash": new_pw_hash,
-            "reset_token":   None,
+            "password_hash":           new_pw_hash,
+            "reset_token":             None,
+            "reset_token_expires_at":  None,
+            "reset_token_attempts":    0,
         }).eq("email", email).execute()
 
         return True, "✅ เปลี่ยนรหัสผ่านสำเร็จ! กรุณาล็อกอินใหม่"
     except Exception as e:
         return False, f"Reset Error: {e}"
-
 
 # ─────────────────────────────────────────────────────────────
 # 📝 6. SYSTEM LOGGING
@@ -690,7 +739,7 @@ def get_dashboard_kpi() -> dict:
     supabase = get_supabase()
     now_utc   = datetime.now(timezone.utc)
     last_24h  = (now_utc - timedelta(hours=24)).isoformat()
-    stats     = {"checks_today": 0, "active_users": 0, "accuracy": 0.0, "feedback_total": 0}
+    stats = {"checks_today": 0, "active_users": 0, "feedback_total": 0, "user_approval_rate": 0.0}
     try:
         res_checks = supabase.table("predictions").select("id", count="exact").gte("timestamp", last_24h).execute()
         stats["checks_today"] = res_checks.count or 0
@@ -705,10 +754,12 @@ def get_dashboard_kpi() -> dict:
         fb_list = res_fb.data or []
         stats["feedback_total"] = len(fb_list)
         if stats["feedback_total"] > 0:
-            correct = sum(1 for i in fb_list if
-                          str(i.get("user_report", "")).lower() == "correct" or
-                          str(i.get("status", "")).lower() == "verified_correct")
-            stats["accuracy"] = round(correct / stats["feedback_total"] * 100, 1)
+                correct = sum(1 for i in fb_list if
+                            str(i.get("user_report", "")).lower() == "correct" or
+                            str(i.get("status", "")).lower() == "verified_correct")
+                stats["user_approval_rate"] = round(correct / stats["feedback_total"] * 100, 1)
+        else:
+                stats["user_approval_rate"] = 0.0
         return stats
     except Exception as e:
         logger.error("KPI Error: %s", e)

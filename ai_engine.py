@@ -13,9 +13,10 @@ from torch_geometric.data import Data
 from transformers import AutoTokenizer, AutoModel
 from sklearn.neighbors import NearestNeighbors
 
-from model_def import GCNNet             # ✅ import จาก model_def
+
 from text_preprocessor import TextPreprocessor   # ✅ import class
 from embed_utils import embed_text
+from model_def import GraphSAGENet
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +78,12 @@ def load_model_pipeline() -> Dict[str, Any]:
         if not os.path.exists(MODEL_PATH):
             raise FileNotFoundError(f"ไม่พบ: {MODEL_PATH}")
 
-        model = GCNNet(
-            in_channels=768, hidden_channels=256,
-            out_channels=2, dropout_rate=0.4
-        ).to(device)
+        model = GraphSAGENet(
+                in_channels=768,
+                hidden_channels=256,
+                out_channels=2,
+                dropout_rate=0.4
+            ).to(device)
         model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
         model.eval()
 
@@ -111,7 +114,7 @@ def get_pipeline() -> Dict[str, Any]:
 # ============================================================================
 # 4. ✅ IMPROVED: PREDICTION WITH PROPER ERROR HANDLING
 # ============================================================================
-from torch_geometric.data import Data
+
 
 def predict_news(text: str, pipeline: Dict[str, Any]) -> Dict[str, Any]:
     if not text or not isinstance(text, str):

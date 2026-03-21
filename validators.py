@@ -16,6 +16,10 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import streamlit as st
+# validators.py — rate limit เก็บใน Supabase (เลี่ยงไม่ได้)
+from database_ops import get_supabase
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -160,33 +164,18 @@ class InputValidator:
             if thai_ratio < 0.4:
                 warning += "Text contains many non-Thai characters. "
 
-        # -------------------------
-        # Character repetition
-        # -------------------------
+        # # Character repetition (ระดับเดียวกับ Suspicious patterns)
+        char_counts = Counter(text)   # Counter import ไว้บนสุดไฟล์แล้ว ไม่ต้อง import ซ้ำ
+        text_len    = len(text)
+        for char, count in char_counts.items():
+            ratio = count / text_len
+            if ratio > 0.5 and char not in " \n\t-:,.":
+                return ValidationResult(False, f"ตัวอักษร '{char}' ซ้ำกันมากเกินไป (สัดส่วน {ratio:.0%})")
 
-        # validators.py — O(N) ด้วย Counter
-            from collections import Counter
-
-            # แทนที่ loop เดิมด้วย
-            char_counts = Counter(text)          # O(N) ครั้งเดียว
-            text_len    = len(text)
-
-            for char, count in char_counts.items():
-                ratio = count / text_len
-                if ratio > 0.5 and char not in " \n\t-:,.":
-                    return ValidationResult(
-                        False,
-                        f"ตัวอักษร '{char}' ซ้ำกันมากเกินไป (สัดส่วน {ratio:.0%})"
-                    )
-
-        # -------------------------
         # Suspicious patterns
-        # -------------------------
-
-        for pattern, reason in InputValidator.SUSPICIOUS_PATTERNS:
+        for pattern, reason in InputValidator.SUSPICIOUS_PATTERNS:  
             if pattern.search(text):
                 return ValidationResult(False, f"Suspicious pattern: {reason}")
-
         # -------------------------
         # SQL Injection
         # -------------------------
@@ -370,15 +359,8 @@ class InputValidator:
 
         return ValidationResult(True, warning_message=warning.strip())
 
-# validators.py — rate limit เก็บใน Supabase (เลี่ยงไม่ได้)
-from database_ops import get_supabase
-import logging
 
-logger = logging.getLogger(__name__)
 
-RATE_LIMIT_PER_MINUTE = 5
-RATE_LIMIT_PER_HOUR   = 30
-COOLDOWN_SECONDS      = 3
 
 
 def check_rate_limit(user_id: int) -> tuple[bool, str]:
@@ -438,13 +420,9 @@ def check_rate_limit(user_id: int) -> tuple[bool, str]:
 
         # ตรวจ per-minute limit
         one_minute_ago = now - timedelta(minutes=1)
-        recent = [t for t in timestamps
-                  if t.replace(tzinfo=TZ_BKK) > one_minute_ago
-                  if t.tzinfo is None]
-        recent_aware = [t for t in timestamps if t > one_minute_ago]
-
+        recent_aware   = [t for t in timestamps if t > one_minute_ago]
         if len(recent_aware) >= RATE_LIMIT_PER_MINUTE:
-            return False, "⚠️ วิเคราะห์เร็วเกินไป กรุณารอสักครู่"
+            return False, "⚠️ วิเคราะห์เร็วเกินไป"
 
         return True, ""
 

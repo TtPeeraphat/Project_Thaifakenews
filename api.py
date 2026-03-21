@@ -14,9 +14,9 @@ from pydantic import BaseModel, field_validator
 from torch_geometric.data import Data
 from sklearn.neighbors import NearestNeighbors
 from transformers import AutoTokenizer, AutoModel
-
+from model_def import GraphSAGENet
 # ✅ import GCNNet จาก model_def — ไม่นิยามซ้ำ
-from model_def import GCNNet
+
 from embed_utils import embed_text
 from validators import InputValidator
 from text_preprocessor import TextPreprocessor
@@ -59,25 +59,23 @@ try:
     resources['artifacts'] = artifacts
 
     # kNN
-    k = min(10, len(artifacts['x_np']))
+    k = int(artifacts.get('k', 10))
+    k = min(k, len(artifacts['x_np']))
+    resources['k'] = k
     resources['nbrs_engine'] = NearestNeighbors(
         n_neighbors=k, metric='cosine'
     ).fit(artifacts['x_np'])
 
     # BERT
     resources['tokenizer']  = AutoTokenizer.from_pretrained(MODEL_NAME)
-    resources['bert_model'] = AutoModel.from_pretrained(MODEL_NAME).to(device)
+    resources['bert_model'] = AutoModel.from_pretrained(MODEL_NAME).to(device).eval()
+
 
     # ✅ GCN — ใช้ parameter ที่ถูกต้องจาก model_def.py
     if not os.path.exists('best_model.pth'):
         raise FileNotFoundError("ไม่พบ best_model.pth")
 
-    model = GCNNet(
-        in_channels=int(artifacts['x_np'].shape[1]),  # ✅ ถูก parameter
-        hidden_channels=256,
-        out_channels=2,
-        dropout_rate=0.4
-    ).to(device)
+    model = GraphSAGENet(in_channels=int(artifacts['x_np'].shape[1]), hidden_channels=256, out_channels=2, dropout_rate=0.4).to(device)
     model.load_state_dict(
         torch.load('best_model.pth', map_location=device)
     )
@@ -115,14 +113,14 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
         tokenizer:  Any          = resources['tokenizer']
         bert_model: Any          = resources['bert_model']
         nbrs:       Any          = resources['nbrs_engine']
-        model_gnn:  GCNNet       = resources['model_gnn']
+        model_gnn:  GraphSAGENet = resources['model_gnn']
         arts:       Dict[str, Any] = resources['artifacts']
 
         x_np:     np.ndarray    = arts['x_np']
         id2label: Dict[int,str] = arts['id2label']
         id2cat:   Optional[Dict] = arts.get('id2cat')
         y_cat_np: Optional[np.ndarray] = arts.get('y_cat_np')
-        topn = 10
+        topn = resources.get('k', 10)
 
         emb = embed_text(content, tokenizer, bert_model, device)
         dists, idxs_2d = nbrs.kneighbors(

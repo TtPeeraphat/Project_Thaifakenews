@@ -4,10 +4,13 @@
 
 import os
 import logging
-from pathlib import Path
+from pathlib import Path         # เหลือแค่บรรทัดเดียว
 from dataclasses import dataclass
 from dotenv import load_dotenv
-from pathlib import Path
+
+
+
+
 
 # หาตำแหน่งของไฟล์ config.py ปัจจุบัน
 PROJECT_ROOT = Path(__file__).parent
