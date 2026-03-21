@@ -3356,13 +3356,35 @@ colorObs.observe(window.parent.document.body,
             else:
                 with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
                     m1, m2 = st.columns(2)
+
+                    # ✅ ดึงข่าวจาก DB มาสุ่ม
+                    df_trending = db.get_all_trending()
+
                     with m1:
-    # st.button ซ่อนไว้เพื่อรับ event จริง
-                        if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake",width='stretch'):
-                            st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท"
+                        if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake", width='stretch'):
+                            if not df_trending.empty:
+                                fake_news = df_trending[df_trending['label'] == 'Fake']
+                                if not fake_news.empty:
+                                    picked = fake_news.sample(1).iloc[0]
+                                    st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
+                                else:
+                                    # fallback ถ้าไม่มีใน DB
+                                    st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท"
+                            else:
+                                st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท"
+
                     with m2:
                         if st.button("✅ ตัวอย่างข่าวจริง", width='stretch', key="demo_real"):
-                            st.session_state['input_text'] = "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูง"
+                            if not df_trending.empty:
+                                real_news = df_trending[df_trending['label'] == 'Real']
+                                if not real_news.empty:
+                                    picked = real_news.sample(1).iloc[0]
+                                    st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
+                                else:
+                                    # fallback ถ้าไม่มีใน DB
+                                    st.session_state['input_text'] = "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูง"
+                            else:
+                                st.session_state['input_text'] = "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูง"
 
                 # ปุ่มล้างข้อความ อยู่นอก expander
                 _, _clr_col = st.columns([5, 1])
