@@ -3738,13 +3738,20 @@ colorObs.observe(window.parent.document.body,
                             key="hist_filter_result"
                         )
                     with col_c:
-                        # ดึง category จาก DB ถ้ามี column นั้น
                         if 'category' in df.columns:
-                            cats = ["ทุกหมวดหมู่"] + sorted(
-                                df['category'].dropna().unique().tolist()
-                            )
+                            # ✅ กรองค่าว่าง None nan ออกก่อนใส่ dropdown
+                            EMPTY_CATS = {"", "None", "nan", "none", "ไม่ระบุ", None}
+                            raw_cats = df['category'].dropna().unique().tolist()
+                            valid_cats = sorted([
+                                c for c in raw_cats
+                                if isinstance(c, str)
+                                and c.strip() != ""
+                                and c.strip() not in EMPTY_CATS
+                            ])
+                            cats = ["ทุกหมวดหมู่"] + valid_cats
                         else:
                             cats = ["ทุกหมวดหมู่"]
+
                         filter_cat = st.selectbox(
                             "หมวดหมู่",
                             cats,
