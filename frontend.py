@@ -1177,6 +1177,7 @@ def show_category_analysis():
                     ).dt.tz_convert("Asia/Bangkok").dt.strftime('%d/%m %H:%M')
 
                     # ✅ แทนด้วย Streamlit native container
+                    import html as html_lib
                     scroll_container = st.container(height=500)
                     with scroll_container:
                         for _, r in df_sample.iterrows():
