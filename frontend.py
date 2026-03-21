@@ -1135,10 +1135,11 @@ def show_category_analysis():
 
             # ── ดึงข้อมูลตาม filter ──────────────────────────────────
             res2 = supabase.table('predictions') \
-                        .select('title, text, category, result, confidence, timestamp') \
-                        .order('timestamp', desc=True) \
-                        .limit(200) \
-                        .execute()
+                    .select('title, text, category, result, confidence, timestamp') \
+                    .order('timestamp', desc=True) \
+                    .limit(1000) \
+                    .execute()
+
 
             if res2.data:
                 # กรองตาม category
