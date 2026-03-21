@@ -14,14 +14,41 @@ from sklearn.preprocessing import normalize
 import logging
 from typing import Counter, Dict, Any
 
+
+__all__ = [
+    "get_pipeline",
+    "predict_news", 
+    "load_model_pipeline",
+    "cleanup_gpu",
+    "GCNNet",
+]
+
 logger = logging.getLogger(__name__)
 
 # Model configuration
 BERT_MODEL_NAME = "airesearch/wangchanberta-base-att-spm-uncased"
 MODEL_PATH = "best_model.pth"
 ARTIFACTS_PATH = "artifacts.pkl"
+pred_category: str = "ข่าวอื่นๆ"
 
-
+def classify_category_by_keyword(text: str) -> str:
+    rules = {
+        "นโยบายรัฐบาล-ข่าวสาร": ["รัฐบาล","ครม.","นายกฯ","กระทรวง","นโยบาย","รัฐสภา","พรรค"],
+        "ผลิตภัณฑ์สุขภาพ":      ["ยา","อาหารเสริม","สุขภาพ","รักษา","โรค","หมอ","โรงพยาบาล"],
+        "การเงิน-หุ้น":          ["หุ้น","ตลาด","ลงทุน","เงิน","ธนาคาร","บาท","กำไร","ขาดทุน"],
+        "ภัยพิบัติ":             ["น้ำท่วม","แผ่นดินไหว","พายุ","ไฟไหม้","ภัย","อพยพ"],
+        "ความสงบและความมั่นคง":  ["ตำรวจ","ทหาร","จับกุม","ความมั่นคง","อาชญากรรม","ยิง"],
+        "เศรษฐกิจ":              ["เศรษฐกิจ","GDP","เงินเฟ้อ","ส่งออก","นำเข้า","การค้า"],
+        "ยาเสพติด":              ["ยาเสพติด","ยาบ้า","โคเคน","จับยา","ปราบปราม"],
+    }
+   
+    scores: dict[str, int] = {
+        cat: sum(1 for kw in kws if kw in text)
+        for cat, kws in rules.items()
+    }
+    best = max(scores.items(), key=lambda x: x[1])
+    return best[0] if best[1] > 0 else "ข่าวอื่นๆ"
+    
 # ============================================================================
 # 1. GCN MODEL DEFINITION (same as before)
 # ============================================================================
@@ -185,18 +212,28 @@ def predict_news(text: str, pipeline: Dict[str, Any]) -> Dict[str, Any]:
 
         id2cat   = pipeline.get('id2cat')
         y_cat_np = pipeline.get('y_cat_np')
+        pred_category = "ข่าวอื่นๆ"
+        print(f"[DEBUG] id2cat = {id2cat}")
+        print(f"[DEBUG] y_cat_np sample = {y_cat_np[:5] if y_cat_np is not None else None}")
+        print(f"[DEBUG] neighbor idxs = {idxs}")
+        print(f"[DEBUG] pred_category = {pred_category}")
 
 # ✅ ทำนาย category จาก majority vote ของ neighbors
-        pred_category = "ไม่ระบุ"
+        pred_category = "ข่าวอื่นๆ"
         if y_cat_np is not None and id2cat is not None:
-            try:
-                neighbor_cat_ids = y_cat_np[idxs]
-                neighbor_cats    = [id2cat[cid] for cid in neighbor_cat_ids]
-                most_common      = Counter(neighbor_cats).most_common(1)
-                if most_common:
-                    pred_category = most_common[0][0]
-            except Exception:
-                pass
+                try:
+                    neighbor_cat_ids = y_cat_np[idxs]
+                    neighbor_cats    = [id2cat[cid] for cid in neighbor_cat_ids]
+                    most_common      = Counter(neighbor_cats).most_common(1)
+                    if most_common and most_common[0][0] != "ไม่ระบุ":
+                        pred_category = most_common[0][0]
+                    else:
+                        # kNN ได้ "ไม่ระบุ" → ใช้ keyword แทน
+                        pred_category = classify_category_by_keyword(text)
+                except Exception:
+                    pred_category = classify_category_by_keyword(text)
+        else:
+            pred_category = classify_category_by_keyword(text)
 
         
         # C. Build small graph (new news + k neighbors)
