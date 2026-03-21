@@ -14,7 +14,7 @@ from pydantic import BaseModel, field_validator
 from torch_geometric.data import Data
 from sklearn.neighbors import NearestNeighbors
 from transformers import AutoTokenizer, AutoModel
-from model_def import GraphSAGENet
+from model_def import GCNNet
 # ✅ import GCNNet จาก model_def — ไม่นิยามซ้ำ
 
 from embed_utils import embed_text
@@ -75,7 +75,7 @@ try:
     if not os.path.exists('best_model.pth'):
         raise FileNotFoundError("ไม่พบ best_model.pth")
 
-    model = GraphSAGENet(in_channels=int(artifacts['x_np'].shape[1]), hidden_channels=256, out_channels=2, dropout_rate=0.4).to(device)
+    model = GCNNet(in_channels=int(artifacts['x_np'].shape[1]), hidden_channels=256, out_channels=2, dropout_rate=0.4).to(device)
     model.load_state_dict(
         torch.load('best_model.pth', map_location=device)
     )
@@ -113,7 +113,7 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
         tokenizer:  Any          = resources['tokenizer']
         bert_model: Any          = resources['bert_model']
         nbrs:       Any          = resources['nbrs_engine']
-        model_gnn:  GraphSAGENet = resources['model_gnn']
+        model_gnn:  GCNNet = resources['model_gnn']
         arts:       Dict[str, Any] = resources['artifacts']
 
         x_np:     np.ndarray    = arts['x_np']

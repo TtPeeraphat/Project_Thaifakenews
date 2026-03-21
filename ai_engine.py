@@ -16,7 +16,7 @@ from sklearn.neighbors import NearestNeighbors
 
 from text_preprocessor import TextPreprocessor   # ✅ import class
 from embed_utils import embed_text
-from model_def import GraphSAGENet
+from model_def import GCNNet
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def load_model_pipeline() -> Dict[str, Any]:
         if not os.path.exists(MODEL_PATH):
             raise FileNotFoundError(f"ไม่พบ: {MODEL_PATH}")
 
-        model = GraphSAGENet(
+        model = GCNNet(
                 in_channels=768,
                 hidden_channels=256,
                 out_channels=2,
