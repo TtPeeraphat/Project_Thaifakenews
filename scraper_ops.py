@@ -1,10 +1,12 @@
 import requests
 import os
 import re
+import logging
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from apify_client import ApifyClient
-from dotenv import load_dotenv  # ✅ นำเข้าตัวช่วยอ่านไฟล์ .env
-from apify_client import ApifyClient
+
+logger = logging.getLogger(__name__)
 
 # ✅ โหลดค่าจากไฟล์ .env เข้าสู่ระบบก่อน
 load_dotenv()
@@ -21,7 +23,7 @@ def get_facebook_post_apify(url: str):
         return None, "⚠️ ไม่พบ APIFY_API_TOKEN ในระบบ กรุณาตรวจสอบไฟล์ .env"
         
     try:
-        print(f"🚀 กำลังส่งให้ Apify ดึงข้อมูล Facebook จาก: {url}")
+        logger.info("Fetching Facebook post: %s", url)
         
         # เริ่มต้นใช้งาน Apify Client
         client = ApifyClient(APIFY_API_TOKEN)
@@ -49,7 +51,7 @@ def get_facebook_post_apify(url: str):
         title = "Facebook Post"
 
         if content:
-            print(f"✅ ดึงสำเร็จ! ความยาวข้อความ: {len(content)} ตัวอักษร")
+            logger.info("Facebook fetch success: %d chars", len(content))
             return title, content
         else:
             return title, "⚠️ ดึงได้ แต่ไม่พบข้อความในโพสต์นี้ (อาจมีแค่รูปภาพหรือวิดีโอ)"
@@ -60,14 +62,6 @@ def get_facebook_post_apify(url: str):
 # ---------------------------------------------------------
 # ฟังก์ชันอัปเดต: ใช้ Apify ดึงเนื้อหา X (Twitter)
 # ---------------------------------------------------------
-# ---------------------------------------------------------
-# ฟังก์ชันอัปเดต: ใช้ Apify ดึงเนื้อหา X (Twitter)
-# ---------------------------------------------------------
-import re # อย่าลืมเช็คว่ามี import re ด้านบนสุดของไฟล์ด้วยนะครับ (ปกติมีอยู่แล้ว)
-
-# ---------------------------------------------------------
-# ฟังก์ชันอัปเดต: ใช้ Apify ดึงเนื้อหา X (Twitter) ด้วยบอทตัวใหม่
-# ---------------------------------------------------------
 def get_x_post_apify(url: str):
     """ใช้ Apify ดึงข้อมูลโพสต์จาก X (Twitter)"""
     if not APIFY_API_TOKEN:
@@ -76,7 +70,7 @@ def get_x_post_apify(url: str):
     try:
         # ✅ 1. ลบช่องว่างที่อาจติดมากับ URL (เช่น กรณีก็อปปี้มาผิด)
         clean_url = url.replace(" ", "")
-        print(f"🚀 กำลังเตรียมดึงข้อมูล X (Twitter) จาก: {clean_url}")
+        logger.info("Fetching X post: %s", clean_url)
         
         # ✅ 2. สกัดเอาเฉพาะ Tweet ID (ตัวเลขที่อยู่หลัง /status/) ออกมา
         match = re.search(r"status/(\d+)", clean_url)
@@ -84,7 +78,7 @@ def get_x_post_apify(url: str):
             return None, "⚠️ ไม่พบ Tweet ID ในลิงก์ กรุณาก๊อปปี้ลิงก์โพสต์ของ X (Twitter) ให้ครบถ้วน"
         
         tweet_id = match.group(1)
-        print(f"🔍 สกัด Tweet ID ได้คือ: {tweet_id} -> กำลังส่งให้ Apify...")
+        logger.info("Tweet ID: %s", tweet_id)
 
         client = ApifyClient(APIFY_API_TOKEN)
 
@@ -113,7 +107,7 @@ def get_x_post_apify(url: str):
         title = f"X (Twitter) Post by @{author}"
 
         if content:
-            print(f"✅ ดึงสำเร็จ! ความยาวข้อความ: {len(content)} ตัวอักษร")
+            logger.info("X fetch success: %d chars", len(content))
             return title, content
         else:
             return title, f"⚠️ ดึงได้ แต่ไม่พบข้อความ (ข้อมูลดิบ: {str(post_data)[:100]})"

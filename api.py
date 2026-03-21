@@ -13,6 +13,7 @@ from torch_geometric.nn import GCNConv
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from collections import Counter
+from embed_utils import embed_text
 
 # --- 🔥 เปลี่ยน: ใช้ Transformers แทน SentenceTransformer ---
 from transformers import AutoTokenizer, AutoModel
@@ -117,31 +118,8 @@ def predict(req: NewsRequest):
 # --- 1) Embedding with WangchanBERTa (Updated: Match Training Logic) ---
         
         # 1.1 แก้ Max Length เป็น 256 (เพื่อให้โมเดลอ่านข่าวความยาวเท่าตอนเทรน)
-        inputs = tokenizer(
-            [content], 
-            padding=True, 
-            truncation=True, 
-            max_length=256,   # <--- 🚩 จุดแก้ที่ 1: ต้องเลข 256 เท่านั้น
-            return_tensors="pt"
-        ).to(device)
+        emb = embed_text(content, tokenizer, bert_model, device)
         
-        # 1.2 Pass through Model
-        with torch.inference_mode():
-            outputs = bert_model(**inputs)
-        
-        # 1.3 แก้ Mean Pooling (ให้คำนวณละเอียด ตัดคำว่างทิ้ง)
-        last_hidden = outputs.last_hidden_state  # Shape: (1, Seq_Len, 768)
-        attn = inputs['attention_mask'].unsqueeze(-1)  # Shape: (1, Seq_Len, 1)
-        
-        # <--- 🚩 จุดแก้ที่ 2: เริ่มสูตรคำนวณใหม่ตรงนี้
-        summed = (last_hidden * attn).sum(dim=1)       # ผลรวมเฉพาะคำจริง
-        denom = attn.sum(dim=1).clamp(min=1)           # จำนวนคำจริง (ไม่นับ Padding)
-        content_emb = (summed / denom).cpu().numpy()[0] # ค่าเฉลี่ยที่ถูกต้อง
-        # <--- จบสูตร
-        
-        # 1.4 Normalize (คงไว้)
-        emb = normalize(content_emb.reshape(1, -1), axis=1, norm='l2')[0]
-
         # --- 2) KNN Search (เหมือนเดิม) ---
         dists, idxs = nbrs.kneighbors(emb.reshape(1, -1), n_neighbors=topn)
         idxs = idxs[0]

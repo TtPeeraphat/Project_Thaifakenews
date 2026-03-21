@@ -17,7 +17,9 @@ import ai_engine as ai
 from scraper_ops import get_content_from_url
 import streamlit.components.v1 as components
 import html  
-
+from validators import InputValidator
+from validators import check_rate_limit, record_prediction_timestamp
+from ai_engine import classify_category_by_keyword as guess_category
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -1148,24 +1150,7 @@ def show_category_analysis():
                 df_sample['timestamp'] = pd.to_datetime(
                     df_sample['timestamp'], utc=True
                 ).dt.tz_convert("Asia/Bangkok").dt.strftime('%d/%m %H:%M')
-                # เพิ่มฟังก์ชันนี้ก่อน for loop ใน show_category_analysis()
-                def guess_category(text: str) -> str:
-                    rules = {
-                        "นโยบายรัฐบาล-ข่าวสาร": ["รัฐบาล","ครม.","นายกฯ","กระทรวง","นโยบาย","รัฐสภา","พรรค"],
-                        "ผลิตภัณฑ์สุขภาพ":      ["ยา","อาหารเสริม","สุขภาพ","รักษา","โรค","หมอ","โรงพยาบาล"],
-                        "การเงิน-หุ้น":          ["หุ้น","ตลาด","ลงทุน","เงิน","ธนาคาร","บาท","กำไร","ขาดทุน"],
-                        "ภัยพิบัติ":             ["น้ำท่วม","แผ่นดินไหว","พายุ","ไฟไหม้","ภัย","อพยพ"],
-                        "ความสงบและความมั่นคง":  ["ตำรวจ","ทหาร","จับกุม","ความมั่นคง","อาชญากรรม","ยิง"],
-                        "เศรษฐกิจ":              ["เศรษฐกิจ","GDP","เงินเฟ้อ","ส่งออก","นำเข้า","การค้า"],
-                        "ยาเสพติด":              ["ยาเสพติด","ยาบ้า","โคเคน","จับยา","ปราบปราม"],
-                    }
-                    scores: dict[str, int] = {
-                        cat: sum(1 for kw in kws if kw in text)
-                        for cat, kws in rules.items()
-                    }
-                    best = max(scores.items(), key=lambda x: x[1])
-                    return best[0] if best[1] > 0 else "ข่าวอื่นๆ"
-
+                
                 # แก้ตรงส่วนแสดง category ใน card
                 for _, r in df_sample.iterrows():
                     result_cfg = {
@@ -3217,6 +3202,10 @@ colorObs.observe(window.parent.document.body,
 
             st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
             if st.button("🚀  วิเคราะห์ข่าวนี้", type="primary", width="stretch"):
+                allowed, msg = check_rate_limit()
+                if not allowed:
+                    st.warning(msg)
+                    st.stop()
                 for k in ['current_result','current_pred_id','feedback_given','current_text']:
                     st.session_state.pop(k, None)
 
@@ -3225,6 +3214,14 @@ colorObs.observe(window.parent.document.body,
                     if not input_url:
                         st.warning("กรุณาวาง URL ก่อนกด")
                         st.stop()
+
+                    # ✅ validate ก่อน
+                    result = InputValidator.validate_url(input_url)
+                    if not result.is_valid:
+                        st.warning(result.error_message)
+                        st.stop()
+
+                    # ✅ fetch อยู่นอก if not valid (indent ระดับเดียวกับ validate)
                     with st.spinner("กำลังดึงข้อมูลจากลิงก์..."):
                         try:
                             db.log_system_event(
@@ -3262,11 +3259,17 @@ colorObs.observe(window.parent.document.body,
                         )
                         st.error(f"ดึงข้อมูลไม่ได้: {content}")
                         st.stop()
+
                 else:
                     clean = str(input_text).strip()
                     if not clean:
                         st.warning("กรุณาใส่เนื้อหาข่าว")
                         st.stop()
+                        # ✅ เพิ่มแค่ 3 บรรทัดนี้ต่อจาก if not clean:
+                        text_check = InputValidator.validate_text(clean)
+                        if not text_check.is_valid:
+                            st.warning(text_check.error_message)
+                            st.stop()
 
                 with st.spinner("🧠 AI กำลังวิเคราะห์..."):
                     try:
@@ -3314,6 +3317,7 @@ colorObs.observe(window.parent.document.body,
                                 'feedback_given':  False,
                                 'current_text':    clean,
                             })
+                            record_prediction_timestamp()
                             st.rerun()
 
                         else:
@@ -3837,3 +3841,6 @@ colorObs.observe(window.parent.document.body,
             elif menu=="👥 Manage Users":
                 page_header("👥","Manage Users","จัดการบัญชีผู้ใช้งาน สิทธิ์ และสถานะ")
                 manage_users_page()
+            else:
+                st.session_state.active_menu = "🏠 หน้าหลัก"
+                st.rerun()

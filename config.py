@@ -66,8 +66,8 @@ class EmailConfig:
     # 2. Generate new app password for "Mail"
     # 3. Copy the 16-character password to .env as GMAIL_APP_PASSWORD
     
-    sender_email: str = os.getenv("GMAIL_EMAIL", "peerapat51443@gmail.com")
-    sender_password: str = os.getenv("GMAIL_APP_PASSWORD", "pjfvnecmnpwxkyrj")
+    sender_email: str = os.getenv("GMAIL_EMAIL", "")
+    sender_password: str = os.getenv("GMAIL_APP_PASSWORD", "")
     
     smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))

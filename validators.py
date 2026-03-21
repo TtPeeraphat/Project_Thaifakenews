@@ -13,10 +13,17 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 
+TZ_BKK = ZoneInfo("Asia/Bangkok")
 
+RATE_LIMIT_PER_MINUTE = 5
+RATE_LIMIT_PER_HOUR   = 30
+COOLDOWN_SECONDS      = 3
 # =========================================================
 # VALIDATION RESULT
 # =========================================================
@@ -359,7 +366,41 @@ class InputValidator:
 
         return ValidationResult(True, warning_message=warning.strip())
 
+def check_rate_limit() -> tuple[bool, str]:
+    now = datetime.now(tz=TZ_BKK)
+    if "rate_timestamps" not in st.session_state:
+        st.session_state["rate_timestamps"] = []
+    if "last_predict_time" not in st.session_state:
+        st.session_state["last_predict_time"] = None
 
+    last = st.session_state["last_predict_time"]
+    if last is not None:
+        elapsed = (now - last).total_seconds()
+        if elapsed < COOLDOWN_SECONDS:
+            wait = COOLDOWN_SECONDS - int(elapsed)
+            return False, f"⏳ กรุณารอ {wait} วินาทีก่อนวิเคราะห์ใหม่"
+
+    cutoff_hour   = now - timedelta(hours=1)
+    cutoff_minute = now - timedelta(minutes=1)
+    timestamps = [t for t in st.session_state["rate_timestamps"] if t > cutoff_hour]
+    st.session_state["rate_timestamps"] = timestamps
+
+    if len(timestamps) >= RATE_LIMIT_PER_HOUR:
+        return False, f"⚠️ คุณวิเคราะห์ครบ {RATE_LIMIT_PER_HOUR} ครั้งต่อชั่วโมงแล้ว — กรุณารอสักครู่"
+
+    recent = [t for t in timestamps if t > cutoff_minute]
+    if len(recent) >= RATE_LIMIT_PER_MINUTE:
+        return False, f"⚠️ คุณวิเคราะห์เร็วเกินไป — กรุณารอสักครู่"
+
+    return True, ""
+
+
+def record_prediction_timestamp():
+    now = datetime.now(tz=TZ_BKK)
+    if "rate_timestamps" not in st.session_state:
+        st.session_state["rate_timestamps"] = []
+    st.session_state["rate_timestamps"].append(now)
+    st.session_state["last_predict_time"] = now
 # =========================================================
 # TEST
 # =========================================================

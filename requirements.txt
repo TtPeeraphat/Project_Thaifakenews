@@ -8,6 +8,7 @@ plotly==5.17.0
 altair>=5.0.0
 streamlit-cookies-controller==0.0.4
 apify-client
+bcrypt
 
 # --- Database & Backend ---
 supabase==2.0.3
