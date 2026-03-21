@@ -58,26 +58,19 @@ class DatabaseConfig:
 
 @dataclass
 class EmailConfig:
-    """Email configuration for notifications and OTP."""
-    
-    # ✅ FIXED Issue 6.1: Gmail app password (not account password!)
-    # Never use your main Gmail password — use app password instead:
-    # 1. Go to https://myaccount.google.com/apppasswords
-    # 2. Generate new app password for "Mail"
-    # 3. Copy the 16-character password to .env as GMAIL_APP_PASSWORD
-    
-    sender_email: str = os.getenv("GMAIL_EMAIL", "")
-    sender_password: str = os.getenv("GMAIL_APP_PASSWORD", "")
-    
-    smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
-    
-    def validate(self) -> bool:
-        """Check if email is configured."""
-        if not self.sender_email or not self.sender_password:
-            logging.warning("Email configuration incomplete")
-            return False
-        return True
+    def __post_init__(self):
+        try:
+            import streamlit as st
+            self.sender_email    = st.secrets.get("GMAIL_EMAIL", os.getenv("GMAIL_EMAIL", ""))
+            self.sender_password = st.secrets.get("GMAIL_APP_PASSWORD", os.getenv("GMAIL_APP_PASSWORD", ""))
+        except Exception:
+            self.sender_email    = os.getenv("GMAIL_EMAIL", "")
+            self.sender_password = os.getenv("GMAIL_APP_PASSWORD", "")
+
+    sender_email:     str = ""
+    sender_password:  str = ""
+    smtp_host:        str = "smtp.gmail.com"
+    smtp_port:        int = 587
 
 
 @dataclass

@@ -551,19 +551,29 @@ def send_otp_email(to_email: str) -> Tuple[bool, str]:
         return False, f"Check Email Error: {e}"
 
     otp = "".join(random.choices(string.digits, k=6))
+
+    # ✅ บันทึก OTP ลง DB ก่อนส่งอีเมล
     try:
         supabase.table("users").update({"reset_token": otp}).eq("email", to_email).execute()
     except Exception as e:
         return False, f"Database Error: {e}"
 
-    sender_email    = str(config.email.sender_email).strip()
-    sender_password = str(config.email.sender_password).strip()
+    try:
+        import streamlit as st
+        sender_email    = st.secrets.get("GMAIL_EMAIL", "") or str(config.email.sender_email).strip()
+        sender_password = st.secrets.get("GMAIL_APP_PASSWORD", "") or str(config.email.sender_password).strip()
+    except Exception:
+        sender_email    = str(config.email.sender_email).strip()
+        sender_password = str(config.email.sender_password).strip()
+
+    if not sender_email or not sender_password:
+        return False, "❌ ยังไม่ได้ตั้งค่า Gmail ใน Secrets"
 
     msg = MIMEText(
-    f"รหัส OTP ของคุณคือ: {otp}\n\n"
-    "กรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่",
-    "plain",
-    "utf-8"
+        f"รหัส OTP ของคุณคือ: {otp}\n\n"
+        "กรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่",
+        "plain",
+        "utf-8"
     )
     msg["Subject"] = "🔑 รหัสยืนยันการเปลี่ยนรหัสผ่าน (Thai Fake News)"
     msg["From"]    = sender_email
@@ -576,7 +586,6 @@ def send_otp_email(to_email: str) -> Tuple[bool, str]:
         return True, "✅ ส่งรหัส OTP ไปที่อีเมลแล้ว"
     except Exception as e:
         return False, f"❌ ส่งอีเมลไม่สำเร็จ: {e}"
-
 
 def verify_otp_and_reset(email: str, otp: str, new_password: str) -> Tuple[bool, str]:
     supabase = get_supabase()
