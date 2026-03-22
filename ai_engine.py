@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 import streamlit as st
 from torch_geometric.data import Data
-from transformers import AutoTokenizer, AutoModelForCausalLMForCausalLM
+from transformers import AutoTokenizer, AutoModel
 from sklearn.neighbors import NearestNeighbors
 
 from text_preprocessor import TextPreprocessor
