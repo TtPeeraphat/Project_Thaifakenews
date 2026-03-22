@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, Any, Optional  
 from urllib.parse import urlparse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,timezone
 from zoneinfo import ZoneInfo
 import streamlit as st
 # validators.py — rate limit เก็บใน Supabase (เลี่ยงไม่ได้)
@@ -371,7 +371,7 @@ def check_rate_limit(user_id: int) -> tuple[bool, str]:
     Args:
         user_id: ID ของ user จาก Supabase (ต้อง login ก่อน)
     """
-    now = datetime.now(tz=TZ_BKK)
+    now = datetime.now(tz=timezone.utc)
 
     try:
         supabase = get_supabase()
@@ -380,10 +380,10 @@ def check_rate_limit(user_id: int) -> tuple[bool, str]:
         one_hour_ago = (now - timedelta(hours=1)).isoformat()
 
         response = supabase.table("predictions") \
-            .select("created_at") \
+            .select("timestamp") \
             .eq("user_id", user_id) \
-            .gte("created_at", one_hour_ago) \
-            .order("created_at", desc=True) \
+            .gte("timestamp", one_hour_ago) \
+            .order("timestamp", desc=True) \
             .execute()
 
         timestamps: list[datetime] = []
@@ -391,7 +391,7 @@ def check_rate_limit(user_id: int) -> tuple[bool, str]:
         for row in (response.data or []):
             # ✅ cast เป็น Dict ก่อน — Pylance รู้ type แล้ว subscript ได้
             row_dict: Dict[str, Any] = row if isinstance(row, dict) else {}
-            raw_ts: Any = row_dict.get("created_at")
+            raw_ts: Any = row_dict.get("timestamp")
 
             # ✅ ตรวจสอบก่อนเรียก .replace() — ป้องกัน None/non-string
             if not isinstance(raw_ts, str) or not raw_ts:
@@ -437,7 +437,7 @@ def check_rate_limit_fallback() -> tuple[bool, str]:
     Fallback สำหรับผู้ใช้ที่ไม่ได้ login
     ใช้ session state เหมือนเดิม (ความปลอดภัยต่ำกว่า)
     """
-    now = datetime.now(tz=TZ_BKK)
+    now = datetime.now(tz=timezone.utc)
 
     if "rate_timestamps" not in st.session_state:
         st.session_state["rate_timestamps"] = []
@@ -469,7 +469,7 @@ def check_rate_limit_fallback() -> tuple[bool, str]:
 
 def record_prediction_timestamp():
     """บันทึก timestamp (fallback สำหรับ session state)"""
-    now = datetime.now(tz=TZ_BKK)
+    now = now = datetime.now(tz=timezone.utc)
     if "rate_timestamps" not in st.session_state:
         st.session_state["rate_timestamps"] = []
     st.session_state["rate_timestamps"].append(now)

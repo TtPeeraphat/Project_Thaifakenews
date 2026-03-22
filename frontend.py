@@ -7,20 +7,21 @@ import plotly.express as px
 import altair as alt
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import re
-from datetime import datetime, timedelta
 import asyncio
 from streamlit_cookies_controller import CookieController
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo 
 import database_ops as db
+from database_ops import get_dashboard_kpi
 import ai_engine as ai
 from scraper_ops import get_content_from_url
 import streamlit.components.v1 as components
 import html  
-from validators import InputValidator
-from validators import check_rate_limit, record_prediction_timestamp
-from ai_engine import classify_category_by_keyword as guess_category, classify_category_by_keyword
+from validators import InputValidator, check_rate_limit_fallback,check_rate_limit, record_prediction_timestamp
 
+from ai_engine import classify_category_by_keyword as guess_category, classify_category_by_keyword
+from model_def import GCNNet
+sys.modules['__main__'].GCNNet = GCNNet
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -29,7 +30,6 @@ cookie_controller = CookieController()
 TZ_BKK = ZoneInfo("Asia/Bangkok")     # UTC+7
 
 def now_bkk() -> datetime:
-    """Current time in Bangkok (GMT+7), timezone-aware."""
     return datetime.now(tz=TZ_BKK)
 
 # 1. ฟังก์ชันล้างข้อความ (เอาไว้ด้านบนสุด หรือก่อนถึง if menu...)
@@ -967,7 +967,7 @@ def show_admin_dashboard_enhanced():
     df_perf = db.get_model_performance_data()
 
     c1,c2,c3 = st.columns(3)
-    with c1: kpi_card("🎯","Accuracy (Verified)", f"{stats['accuracy']}%",
+    with c1: kpi_card("🎯","Accuracy (Verified)", f"{stats.get('accuracy', 'N/A')}%",
                     f"{stats['feedback_total']} verified samples", stats['accuracy']>=70)
     with c2: kpi_card("🔍","Checks Today",        f"{stats['checks_today']:,}")
     with c3: kpi_card("👥","Active Users",         f"{stats['active_users']:,}")
@@ -3658,7 +3658,11 @@ colorObs.observe(window.parent.document.body,
             # ปุ่มวิเคราะห์
             # ══════════════════════════════════════
             if st.button("🚀  วิเคราะห์ข่าวนี้", type="primary", width="stretch"):
-                allowed, msg = check_rate_limit()
+                _uid = st.session_state.get('user_id')
+                if _uid and st.session_state.get('logged_in'):
+                    allowed, msg = check_rate_limit(_uid)        # ← login: ใช้ DB
+                else:
+                    allowed, msg = check_rate_limit_fallback()   # ← guest: ใช้ session_state
                 if not allowed:
                     st.warning(msg)
                     st.stop()
@@ -3708,7 +3712,11 @@ colorObs.observe(window.parent.document.body,
                             details=f"URL={input_url[:100]} | scraper returned: {str(content)[:120]}",
                             level="ERROR"
                         )
-                        st.error(f"ดึงข้อมูลไม่ได้: {content}")
+                        if "เครดิต Apify หมด" in str(content):
+                            st.warning(str(content))
+                            st.info("💡 วิธีแก้: ก๊อปปี้ข้อความจากโพสต์ แล้วสลับไปใช้แท็บ 'พิมพ์ / วางเนื้อหา' แทน")
+                        else:
+                            st.error(f"ดึงข้อมูลไม่ได้: {content}")
                         st.stop()
                 else:
                     clean = str(input_text).strip()
@@ -3739,7 +3747,9 @@ colorObs.observe(window.parent.document.body,
                             time.sleep(0.35)
                             rl  = result.get('result')
                             rc  = result.get('confidence')
-                            cat = result.get('category', '')
+                            cat = re.sub(r'<[^>]+>', '', str(result.get('category', 'ไม่ระบุ'))).strip()
+                            if not cat:
+                                cat = 'ไม่ระบุ'
                             uname = st.session_state.get('username', 'Unknown')
 
                             # ── log ผลทำนาย พร้อม category ──

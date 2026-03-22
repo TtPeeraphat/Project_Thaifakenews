@@ -5,7 +5,10 @@ import logging
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from apify_client import ApifyClient
+
 from text_preprocessor import TextPreprocessor
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +61,11 @@ def get_facebook_post_apify(url: str):
             return title, "⚠️ ดึงได้ แต่ไม่พบข้อความในโพสต์นี้ (อาจมีแค่รูปภาพหรือวิดีโอ)"
 
     except Exception as e:
-        return None, f"⚠️ Apify Error (Facebook): {str(e)}"
+        err = str(e)   # ← แปลง exception เป็น string เอง
+        if "exceed" in err.lower() or "usage" in err.lower() or "billing" in err.lower():
+            return None, "⚠️ เครดิต Apify หมดแล้ว — กรุณาก๊อปปี้เนื้อหามาวางแทน"
+        return None, f"⚠️ Apify Error (Facebook): {err}"
+       
 
 # ---------------------------------------------------------
 # ฟังก์ชันอัปเดต: ใช้ Apify ดึงเนื้อหา X (Twitter)
@@ -114,39 +121,46 @@ def get_x_post_apify(url: str):
             return title, f"⚠️ ดึงได้ แต่ไม่พบข้อความ (ข้อมูลดิบ: {str(post_data)[:100]})"
 
     except Exception as e:
-        return None, f"⚠️ Apify Error (X/Twitter): {str(e)}"
+            err = str(e)   # ← แปลง exception เป็น string เอง
+            if "exceed" in err.lower() or "usage" in err.lower() or "billing" in err.lower():
+                return None, "⚠️ เครดิต Apify หมดแล้ว — กรุณาก๊อปปี้เนื้อหามาวางแทน"
+            return None, f"⚠️ Apify Error (Facebook): {err}"
 # ---------------------------------------------------------
 # ฟังก์ชันหลัก
 # ---------------------------------------------------------
+def clean_html(text: str) -> str:
+    if not text:
+        return ""
+    soup = BeautifulSoup(text, "html.parser")
+    text = soup.get_text(separator=" ")
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text   # ← return อยู่ตรงนี้ถูกต้องแล้ว
+
 def get_content_from_url(url):
-    # ✅ 1. เช็คว่าเป็นลิงก์ Facebook หรือไม่
     fb_domains = ["facebook.com", "fb.watch", "fb.com", "fb.me"]
     if any(domain in url.lower() for domain in fb_domains):
         return get_facebook_post_apify(url)
 
-    # ✅ 2. เช็คว่าเป็นลิงก์ X (Twitter) หรือไม่
     x_domains = ["x.com", "twitter.com"]
     if any(domain in url.lower() for domain in x_domains):
         return get_x_post_apify(url)
 
-    # ✅ 3. ปิด social media อื่นที่ยังไม่มีระบบรองรับ
     blocked_domains = ["tiktok.com", "instagram.com"]
     if any(domain in url.lower() for domain in blocked_domains):
-        return None, "⚠️ ไม่สามารถดึงข้อมูลจาก Social Media ระบบอื่นได้โดยตรง กรุณาก๊อปปี้ข้อความมาวางแทน"
+        return None, "⚠️ ไม่สามารถดึงข้อมูลจาก Social Media ระบบอื่นได้โดยตรง"
 
-    # ✅ 4. สำหรับเว็บไซต์ข่าวทั่วไป ใช้โค้ด BeautifulSoup เดิม
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        "Accept-Language": "th-TH,th;q=0.9",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     }
     try:
         response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
+        soup = BeautifulSoup(response.content, "html.parser")
 
-        # ✅ og_title
         og_title_tag = soup.find("meta", property="og:title")
         if og_title_tag is not None:
-            og_content = og_title_tag.get("content")       # คืน str | list | None
+            og_content = og_title_tag.get("content")
             title = str(og_content) if og_content else "ไม่พบหัวข้อข่าว"
         else:
             h1_tag = soup.find("h1")
@@ -160,9 +174,18 @@ def get_content_from_url(url):
         if not full_content:
             return title, "⚠️ ดึงเนื้อหาไม่สำเร็จ: เว็บไซต์นี้อาจใช้ JavaScript หรือบล็อกการดึงข้อมูล"
 
+        # ✅ cleanup อยู่ตรงนี้ — ก่อน return และนอก if block
+        title        = clean_html(title)
+        full_content = clean_html(full_content)
+
         return title, full_content
 
     except requests.exceptions.RequestException as e:
-        return None, f"⚠️ ไม่สามารถเชื่อมต่อได้\nรายละเอียด: {str(e)}"
+        return None, f"⚠️ ไม่สามารถเชื่อมต่อได้: {str(e)}"
     except Exception as e:
-        return None, f"Error: {str(e)}"
+        err = str(e)
+        if "exceed" in err.lower() or "usage" in err.lower() or "billing" in err.lower():
+            return None, "⚠️ เครดิต Apify หมดแล้ว — ไม่สามารถดึงข้อมูล X/Twitter ได้\nกรุณาก๊อปปี้เนื้อหาโพสต์มาวางแทน"
+        return None, f"⚠️ Apify Error (X): {err}"
+
+    

@@ -234,7 +234,7 @@ def create_prediction(user_id, title, text, url, result, confidence, category=""
         "result":     result,
         "confidence": confidence,
         "category":   category,
-        "timestamp":  datetime.now().isoformat(),
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
     }
     try:
         response = supabase.table("predictions").insert(payload).execute()
@@ -302,11 +302,12 @@ def get_model_performance_data() -> pd.DataFrame:
         for item in res.data:
             ai_pred = str(item.get("result", "")).capitalize()
             if ai_pred not in ("Real", "Fake"):
-                continue
+                ai_pred = "Error"   # แทน continue
+
             rows.append({
                 "timestamp":  item.get("timestamp"),
                 "prediction": ai_pred,
-                "confidence": item.get("confidence"),
+                "confidence": item.get("confidence") if ai_pred != "Error" else 0,
                 "is_correct": None,
             })
         df = pd.DataFrame(rows)
@@ -739,7 +740,7 @@ def get_dashboard_kpi() -> dict:
     supabase = get_supabase()
     now_utc   = datetime.now(timezone.utc)
     last_24h  = (now_utc - timedelta(hours=24)).isoformat()
-    stats = {"checks_today": 0, "active_users": 0, "feedback_total": 0, "user_approval_rate": 0.0}
+    stats = {"checks_today": 0, "active_users": 0, "feedback_total": 0, "user_approval_rate": 0.0, "accuracy": 0.0}
     try:
         res_checks = supabase.table("predictions").select("id", count="exact").gte("timestamp", last_24h).execute()
         stats["checks_today"] = res_checks.count or 0
@@ -758,8 +759,10 @@ def get_dashboard_kpi() -> dict:
                             str(i.get("user_report", "")).lower() == "correct" or
                             str(i.get("status", "")).lower() == "verified_correct")
                 stats["user_approval_rate"] = round(correct / stats["feedback_total"] * 100, 1)
+                stats["accuracy"] = stats["user_approval_rate"]
         else:
                 stats["user_approval_rate"] = 0.0
+                stats["accuracy"] = 0.0 
         return stats
     except Exception as e:
         logger.error("KPI Error: %s", e)

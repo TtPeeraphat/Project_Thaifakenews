@@ -15,7 +15,7 @@ from torch_geometric.data import Data
 from sklearn.neighbors import NearestNeighbors
 from transformers import AutoTokenizer, AutoModel
 from model_def import GCNNet
-# ✅ import GCNNet จาก model_def — ไม่นิยามซ้ำ
+
 
 from embed_utils import embed_text
 from validators import InputValidator
@@ -53,6 +53,8 @@ try:
     if not os.path.exists('artifacts.pkl'):
         raise FileNotFoundError("ไม่พบ artifacts.pkl")
 
+    sys.modules['__main__'].GCNNet = GCNNet   
+
     with open('artifacts.pkl', 'rb') as f:
         artifacts = pickle.load(f)
 
@@ -76,9 +78,11 @@ try:
         raise FileNotFoundError("ไม่พบ best_model.pth")
 
     model = GCNNet(in_channels=int(artifacts['x_np'].shape[1]), hidden_channels=256, out_channels=2, dropout_rate=0.4).to(device)
-    model.load_state_dict(
-        torch.load('best_model.pth', map_location=device)
-    )
+    _raw = torch.load('best_model.pth', map_location=device, weights_only=False)
+    if isinstance(_raw, dict):
+        model.load_state_dict(_raw)
+    else:
+        model.load_state_dict(_raw.state_dict())
     model.eval()
     resources['model_gnn'] = model
     print("✅ Models Loaded Successfully!")
@@ -149,9 +153,8 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
             self_loop_np
         ], axis=1)
 
-        edge_w = np.concatenate(
-            [1 - dists[0], 1 - dists[0], np.array([1.0])]
-        )
+        w = np.clip(1 - dists[0], 0.0, 1.0)
+        edge_w = np.concatenate([w, w, np.array([1.0])])
 
         graph_data = Data(
             x=torch.tensor(X_new, dtype=torch.float, device=device),
