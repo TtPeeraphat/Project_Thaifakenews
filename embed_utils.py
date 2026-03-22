@@ -1,14 +1,3 @@
-# =============================================================================
-# embed_utils.py  —  Fixed Version
-# =============================================================================
-# 🔧 ปัญหาที่แก้:
-#   [C2] รับ title + content แยกกัน และรวมแบบเดียวกับ training
-#        เหตุผล: training embed จาก "หัวข้อข่าว + เนื้อหา" แต่ inference รับ text เดี่ยว
-#               ทำให้ embedding distribution ต่างกัน → kNN หา neighbor ผิดทิศ
-#
-#   [NEW] เพิ่ม embed_combined() สำหรับรวม title+content ก่อน embed
-#   [NEW] เพิ่ม embed_batch() สำหรับ training pipeline
-# =============================================================================
 
 import torch
 import numpy as np

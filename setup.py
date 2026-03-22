@@ -4,10 +4,13 @@ Setup Script for TrueCheck AI
 Installs all dependencies and verifies the setup is correct.
 """
 
+# เพิ่ม root path ให้ Python หาไฟล์เจอ
+
 import subprocess
 import sys
 import os
 from pathlib import Path
+
 
 def run_command(cmd, description):
     """Run a command and report status"""

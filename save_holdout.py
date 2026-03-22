@@ -11,6 +11,9 @@
 # =============================================================================
 
 import numpy as np
+import sys
+import os
+
 
 # เพิ่มใน Section 11 ของ train_fixed.py หลังจาก save artifacts
 

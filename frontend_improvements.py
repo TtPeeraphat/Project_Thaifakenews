@@ -2,7 +2,6 @@
 import streamlit as st
 import logging
 import time
-
 from text_preprocessor import TextPreprocessor
 from validators import InputValidator
 from ai_engine import get_pipeline, predict_news

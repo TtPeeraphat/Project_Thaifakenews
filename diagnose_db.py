@@ -4,9 +4,6 @@ Database Connection Diagnostic Tool
 Helps troubleshoot login and database connection issues.
 """
 
-import os
-import sys
-from pathlib import Path
 
 def check_env_file():
     """Check if .env file exists and has required variables"""

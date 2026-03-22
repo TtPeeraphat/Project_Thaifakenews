@@ -1,5 +1,8 @@
 from supabase import create_client
 import httpx
+import sys
+import os
+
 
 # 1. ใส่ URL และ KEY ตรงๆ เพื่อตัดปัญหาไฟล์ .env
 SUPABASE_URL = "https://orxtfxdernqmpkfmsijj.supabase.co"
