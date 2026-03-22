@@ -218,7 +218,7 @@ def demo_single_prediction(title: str, content: str = ""):
     """
     from ai_engine import load_model_pipeline, predict_news
     pipeline = load_model_pipeline()
-    result   = predict_news(title=title, content=content, pipeline=pipeline)
+    result = predict_news(text=title, content=content, pipeline=pipeline)
 
     print("\n" + "═" * 55)
     print("📰 ผลการวิเคราะห์ข่าว")

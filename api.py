@@ -1,4 +1,3 @@
-
 import sys
 import os
 import pickle
@@ -15,8 +14,6 @@ from torch_geometric.data import Data
 from sklearn.neighbors import NearestNeighbors
 from transformers import AutoTokenizer, AutoModel
 from model_def import GCNNet
-
-
 from embed_utils import embed_text
 from validators import InputValidator
 from text_preprocessor import TextPreprocessor
@@ -26,8 +23,11 @@ logger = logging.getLogger(__name__)
 app    = FastAPI(title="Fake News Detection API (WangchanBERTa)")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# ============================================================
-# ✅ นิยาม NewsRequest ครั้งเดียว — ลบตัวซ้ำออก
+# ── Constants ────────────────────────────────────────────────
+MODEL_NAME     = "airesearch/wangchanberta-base-att-spm-uncased"
+MODEL_PATH     = "best_model.pth"      # ✅ ไฟล์เดียวกับ api.py
+ARTIFACTS_PATH = "artifacts.pkl"       # ✅ ไฟล์เดียวกับ api.py
+
 # ============================================================
 class NewsRequest(BaseModel):
     text: str
@@ -39,43 +39,36 @@ class NewsRequest(BaseModel):
             raise ValueError("ข้อความต้องไม่ว่างเปล่า")
         return v.strip()
 
-
-# ============================================================
-# ✅ นิยาม resources และ artifacts ก่อน try block
-# ============================================================
 resources: Dict[str, Any] = {}
 artifacts: Dict[str, Any] = {}
 
-MODEL_NAME = "airesearch/wangchanberta-base-att-spm-uncased"
-
 print("⏳ Loading Models & Artifacts...")
 try:
-    if not os.path.exists('artifacts.pkl'):
-        raise FileNotFoundError("ไม่พบ artifacts.pkl")
+    if not os.path.exists(ARTIFACTS_PATH):
+        raise FileNotFoundError(f"ไม่พบ {ARTIFACTS_PATH}")
 
-    sys.modules['__main__'].GCNNet = GCNNet   
+    sys.modules['__main__'].GCNNet = GCNNet
 
-    with open('artifacts.pkl', 'rb') as f:
+    with open(ARTIFACTS_PATH, 'rb') as f:
         artifacts = pickle.load(f)
 
     resources['artifacts'] = artifacts
 
     # kNN
-    k = int(artifacts.get('k', 10))
-    k = min(k, len(artifacts['x_np']))
-    resources['k'] = k
+    k_neighbors = int(artifacts.get('k', 10))           # ✅ เปลี่ยนชื่อไม่ชนกัน
+    k_neighbors = min(k_neighbors, len(artifacts['x_np']))
+    resources['k'] = k_neighbors
     resources['nbrs_engine'] = NearestNeighbors(
-        n_neighbors=k, metric='cosine'
+        n_neighbors=k_neighbors, metric='cosine'
     ).fit(artifacts['x_np'])
 
     # BERT
     resources['tokenizer']  = AutoTokenizer.from_pretrained(MODEL_NAME)
     resources['bert_model'] = AutoModel.from_pretrained(MODEL_NAME).to(device).eval()
 
-
-    
+    # GCN
     if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(f"ไม่พบ model: {MODEL_PATH}")
+        raise FileNotFoundError(f"ไม่พบ {MODEL_PATH}")
 
     model = GCNNet(
         in_channels     = int(artifacts['x_np'].shape[1]),
@@ -84,11 +77,9 @@ try:
         dropout_rate    = 0.4
     ).to(device)
 
-    sd = torch.load(MODEL_PATH, map_location=device, weights_only=False)
-
-    # filter เฉพาะ key ของ GCNNet
+    sd          = torch.load(MODEL_PATH, map_location=device, weights_only=False)
     gcn_keys    = set(model.state_dict().keys())
-    sd_filtered = {k: v for k, v in sd.items() if k in gcn_keys}
+    sd_filtered = {key: val for key, val in sd.items() if key in gcn_keys}  # ✅ ไม่ชนกับ k
 
     model.load_state_dict(sd_filtered, strict=True)
     model.eval()
@@ -100,7 +91,7 @@ except Exception as e:
 
 
 # ============================================================
-# Endpoints
+# Endpoints (ไม่มีการเปลี่ยนแปลง)
 # ============================================================
 @app.get("/")
 def home() -> Dict[str, str]:
@@ -109,12 +100,10 @@ def home() -> Dict[str, str]:
 
 @app.post("/predict")
 def predict(req: NewsRequest) -> Dict[str, Any]:
-    # ✅ Validate
     validation = InputValidator.validate_text(req.text, require_thai=True)
     if not validation.is_valid:
         raise HTTPException(status_code=422, detail=validation.error_message)
 
-    # ✅ Preprocess — ใช้ method ที่ถูกต้อง
     cleaned, is_valid, reason = TextPreprocessor.preprocess(req.text)
     if not is_valid:
         raise HTTPException(status_code=422, detail=reason)
@@ -122,34 +111,30 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
     content = cleaned
 
     try:
-        tokenizer:  Any          = resources['tokenizer']
-        bert_model: Any          = resources['bert_model']
-        nbrs:       Any          = resources['nbrs_engine']
-        model_gnn:  GCNNet = resources['model_gnn']
-        arts:       Dict[str, Any] = resources['artifacts']
+        tokenizer  = resources['tokenizer']
+        bert_model = resources['bert_model']
+        nbrs       = resources['nbrs_engine']
+        model_gnn  = resources['model_gnn']
+        arts       = resources['artifacts']
 
-        x_np:     np.ndarray    = arts['x_np']
-        id2label: Dict[int,str] = arts['id2label']
-        id2cat:   Optional[Dict] = arts.get('id2cat')
-        y_cat_np: Optional[np.ndarray] = arts.get('y_cat_np')
-        topn = resources.get('k', 10)
+        x_np     = arts['x_np']
+        id2label = arts['id2label']
+        id2cat   = arts.get('id2cat')
+        y_cat_np = arts.get('y_cat_np')
+        topn     = resources.get('k', 10)
 
         emb = embed_text(content, tokenizer, bert_model, device)
-        dists, idxs_2d = nbrs.kneighbors(
-            emb.reshape(1, -1), n_neighbors=topn
-        )
-        idxs: np.ndarray = idxs_2d[0]
+        dists, idxs_2d = nbrs.kneighbors(emb.reshape(1, -1), n_neighbors=topn)
+        idxs = idxs_2d[0]
 
         pred_category = "ไม่ระบุ"
-        neighbor_cats: list = []
+        neighbor_cats = []
         if y_cat_np is not None and id2cat is not None:
-            neighbor_cat_ids = y_cat_np[idxs]
-            neighbor_cats = [id2cat[int(cid)] for cid in neighbor_cat_ids]
-            most_common = Counter(neighbor_cats).most_common(1)
+            neighbor_cats = [id2cat[int(cid)] for cid in y_cat_np[idxs]]
+            most_common   = Counter(neighbor_cats).most_common(1)
             if most_common:
                 pred_category = most_common[0][0]
 
-        # Build graph + self-loop
         X_new        = np.vstack([emb, x_np[idxs]])
         center_node  = 0
         nbr_nodes    = np.arange(1, topn + 1)
@@ -161,26 +146,23 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
             self_loop_np
         ], axis=1)
 
-        w = np.clip(1 - dists[0], 0.0, 1.0)
+        w      = np.clip(1 - dists[0], 0.0, 1.0)
         edge_w = np.concatenate([w, w, np.array([1.0])])
 
         graph_data = Data(
-            x=torch.tensor(X_new, dtype=torch.float, device=device),
-            edge_index=torch.tensor(
-                edge_index_np, dtype=torch.long, device=device
-            ),
-            edge_attr=torch.tensor(edge_w, dtype=torch.float, device=device),
+            x          = torch.tensor(X_new,          dtype=torch.float, device=device),
+            edge_index = torch.tensor(edge_index_np,  dtype=torch.long,  device=device),
+            edge_attr  = torch.tensor(edge_w,         dtype=torch.float, device=device),
         )
 
         with torch.no_grad():
-            logits: torch.Tensor = model_gnn(graph_data)
-            probas = torch.softmax(logits, dim=1)[0].cpu().numpy()
-            pred_id   = int(np.argmax(probas))
-            label_out = id2label[pred_id]
+            logits  = model_gnn(graph_data)
+            probas  = torch.softmax(logits, dim=1)[0].cpu().numpy()
+            pred_id = int(np.argmax(probas))
 
         return {
             "status":        "success",
-            "label":         label_out,
+            "label":         id2label[pred_id],
             "probability":   float(probas[pred_id]),
             "category":      pred_category,
             "neighbor_cats": neighbor_cats,

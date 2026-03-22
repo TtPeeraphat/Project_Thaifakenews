@@ -2,30 +2,32 @@ import sys
 import os
 import pickle
 import logging
-import re
 from collections import Counter
 from typing import Dict, Any, Optional
-
+import re
+import streamlit as st
 import numpy as np
 import torch
 import torch.nn.functional as F
-import streamlit as st
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, field_validator
 from torch_geometric.data import Data
-from transformers import AutoTokenizer, AutoModel
 from sklearn.neighbors import NearestNeighbors
-
-from text_preprocessor import TextPreprocessor
-from embed_utils import embed_combined, embed_text
+from transformers import AutoTokenizer, AutoModel
 from model_def import GCNNet
+from embed_utils import embed_combined, embed_text
+from validators import InputValidator
+from text_preprocessor import TextPreprocessor
 
 logger = logging.getLogger(__name__)
 
-BERT_MODEL_NAME = "airesearch/wangchanberta-base-att-spm-uncased"
-MODEL_PATH     = os.path.join(_model_dir, 'best_model.pth')
-ARTIFACTS_PATH = os.path.join(_model_dir, 'artifacts.pkl')
-print(f"_model_dir    : {_model_dir}")
-print(f"ARTIFACTS_PATH: {ARTIFACTS_PATH}")
-print(f"exists        : {os.path.exists(ARTIFACTS_PATH)}")
+app    = FastAPI(title="Fake News Detection API (WangchanBERTa)")
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# ── path ใช้ชื่อไฟล์ตรงๆ ────────────────────────────────────
+MODEL_PATH     = "best_model.pth"
+ARTIFACTS_PATH = "artifacts.pkl"
+MODEL_NAME     = "airesearch/wangchanberta-base-att-spm-uncased"
 # ─────────────────────────────────────────────────────────────────────────────
 # Category keyword rules (fallback เมื่อ neighbor ไม่ตัดสินได้)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -123,8 +125,8 @@ def load_model_pipeline() -> Dict[str, Any]:
     ).fit(x_database)
 
     # ── WangchanBERTa ──
-    tokenizer  = AutoTokenizer.from_pretrained(BERT_MODEL_NAME)
-    bert_model = AutoModel.from_pretrained(BERT_MODEL_NAME).to(device).eval()
+    tokenizer  = AutoTokenizer.from_pretrained(MODEL_NAME)
+    bert_model = AutoModel.from_pretrained(MODEL_NAME).to(device).eval()
 
     # ── GNN model — detect  GCNNet ──
     if not os.path.exists(MODEL_PATH):

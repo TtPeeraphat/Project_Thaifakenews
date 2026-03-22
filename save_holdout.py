@@ -1,28 +1,28 @@
-# =============================================================================
-# save_holdout.py  ── เพิ่มต่อท้าย train_fixed.py (Section 11)
-# =============================================================================
-#
-# บันทึก holdout arrays แยกออกมา เพื่อให้ evaluate_inductive.py ใช้ได้
-#
-# ทำไมต้อง save holdout แยก:
-# - evaluate_inductive.py รันแยกจาก training
-# - ต้องการ holdout ที่แน่ใจ 100% ว่าไม่เคยอยู่ใน graph
-# - บันทึก random_state=42 ด้วยเพื่อ reproducibility
-# =============================================================================
-
+# save_holdout.py
 import numpy as np
-import sys
-import os
+import pickle
+from sklearn.model_selection import train_test_split
 
+# โหลด artifacts
+with open('artifacts.pkl', 'rb') as f:
+    arts = pickle.load(f)
 
-# เพิ่มใน Section 11 ของ train_fixed.py หลังจาก save artifacts
+x_np      = arts['x_np']        # x_train ที่บันทึกไว้
+y_np      = arts['y_label_np']
+y_cat_np  = arts.get('y_cat_np')
 
-np.save("holdout_x.npy", x_holdout)
-np.save("holdout_y.npy", y_holdout)
+# แบ่ง holdout 15% จาก x_train
+idx_all = np.arange(len(x_np))
+idx_train, idx_holdout = train_test_split(
+    idx_all, test_size=0.15,
+    stratify=y_np, random_state=42
+)
+
+x_holdout = x_np[idx_holdout]
+y_holdout  = y_np[idx_holdout]
+
+np.save('holdout_x.npy', x_holdout)
+np.save('holdout_y.npy', y_holdout)
+
 print(f"Saved holdout_x.npy: {x_holdout.shape}")
 print(f"Saved holdout_y.npy: {y_holdout.shape}")
-
-# Optional: บันทึก category ของ holdout ด้วย (สำหรับ per-category analysis)
-y_cat_holdout = y_cat_bal[idx_holdout]
-np.save("holdout_y_cat.npy", y_cat_holdout)
-print(f"Saved holdout_y_cat.npy: {y_cat_holdout.shape}")
