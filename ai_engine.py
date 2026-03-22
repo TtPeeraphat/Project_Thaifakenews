@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 import streamlit as st
 from torch_geometric.data import Data
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModelForCausalLMForCausalLM
 from sklearn.neighbors import NearestNeighbors
 
 from text_preprocessor import TextPreprocessor
@@ -121,7 +121,7 @@ def load_model_pipeline() -> Dict[str, Any]:
 
     # ── WangchanBERTa ──
     tokenizer  = AutoTokenizer.from_pretrained(BERT_MODEL_NAME)
-    bert_model = AutoModel.from_pretrained(BERT_MODEL_NAME).to(device).eval()
+    bert_model = AutoModelForCausalLMForCausalLM.from_pretrained(BERT_MODEL_NAME).to(device).eval()
 
     # ── GNN model — detect  GCNNet ──
     if not os.path.exists(MODEL_PATH):
@@ -158,6 +158,8 @@ def get_pipeline() -> Dict[str, Any]:
 # =============================================================================
 # predict_news — ฟังก์ชันหลักสำหรับทำนาย
 # =============================================================================
+def _strip_html(text: str) -> str:
+            return re.sub(r'<[^>]+>', '', str(text)).strip()
 
 def predict_news(
     text: str,
@@ -243,8 +245,7 @@ def predict_news(
             torch.cuda.empty_cache()
 
         logger.info("Prediction: %s (%.1f%%)", result_text, confidence)
-        def _strip_html(text: str) -> str:
-            return re.sub(r'<[^>]+>', '', str(text)).strip()
+    
         return {
             "result":     result_text,
             "confidence": round(confidence, 2),

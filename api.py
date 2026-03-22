@@ -77,8 +77,16 @@ try:
     if not os.path.exists('best_model.pth'):
         raise FileNotFoundError("ไม่พบ best_model.pth")
 
-    model = GCNNet(in_channels=int(artifacts['x_np'].shape[1]), hidden_channels=256, out_channels=2, dropout_rate=0.4).to(device)
-    _raw = torch.load('best_model.pth', map_location=device, weights_only=False)
+        model = GCNNet(in_channels=int(artifacts['x_np'].shape[1]),
+                    hidden_channels=256, out_channels=2, dropout_rate=0.4).to(device)
+        sd = torch.load('best_model.pth', map_location=device, weights_only=False)
+
+        gcn_keys    = set(model.state_dict().keys())
+        sd_filtered = {k: v for k, v in sd.items() if k in gcn_keys}
+
+        model.load_state_dict(sd_filtered, strict=True)
+        print(f"โหลด {len(sd_filtered)} keys จากทั้งหมด {len(sd)} keys")
+        model.eval()
     if isinstance(_raw, dict):
         model.load_state_dict(_raw)
     else:

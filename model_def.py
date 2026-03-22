@@ -21,7 +21,3 @@ class GCNNet(torch.nn.Module):
         x = F.dropout(x, p=self.dropout_rate, training=self.training)
         x = self.conv2(x, edge_index, edge_weight)
         return x
-
-import torch
-sd = torch.load("best_model.pth", map_location="cpu", weights_only=True)
-print(list(sd.keys()))

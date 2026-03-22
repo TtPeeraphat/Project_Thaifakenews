@@ -1,4 +1,4 @@
-from altair.datasets import url
+
 import streamlit as st
 import logging
 import time
@@ -9,7 +9,7 @@ from ai_engine import get_pipeline, predict_news
 import database_ops as db
 from scraper_ops import get_content_from_url
 
-title, content = get_content_from_url(url)
+
 
 logger = logging.getLogger(__name__)
 
