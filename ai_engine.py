@@ -124,7 +124,7 @@ def load_model_pipeline() -> Dict[str, Any]:
 
     # ── WangchanBERTa ──
     tokenizer  = AutoTokenizer.from_pretrained(BERT_MODEL_NAME)
-    bert_model = AutoModelForCausalLMForCausalLM.from_pretrained(BERT_MODEL_NAME).to(device).eval()
+    bert_model = AutoModel.from_pretrained(BERT_MODEL_NAME).to(device).eval()
 
     # ── GNN model — detect  GCNNet ──
     if not os.path.exists(MODEL_PATH):
