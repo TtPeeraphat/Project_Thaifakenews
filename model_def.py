@@ -23,5 +23,5 @@ class GCNNet(torch.nn.Module):
         return x
 
 import torch
-sd = torch.load("best_model.pth", map_location="cpu")
+sd = torch.load("best_model.pth", map_location="cpu", weights_only=True)
 print(list(sd.keys()))
