@@ -1,4 +1,4 @@
-# model_def.py — นิยาม GCNNet ที่เดียว ทุกไฟล์ import จากที่นี่
+
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv

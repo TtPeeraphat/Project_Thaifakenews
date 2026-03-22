@@ -1,7 +1,6 @@
 # ✅ REFACTORED: Configuration & Security
 # Location: config.py
 # This file fixes Issue 6.1 (Credentials in Code)
-
 import os
 import logging
 from pathlib import Path         # เหลือแค่บรรทัดเดียว

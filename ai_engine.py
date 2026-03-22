@@ -1,3 +1,4 @@
+import sys
 import os
 import pickle
 import logging
@@ -20,9 +21,11 @@ from model_def import GCNNet
 logger = logging.getLogger(__name__)
 
 BERT_MODEL_NAME = "airesearch/wangchanberta-base-att-spm-uncased"
-MODEL_PATH      = "best_model.pth"
-ARTIFACTS_PATH  = "artifacts.pkl"
-
+MODEL_PATH     = os.path.join(_model_dir, 'best_model.pth')
+ARTIFACTS_PATH = os.path.join(_model_dir, 'artifacts.pkl')
+print(f"_model_dir    : {_model_dir}")
+print(f"ARTIFACTS_PATH: {ARTIFACTS_PATH}")
+print(f"exists        : {os.path.exists(ARTIFACTS_PATH)}")
 # ─────────────────────────────────────────────────────────────────────────────
 # Category keyword rules (fallback เมื่อ neighbor ไม่ตัดสินได้)
 # ─────────────────────────────────────────────────────────────────────────────

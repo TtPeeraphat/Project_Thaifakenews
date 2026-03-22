@@ -1,11 +1,4 @@
-"""
-validators.py
-Production-ready input validation for Fake News Detection system
 
-Fixes:
-- Issue 5.1: No input validation
-- Issue 6.2: Log injection risk
-"""
 from collections import Counter 
 import re
 import html
