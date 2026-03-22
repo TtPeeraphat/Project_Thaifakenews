@@ -1,20 +1,32 @@
+"""
+api.py  (UPDATED)
+=================
+CHANGES:
+  - import build_star_graph จาก graph_utils แทนโค้ด inline
+  - [FIX CRITICAL #2] เพิ่ม embed_combined เพื่อรองรับ title+content
+    เหมือน ai_engine.py (เดิม api.py ใช้แค่ embed_text เสมอ)
+  - ทุกอย่างอื่นเหมือนเดิม 100%
+"""
 import sys
 import os
 import pickle
 import logging
 from collections import Counter
 from typing import Dict, Any, Optional
-
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, field_validator
 import numpy as np
 import torch
 import torch.nn.functional as F
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, field_validator
 from torch_geometric.data import Data
 from sklearn.neighbors import NearestNeighbors
 from transformers import AutoTokenizer, AutoModel
 from model_def import GCNNet
-from embed_utils import embed_text
+
+# ✅ [FIX CRITICAL #1] import shared graph builder
+from graph_utils import build_star_graph
+# ✅ [FIX CRITICAL #2] import embed_combined ด้วย (ไม่ใช่แค่ embed_text)
+from embed_utils import embed_text, embed_combined
 from validators import InputValidator
 from text_preprocessor import TextPreprocessor
 
@@ -23,14 +35,14 @@ logger = logging.getLogger(__name__)
 app    = FastAPI(title="Fake News Detection API (WangchanBERTa)")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# ── Constants ────────────────────────────────────────────────
 MODEL_NAME     = "airesearch/wangchanberta-base-att-spm-uncased"
-MODEL_PATH     = "best_model.pth"      # ✅ ไฟล์เดียวกับ api.py
-ARTIFACTS_PATH = "artifacts.pkl"       # ✅ ไฟล์เดียวกับ api.py
+MODEL_PATH     = "best_model.pth"
+ARTIFACTS_PATH = "artifacts.pkl"
 
-# ============================================================
+
 class NewsRequest(BaseModel):
-    text: str
+    text:    str
+    content: str = ""   # ✅ [FIX CRITICAL #2] เพิ่ม field content (optional)
 
     @field_validator('text')
     @classmethod
@@ -38,6 +50,7 @@ class NewsRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("ข้อความต้องไม่ว่างเปล่า")
         return v.strip()
+
 
 resources: Dict[str, Any] = {}
 artifacts: Dict[str, Any] = {}
@@ -54,19 +67,16 @@ try:
 
     resources['artifacts'] = artifacts
 
-    # kNN
-    k_neighbors = int(artifacts.get('k', 10))           # ✅ เปลี่ยนชื่อไม่ชนกัน
+    k_neighbors = int(artifacts.get('k', 10))
     k_neighbors = min(k_neighbors, len(artifacts['x_np']))
     resources['k'] = k_neighbors
     resources['nbrs_engine'] = NearestNeighbors(
         n_neighbors=k_neighbors, metric='cosine'
     ).fit(artifacts['x_np'])
 
-    # BERT
     resources['tokenizer']  = AutoTokenizer.from_pretrained(MODEL_NAME)
     resources['bert_model'] = AutoModel.from_pretrained(MODEL_NAME).to(device).eval()
 
-    # GCN
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"ไม่พบ {MODEL_PATH}")
 
@@ -79,7 +89,7 @@ try:
 
     sd          = torch.load(MODEL_PATH, map_location=device, weights_only=False)
     gcn_keys    = set(model.state_dict().keys())
-    sd_filtered = {key: val for key, val in sd.items() if key in gcn_keys}  # ✅ ไม่ชนกับ k
+    sd_filtered = {key: val for key, val in sd.items() if key in gcn_keys}
 
     model.load_state_dict(sd_filtered, strict=True)
     model.eval()
@@ -90,9 +100,6 @@ except Exception as e:
     print(f"🔥 Error loading resources: {e}")
 
 
-# ============================================================
-# Endpoints (ไม่มีการเปลี่ยนแปลง)
-# ============================================================
 @app.get("/")
 def home() -> Dict[str, str]:
     return {"message": "Fake News Detection API is Running"}
@@ -108,8 +115,6 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
     if not is_valid:
         raise HTTPException(status_code=422, detail=reason)
 
-    content = cleaned
-
     try:
         tokenizer  = resources['tokenizer']
         bert_model = resources['bert_model']
@@ -123,10 +128,20 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
         y_cat_np = arts.get('y_cat_np')
         topn     = resources.get('k', 10)
 
-        emb = embed_text(content, tokenizer, bert_model, device)
+        # ✅ [FIX CRITICAL #2] ใช้ embed_combined เมื่อมี content
+        #    เหมือน ai_engine.py → embedding space ตรงกัน
+        if req.content and req.content.strip():
+            emb = embed_combined(
+                title=cleaned, content=req.content,
+                tokenizer=tokenizer, bert_model=bert_model, device=device,
+            )
+        else:
+            emb = embed_text(cleaned, tokenizer, bert_model, device)
+
         dists, idxs_2d = nbrs.kneighbors(emb.reshape(1, -1), n_neighbors=topn)
         idxs = idxs_2d[0]
 
+        # Category prediction
         pred_category = "ไม่ระบุ"
         neighbor_cats = []
         if y_cat_np is not None and id2cat is not None:
@@ -135,29 +150,19 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
             if most_common:
                 pred_category = most_common[0][0]
 
-        X_new        = np.vstack([emb, x_np[idxs]])
-        center_node  = 0
-        nbr_nodes    = np.arange(1, topn + 1)
-        self_loop_np = np.array([[center_node], [center_node]])
-
-        edge_index_np = np.concatenate([
-            np.stack([np.full(topn, center_node), nbr_nodes]),
-            np.stack([nbr_nodes, np.full(topn, center_node)]),
-            self_loop_np
-        ], axis=1)
-
-        w      = np.clip(1 - dists[0], 0.0, 1.0)
-        edge_w = np.concatenate([w, w, np.array([1.0])])
-
-        graph_data = Data(
-            x          = torch.tensor(X_new,          dtype=torch.float, device=device),
-            edge_index = torch.tensor(edge_index_np,  dtype=torch.long,  device=device),
-            edge_attr  = torch.tensor(edge_w,         dtype=torch.float, device=device),
+        # ✅ [FIX CRITICAL #1] ใช้ build_star_graph จาก graph_utils
+        #    → structure เหมือน training ทุกประการ
+        graph_data = build_star_graph(
+            query_emb      = emb,
+            neighbor_embs  = x_np[idxs],
+            neighbor_dists = dists[0],
+            device         = device,
         )
 
         with torch.no_grad():
             logits  = model_gnn(graph_data)
-            probas  = torch.softmax(logits, dim=1)[0].cpu().numpy()
+            # logits shape: (k+1, 2) — node 0 คือ query
+            probas  = torch.softmax(logits[0], dim=0).cpu().numpy()
             pred_id = int(np.argmax(probas))
 
         return {

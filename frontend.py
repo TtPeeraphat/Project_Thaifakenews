@@ -22,6 +22,7 @@ from validators import InputValidator, check_rate_limit_fallback,check_rate_limi
 
 from ai_engine import classify_category_by_keyword as guess_category, classify_category_by_keyword
 from model_def import GCNNet
+from frontend_improvements import show_home_improved
 sys.modules['__main__'].GCNNet = GCNNet
 
 if sys.platform == 'win32':
@@ -1002,7 +1003,174 @@ def show_admin_dashboard_enhanced():
                 st.plotly_chart(fig, width="stretch")
         else:
                 st.info("ยังไม่มีข้อมูลที่ Admin ตรวจสอบแล้ว")
-        
+def show_prediction_result(result: dict):
+    """
+    แสดงผลการทำนายจาก predict_news()
+ 
+    รับ dict:
+        result['result']     → 'Real' | 'Fake' | 'Error'
+        result['confidence'] → float (0-100)
+        result['thai_label'] → str   (label ภาษาไทย)
+        result['category']   → str
+        result['error']      → str | None
+ 
+    ใช้งาน:
+        if "current_result" in st.session_state:
+            show_prediction_result(st.session_state.current_result)
+    """
+ 
+    # ── กรณี error ──────────────────────────────────────────────────────────
+    if result.get("error"):
+        st.error(f"❌ เกิดข้อผิดพลาด: {result['error']}")
+        return
+ 
+    label = result.get("result", "")
+    conf  = float(result.get("confidence", 0.0))
+    cat   = result.get("category") or "ไม่ระบุ"
+ 
+    # ── preview ข้อความ ──────────────────────────────────────────────────────
+    raw_text = st.session_state.get("current_text", "")
+    preview  = re.sub(r"\s+", " ", str(raw_text)).strip()[:150]
+    preview  = (preview + "…") if len(str(raw_text)) > 150 else preview
+ 
+    # ── เลือก color config ตาม verdict ──────────────────────────────────────
+    if conf < 70:
+        cfg = dict(
+            bg="#FFFBEB", border="#F59E0B", bc="#92400E", bbg="#FEF3C7",
+            icon="⚠️", verdict="UNVERIFIED", bar="#F59E0B",
+            desc="AI ยังไม่มีความมั่นใจเพียงพอ — ควรตรวจสอบจากแหล่งอื่นด้วย",
+        )
+    elif label == "Fake":
+        cfg = dict(
+            bg="#FFF5F5", border="#EF4444", bc="#991B1B", bbg="#FEE2E2",
+            icon="🚨", verdict="FAKE NEWS", bar="#EF4444",
+            desc="เนื้อหานี้มีลักษณะเป็นข่าวปลอมหรือข้อมูลบิดเบือน — กรุณาตรวจสอบแหล่งที่มาก่อนแชร์",
+        )
+    else:
+        cfg = dict(
+            bg="#F0FDF4", border="#22C55E", bc="#14532D", bbg="#DCFCE7",
+            icon="✅", verdict="REAL NEWS", bar="#22C55E",
+            desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ",
+        )
+ 
+    # ── preview block  ────────────────────────────────────────────────
+    preview_html = ""
+    if preview:
+        preview_html = (
+            "<div style='background:rgba(0,0,0,0.04);border-radius:10px;"
+            "padding:12px 16px;margin-bottom:14px;'>"
+            "<div style='font-size:0.72rem;font-weight:700;color:#64748B;"
+            "text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;'>"
+            "📄 จากเนื้อหาข่าว</div>"
+            f"<div style='font-size:0.88rem;color:#334155;line-height:1.6;font-style:italic;'>"
+            f"&quot;{preview}&quot;</div></div>"
+        )
+ 
+    # ── Result Card ───────────────────────────────────────────────────────────
+    st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="background:{cfg['bg']};border:1.5px solid {cfg['border']};
+                border-radius:16px;padding:26px 28px;
+                box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+      <div style="display:flex;align-items:flex-start;gap:15px;margin-bottom:18px;">
+        <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
+        <div style="flex:1;">
+          <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
+                       font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
+                       font-size:1.15rem;padding:5px 16px;border-radius:8px;">
+            {cfg['verdict']}
+          </span>
+          <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
+            {cfg['desc']}
+          </div>
+        </div>
+      </div>
+ 
+      {preview_html}
+ 
+      <div style="margin-bottom:14px;">
+        <span style="font-size:0.75rem;font-weight:600;color:#64748B;">📂 หมวดหมู่ข่าว</span>&nbsp;
+        <span style="background:#EFF6FF;color:#1148A8;font-size:0.82rem;font-weight:700;
+                     padding:4px 12px;border-radius:99px;border:1px solid #BFDBFE;">
+          {cat}
+        </span>
+      </div>
+ 
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:0.8rem;font-weight:600;color:#64748B;">AI Confidence</span>
+          <span style="font-size:0.88rem;font-weight:800;color:{cfg['bc']};">{conf:.1f}%</span>
+        </div>
+        <div style="background:rgba(0,0,0,0.07);border-radius:99px;height:7px;overflow:hidden;">
+          <div style="width:{conf}%;height:100%;background:{cfg['bar']};border-radius:99px;"></div>
+        </div>
+      </div>
+    </div>""", unsafe_allow_html=True)
+ 
+    # ── Feedback ──────────────────────────────────────────────────────────────
+    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+ 
+    if not st.session_state.get("feedback_given"):
+        st.markdown("""
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;
+                    padding:16px 20px 8px;">
+          <div style="font-weight:700;font-size:0.9rem;color:#1E293B;">
+            💬 AI ทายถูกหรือเปล่า?
+          </div>
+          <div style="font-size:0.8rem;color:#94A3B8;margin:3px 0 10px;">
+            Feedback ของคุณช่วยให้ AI แม่นยำขึ้น
+          </div>
+        </div>""", unsafe_allow_html=True)
+ 
+        fc1, fc2, fc3 = st.columns([2, 2, 1])
+        pred_id = st.session_state.get("current_pred_id")
+ 
+        with fc1:
+            if st.button("👍  ถูกต้อง — AI ทายถูก", type="primary",
+                         key="fb_correct_imp", use_container_width=True):
+                db.save_feedback(pred_id, "Correct")
+                db.log_system_event(
+                    user_id=st.session_state.get("user_id"),
+                    action="FEEDBACK",
+                    details=f"[{st.session_state.get('username')}] Correct (pred_id: {pred_id})",
+                    level="INFO",
+                )
+                st.session_state["feedback_given"] = True
+                st.toast("ขอบคุณ!")
+                time.sleep(0.7)
+                st.rerun()
+ 
+        with fc2:
+            if st.button("👎  ไม่ถูกต้อง — AI ทายผิด",
+                         key="fb_incorrect_imp", use_container_width=True):
+                db.save_feedback(pred_id, "Incorrect")
+                db.log_system_event(
+                    user_id=st.session_state.get("user_id"),
+                    action="FEEDBACK",
+                    details=f"[{st.session_state.get('username')}] Incorrect (pred_id: {pred_id})",
+                    level="INFO",
+                )
+                st.session_state["feedback_given"] = True
+                st.toast("ขอบคุณ! เราจะนำไปปรับปรุง")
+                time.sleep(0.7)
+                st.rerun()
+ 
+        with fc3:
+            if st.button("🗑️ ล้างผล", key="fb_clear_imp", use_container_width=True):
+                for k in ["current_result", "current_pred_id", "feedback_given", "current_text"]:
+                    st.session_state.pop(k, None)
+                st.rerun()
+ 
+    else:
+        rc1, rc2 = st.columns([3, 1])
+        with rc1:
+            st.success("✅ ส่ง Feedback แล้ว — ขอบคุณที่ช่วยพัฒนา AI!")
+        with rc2:
+            if st.button("🗑️ ล้างผล", key="fb_clear_after_imp", use_container_width=True):
+                for k in ["current_result", "current_pred_id", "feedback_given", "current_text"]:
+                    st.session_state.pop(k, None)
+                st.rerun()
+
 def show_category_analysis():
         """วิเคราะห์ความแม่นยำและการกระจายของ Category"""
         section_title("📂 Category Distribution Analysis", "ตรวจสอบการจำแนกหมวดหมู่ของ AI")
@@ -3828,125 +3996,12 @@ colorObs.observe(window.parent.document.body,
                         )
                         st.error(f"❌ เกิดข้อผิดพลาด: {type(e).__name__}: {e}")
 
+          
             # ═══════════════════════════════
             # ✅ Result — แสดงเสมอจนกดวิเคราะห์ใหม่
             # ═══════════════════════════════
             if st.session_state.get('current_result'):
-                res   = st.session_state['current_result']
-                label = res['result']
-                conf  = float(res['confidence'])
-                cat   = res.get('category', 'ไม่ระบุ')
-
-                raw_text = st.session_state.get('current_text', '')
-                preview  = re.sub(r'\s+', ' ', str(raw_text)).strip()[:150]
-                preview  = (preview + "…") if len(str(raw_text)) > 150 else preview
-
-                if conf < 70:
-                    cfg = dict(bg="#FFFBEB", border="#F59E0B", bc="#92400E", bbg="#FEF3C7",
-                            icon="⚠️", verdict="UNVERIFIED", bar="#F59E0B",
-                            desc="AI ยังไม่มีความมั่นใจเพียงพอ — ควรตรวจสอบจากแหล่งอื่นด้วย")
-                elif label == "Fake":
-                    cfg = dict(bg="#FFF5F5", border="#EF4444", bc="#991B1B", bbg="#FEE2E2",
-                            icon="🚨", verdict="FAKE NEWS", bar="#EF4444",
-                            desc="เนื้อหานี้มีลักษณะเป็นข่าวปลอมหรือข้อมูลบิดเบือน — กรุณาตรวจสอบแหล่งที่มาก่อนแชร์")
-                else:
-                    cfg = dict(bg="#F0FDF4", border="#22C55E", bc="#14532D", bbg="#DCFCE7",
-                            icon="✅", verdict="REAL NEWS", bar="#22C55E",
-                            desc="เนื้อหาดูน่าเชื่อถือและสมเหตุสมผล — ควรอ้างอิงแหล่งข้อมูลหลักเสมอ")
-
-                st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
-                st.markdown(f"""
-                <div style="background:{cfg['bg']};border:1.5px solid {cfg['border']};
-                            border-radius:16px;padding:26px 28px;
-                            box-shadow:0 4px 20px rgba(0,0,0,0.06);">
-                <div style="display:flex;align-items:flex-start;gap:15px;margin-bottom:18px;">
-                    <span style="font-size:2rem;line-height:1;flex-shrink:0;">{cfg['icon']}</span>
-                    <div style="flex:1;">
-                    <span style="display:inline-block;background:{cfg['bbg']};color:{cfg['bc']};
-                                font-family:'IBM Plex Sans Thai',sans-serif;font-weight:800;
-                                font-size:1.15rem;padding:5px 16px;border-radius:8px;">
-                        {cfg['verdict']}
-                    </span>
-                    <div style="margin-top:9px;font-size:0.9rem;color:#475569;line-height:1.55;">
-                        {cfg['desc']}
-                    </div>
-                    </div>
-                </div>
-                {'<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px 16px;margin-bottom:14px;"><div style="font-size:0.72rem;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">📄 จากเนื้อหาข่าว</div><div style="font-size:0.88rem;color:#334155;line-height:1.6;font-style:italic;">&quot;' + preview + '&quot;</div></div>' if preview else ''}
-                <div style="margin-bottom:14px;">
-                    <span style="font-size:0.75rem;font-weight:600;color:#64748B;">📂 หมวดหมู่ข่าว</span>&nbsp;
-                    <span style="background:#EFF6FF;color:#1148A8;font-size:0.82rem;font-weight:700;
-                                padding:4px 12px;border-radius:99px;border:1px solid #BFDBFE;">
-                    {cat}
-                    </span>
-                </div>
-                <div>
-                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-                    <span style="font-size:0.8rem;font-weight:600;color:#64748B;">AI Confidence</span>
-                    <span style="font-size:0.88rem;font-weight:800;color:{cfg['bc']};">{conf:.1f}%</span>
-                    </div>
-                    <div style="background:rgba(0,0,0,0.07);border-radius:99px;height:7px;overflow:hidden;">
-                    <div style="width:{conf}%;height:100%;background:{cfg['bar']};border-radius:99px;"></div>
-                    </div>
-                </div>
-                </div>""", unsafe_allow_html=True)
-
-                # ── Feedback ──
-                st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-
-                if not st.session_state.get('feedback_given'):
-                    st.markdown("""
-                    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;
-                                padding:16px 20px 8px;">
-                    <div style="font-weight:700;font-size:0.9rem;color:#1E293B;">
-                        💬 AI ทายถูกหรือเปล่า?
-                    </div>
-                    <div style="font-size:0.8rem;color:#94A3B8;margin:3px 0 10px;">
-                        Feedback ของคุณช่วยให้ AI แม่นยำขึ้น
-                    </div>
-                    </div>""", unsafe_allow_html=True)
-
-                    fc1, fc2, fc3 = st.columns([2, 2, 1])
-                    with fc1:
-                        if st.button("👍  ถูกต้อง — AI ทายถูก", type="primary", width="stretch"):
-                            db.save_feedback(st.session_state['current_pred_id'], "Correct")
-                            db.log_system_event(
-                                user_id=st.session_state.get('user_id'), action="FEEDBACK",
-                                details=f"[{st.session_state.get('username')}] Correct "
-                                        f"(pred_id: {st.session_state['current_pred_id']})",
-                                level="INFO"
-                            )
-                            st.session_state['feedback_given'] = True
-                            st.toast("ขอบคุณ!"); time.sleep(0.7); st.rerun()
-                    with fc2:
-                        if st.button("👎  ไม่ถูกต้อง — AI ทายผิด", width="stretch"):
-                            db.save_feedback(st.session_state['current_pred_id'], "Incorrect")
-                            db.log_system_event(
-                                user_id=st.session_state.get('user_id'), action="FEEDBACK",
-                                details=f"[{st.session_state.get('username')}] Incorrect "
-                                        f"(pred_id: {st.session_state['current_pred_id']})",
-                                level="INFO"
-                            )
-                            st.session_state['feedback_given'] = True
-                            st.toast("ขอบคุณ! เราจะนำไปปรับปรุง"); time.sleep(0.7); st.rerun()
-                    with fc3:
-                        # ✅ ปุ่มล้างผลลัพธ์ manually
-                        if st.button("🗑️ ล้างผล", width="stretch"):
-                            for k in ['current_result','current_pred_id',
-                                    'feedback_given','current_text']:
-                                st.session_state.pop(k, None)
-                            st.rerun()
-                else:
-                    rc1, rc2 = st.columns([3, 1])
-                    with rc1:
-                        st.success("✅ ส่ง Feedback แล้ว — ขอบคุณที่ช่วยพัฒนา AI!")
-                    with rc2:
-                        # ✅ ปุ่มล้างผลหลังส่ง feedback
-                        if st.button("🗑️ ล้างผล", width="stretch"):
-                            for k in ['current_result','current_pred_id',
-                                    'feedback_given','current_text']:
-                                st.session_state.pop(k, None)
-                            st.rerun()
+                show_prediction_result(st.session_state['current_result'])
 
         # ══════════════════════════════════════
         # 📜 HISTORY

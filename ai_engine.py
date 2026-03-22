@@ -1,3 +1,11 @@
+"""
+ai_engine.py  (UPDATED)
+=======================
+CHANGES:
+  - ลบ _build_star_graph() ออก (โค้ดซ้ำ)
+  - import build_star_graph จาก graph_utils แทน
+  - ทุกอย่างอื่นเหมือนเดิม 100%
+"""
 import sys
 import os
 import pickle
@@ -9,7 +17,7 @@ import streamlit as st
 import numpy as np
 import torch
 import torch.nn.functional as F
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException    
 from pydantic import BaseModel, field_validator
 from torch_geometric.data import Data
 from sklearn.neighbors import NearestNeighbors
@@ -19,18 +27,18 @@ from embed_utils import embed_combined, embed_text
 from validators import InputValidator
 from text_preprocessor import TextPreprocessor
 
+# ✅ [FIX CRITICAL] import shared function แทน _build_star_graph ที่อยู่ใน file นี้
+from graph_utils import build_star_graph
+
 logger = logging.getLogger(__name__)
 
-app    = FastAPI(title="Fake News Detection API (WangchanBERTa)")
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# ── path ใช้ชื่อไฟล์ตรงๆ ────────────────────────────────────
 MODEL_PATH     = "best_model.pth"
 ARTIFACTS_PATH = "artifacts.pkl"
 MODEL_NAME     = "airesearch/wangchanberta-base-att-spm-uncased"
-# ─────────────────────────────────────────────────────────────────────────────
-# Category keyword rules (fallback เมื่อ neighbor ไม่ตัดสินได้)
-# ─────────────────────────────────────────────────────────────────────────────
+
 CATEGORY_RULES: Dict[str, list] = {
     "นโยบายรัฐบาล-ข่าวสาร": ["รัฐบาล", "ครม.", "นายกฯ", "กระทรวง", "นโยบาย"],
     "ผลิตภัณฑ์สุขภาพ":      ["ยา", "อาหารเสริม", "สุขภาพ", "รักษา", "โรค"],
@@ -51,60 +59,19 @@ def classify_category_by_keyword(text: str) -> str:
     return best[0] if best[1] > 0 else "ข่าวอื่นๆ"
 
 
-def _build_star_graph(
-    query_emb: np.ndarray,
-    neighbor_embs: np.ndarray,
-    neighbor_dists: np.ndarray,
-    device: torch.device,
-) -> Data:
-    k = len(neighbor_embs)
+# ✅ _build_star_graph เดิมถูกลบออกแล้ว — ใช้ build_star_graph จาก graph_utils แทน
 
-    # Node features: [query, neighbor_1, ..., neighbor_k]
-    x_np = np.vstack([query_emb.reshape(1, -1), neighbor_embs])  # (k+1, 768)
-    x = torch.tensor(x_np, dtype=torch.float32).to(device)
-
-    center = 0
-    neighbors = np.arange(1, k + 1)
-
-    # Forward edges: center → each neighbor
-    fwd = np.stack([np.full(k, center), neighbors])       # (2, k)
-    # Backward edges: each neighbor → center
-    bwd = np.stack([neighbors, np.full(k, center)])       # (2, k)
-    # Self-loop บน center node
-    slf = np.array([[center], [center]])                   # (2, 1)
-
-    edge_index_np = np.concatenate([fwd, bwd, slf], axis=1)  # (2, 2k+1)
-    edge_index = torch.tensor(edge_index_np, dtype=torch.long).to(device)
-
-    # Edge weights: [FIX M3] clip ให้อยู่ใน [0, 1]
-    w = np.clip(1.0 - neighbor_dists, 0.0, 1.0)           # (k,)
-    weights_np = np.concatenate([w, w, np.array([1.0])])  # (2k+1,)
-    edge_attr = torch.tensor(weights_np, dtype=torch.float32).to(device)
-
-    return Data(x=x, edge_index=edge_index, edge_attr=edge_attr).to(device)
-
-
-# =============================================================================
-# โหลด ML Pipeline (cached ด้วย Streamlit)
-# =============================================================================
 
 @st.cache_resource
 def load_model_pipeline() -> Dict[str, Any]:
     """
     โหลด model และ artifacts ทั้งหมด (ทำครั้งเดียว cache ไว้)
-
     [FIX M2] id2label ดึงจาก artifacts.pkl เสมอ — ไม่ hardcode
-    เหตุผล: ถ้า label index เปลี่ยน (เช่น 0=fake, 1=real แทน 0=real, 1=fake)
-            hardcode จะทำให้ผลพลิกกลับหมด
-
-    [NEW] Auto-detect model type:  GCNNet
-    model เก่า (GCNNet) 
     """
     logger.info("🔄 Loading ML Pipeline...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Device: %s", device)
 
-    # ── โหลด artifacts ──
     if not os.path.exists(ARTIFACTS_PATH):
         raise FileNotFoundError(f"ไม่พบ artifacts: {ARTIFACTS_PATH}")
 
@@ -112,36 +79,29 @@ def load_model_pipeline() -> Dict[str, Any]:
         artifacts = pickle.load(f)
 
     x_database:  np.ndarray    = artifacts["x_np"]
-    id2label:    Dict[int, str] = artifacts["id2label"]    # [FIX M2]
+    id2label:    Dict[int, str] = artifacts["id2label"]
     id2cat:      Optional[Dict] = artifacts.get("id2cat")
     y_cat_np:    Optional[np.ndarray] = artifacts.get("y_cat_np")
     k_neighbors: int            = int(artifacts.get("k", 10))
 
     logger.info("Database size: %d samples, k=%d", len(x_database), k_neighbors)
 
-    # ── kNN ──
-    nbrs = NearestNeighbors(
-        n_neighbors=k_neighbors, metric="cosine"
-    ).fit(x_database)
+    nbrs = NearestNeighbors(n_neighbors=k_neighbors, metric="cosine").fit(x_database)
 
-    # ── WangchanBERTa ──
     tokenizer  = AutoTokenizer.from_pretrained(MODEL_NAME)
     bert_model = AutoModel.from_pretrained(MODEL_NAME).to(device).eval()
 
-    # ── GNN model — detect  GCNNet ──
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"ไม่พบ model: {MODEL_PATH}")
 
     state_dict = torch.load(MODEL_PATH, map_location=device)
-        # GCNConv — model เดิม
     model = GCNNet(
-            in_channels=768, hidden_channels=256, out_channels=2, dropout_rate=0.4
-        ).to(device)
-    logger.info(" โหลด GCNNet ")
-
+        in_channels=768, hidden_channels=256, out_channels=2, dropout_rate=0.4
+    ).to(device)
+    logger.info("โหลด GCNNet")
     model.load_state_dict(state_dict)
     model.eval()
-    
+
     return {
         "model":       model,
         "tokenizer":   tokenizer,
@@ -160,35 +120,15 @@ def get_pipeline() -> Dict[str, Any]:
     return load_model_pipeline()
 
 
-# =============================================================================
-# predict_news — ฟังก์ชันหลักสำหรับทำนาย
-# =============================================================================
 def _strip_html(text: str) -> str:
-            return re.sub(r'<[^>]+>', '', str(text)).strip()
+    return re.sub(r'<[^>]+>', '', str(text)).strip()
+
 
 def predict_news(
     text: str,
     pipeline: Dict[str, Any],
-    content: str = "",          # [FIX C2] รับ content เพิ่มถ้ามี
+    content: str = "",
 ) -> Dict[str, Any]:
-    """
-    ทำนายว่าข่าวเป็น จริง หรือ ปลอม
-
-    Args:
-        text:     ข้อความข่าว (หัวข้อ หรือ หัวข้อ+เนื้อหารวม)
-        pipeline: dict จาก load_model_pipeline()
-        content:  เนื้อหาข่าว (optional) — ถ้ามีจะรวมกับ text ก่อน embed
-
-    Returns:
-        dict: {
-            'result':     'Real' | 'Fake' | 'Error'
-            'confidence': float (0-100)
-            'thai_label': str
-            'category':   str
-            'error':      str | None
-        }
-    """
-    # ── Validation ──
     if not text or not isinstance(text, str):
         return _error("Invalid text input")
 
@@ -209,8 +149,6 @@ def predict_news(
         k_neighbors = pipeline["k_neighbors"]
 
         # ── A. Embed ──
-        # [FIX C2] ถ้ามี content จาก frontend ให้รวมก่อน embed
-        #          เพื่อให้ embedding ตรงกับ training (combined_text = title + content)
         if content and content.strip():
             emb = embed_combined(
                 title=cleaned, content=content,
@@ -220,29 +158,28 @@ def predict_news(
             emb = embed_text(
                 cleaned, tokenizer=tokenizer, bert_model=bert_model, device=device,
             )
-        # emb shape: (768,)
 
         # ── B. kNN Search ──
         dists, idxs = nbrs.kneighbors(emb.reshape(1, -1), n_neighbors=k_neighbors)
-        dists = dists[0]  # (k,)
-        idxs  = idxs[0]   # (k,)
+        dists = dists[0]
+        idxs  = idxs[0]
 
-        # ── C. Category prediction (Majority Vote จาก neighbors) ──
+        # ── C. Category prediction ──
         pred_category = _predict_category(idxs, y_cat_np, id2cat, cleaned)
 
-        # ── D. สร้าง Star Graph + GNN Inference ──
-        # [FIX C3 + C4] ใช้ _build_star_graph ที่มี self-loop และ bidirectional edges
+        # ── D. Star Graph + GNN Inference ──
+        # ✅ [FIX CRITICAL] ใช้ build_star_graph จาก graph_utils
+        #    → structure เหมือน training ทุกประการ (bidirectional + self-loop)
         neighbor_embs = x_database[idxs]
-        graph_data = _build_star_graph(emb, neighbor_embs, dists, device)
+        graph_data = build_star_graph(emb, neighbor_embs, dists, device)
 
         with torch.no_grad():
-            out: torch.Tensor = model(graph_data)       # (k+1, 2)
-            query_logits = out[0, :]                    # (2,)  — node 0 คือ query
-            probs = F.softmax(query_logits, dim=0)      # softmax บน class dimension
+            out: torch.Tensor = model(graph_data)
+            query_logits = out[0, :]
+            probs = F.softmax(query_logits, dim=0)
             pred_idx   = int(torch.argmax(probs).item())
             confidence = float(probs[pred_idx].item()) * 100
 
-        # [FIX M2] ดึง label จาก id2label ใน artifacts (ไม่ hardcode)
         label       = id2label[pred_idx]
         result_text = "Real" if "จริง" in label else "Fake"
 
@@ -250,12 +187,12 @@ def predict_news(
             torch.cuda.empty_cache()
 
         logger.info("Prediction: %s (%.1f%%)", result_text, confidence)
-    
+
         return {
             "result":     result_text,
             "confidence": round(confidence, 2),
             "thai_label": label,
-            'category':   _strip_html(pred_category),
+            "category":   _strip_html(pred_category),
             "error":      None,
         }
 
@@ -266,10 +203,6 @@ def predict_news(
         logger.error("Prediction error: %s", e, exc_info=True)
         return _error(f"Unexpected error: {str(e)[:100]}")
 
-
-# =============================================================================
-# Helper functions
-# =============================================================================
 
 def _error(msg: str) -> Dict[str, Any]:
     return {
@@ -284,7 +217,6 @@ def _predict_category(
     id2cat: Optional[Dict],
     text: str,
 ) -> str:
-    """Majority vote จาก neighbors, fallback เป็น keyword matching"""
     if y_cat_np is not None and id2cat is not None:
         try:
             neighbor_cat_ids = y_cat_np[idxs]

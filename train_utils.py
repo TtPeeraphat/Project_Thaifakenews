@@ -1,26 +1,17 @@
-
+"""
+train_utils.py  (UPDATED)
+=========================
+CHANGES:
+  - ลบ _build_batch_star_graphs() ออก (เดิมไม่มี self-loop)
+  - import build_batch_star_graphs จาก graph_utils แทน
+  - ทุกอย่างอื่นเหมือนเดิม 100%
+"""
 import numpy as np
 import torch
-from torch_geometric.data import Data, Batch
+from torch_geometric.data import Batch
 
-def _build_batch_star_graphs(query_embs, support_embs, support_nbrs, k, device):
-    """สร้าง star graph ทั้ง batch แล้วรวมเป็น graph เดียว"""
-    dists_all, idxs_all = support_nbrs.kneighbors(query_embs, n_neighbors=k + 1)
-    graphs = []
-    for i in range(len(query_embs)):
-        idxs  = idxs_all[i][1:]
-        dists = dists_all[i][1:]
-        x_nodes    = np.vstack([query_embs[i], support_embs[idxs]])
-        neighbors  = np.arange(1, k + 1)
-        src        = np.concatenate([np.zeros(k, dtype=np.int64), neighbors])
-        dst        = np.concatenate([neighbors, np.zeros(k, dtype=np.int64)])
-        edge_weight = np.clip(np.concatenate([1.0 - dists, 1.0 - dists]), 0.0, 1.0)
-        graphs.append(Data(
-            x          = torch.tensor(x_nodes,              dtype=torch.float),
-            edge_index = torch.tensor(np.stack([src, dst]), dtype=torch.long),
-            edge_attr  = torch.tensor(edge_weight,          dtype=torch.float),
-        ))
-    return Batch.from_data_list(graphs).to(device)
+# ✅ [FIX CRITICAL] import shared function แทนโค้ดซ้ำ
+from graph_utils import build_batch_star_graphs
 
 
 def train_epoch_inductive(model, optimizer, criterion,
@@ -36,13 +27,12 @@ def train_epoch_inductive(model, optimizer, criterion,
         batch_idx = indices[start: start + batch_size]
         optimizer.zero_grad()
 
-        # ── สร้างทั้ง batch ครั้งเดียว ──
-        batch_graph = _build_batch_star_graphs(
+        # ✅ ใช้ shared function → structure เหมือน inference ทุกประการ
+        batch_graph = build_batch_star_graphs(
             x_query[batch_idx], x_support, support_nbrs, k, device
         )
         labels = torch.tensor(y_query[batch_idx], dtype=torch.long, device=device)
 
-        # ── forward ครั้งเดียว ──
         logits = model(batch_graph)                              # (batch*(k+1), 2)
         query_idx = torch.arange(len(batch_idx), device=device) * (k + 1)
         logits_q  = logits[query_idx]                           # (batch_size, 2)
@@ -66,7 +56,9 @@ def eval_epoch_inductive(model, x_query, y_query,
 
     for start in range(0, len(x_query), batch_size):
         batch_idx   = np.arange(start, min(start + batch_size, len(x_query)))
-        batch_graph = _build_batch_star_graphs(
+
+        # ✅ ใช้ shared function เช่นกัน
+        batch_graph = build_batch_star_graphs(
             x_query[batch_idx], x_support, support_nbrs, k, device
         )
         logits    = model(batch_graph)

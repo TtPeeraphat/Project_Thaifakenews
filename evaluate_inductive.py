@@ -1,18 +1,13 @@
-# =============================================================================
-# evaluate_inductive.py  ── Thesis Evaluation Script
-# =============================================================================
-#
-# สคริปต์สำหรับวัดผลโมเดลแบบครบถ้วน สำหรับนำเสนอ thesis
-#
-# วัดผล 3 แบบ:
-#   1. Transductive Val   — val nodes อยู่ใน training graph (สูงเกินจริง)
-#   2. Inductive Holdout  — star-graph inference เหมือน production
-#   3. Per-category       — accuracy แยกตามหมวดหมู่ข่าว
-#
-# วิธีใช้:
-#   python evaluate_inductive.py --data AFNC_news_dataset_tf-2.csv
-# =============================================================================
-
+"""
+evaluate_inductive.py  (UPDATED)
+=================================
+CHANGES:
+  - ลบ star_graph_predict() ที่ใช้ add_self_loops จาก PyG ออก
+    (เดิม: structure ต่างจาก training เพราะใช้ add_self_loops)
+  - import build_star_graph จาก graph_utils แทน
+  - ทุกอย่างอื่นเหมือนเดิม 100% — ตัวเลข metrics ที่ได้ตอนนี้
+    honest กับ production performance จริงๆ
+"""
 import argparse
 import pickle
 import warnings
@@ -30,16 +25,14 @@ from sklearn.metrics import (
 )
 from sklearn.neighbors import NearestNeighbors
 from torch_geometric.data import Data
-from torch_geometric.utils import add_self_loops
 
 from model_def import GCNNet
 
+# ✅ [FIX CRITICAL] import shared function — ลบ add_self_loops ที่ทำให้ structure ต่างกัน
+from graph_utils import build_star_graph
+
 warnings.filterwarnings("ignore")
 
-
-# =============================================================================
-# HELPERS
-# =============================================================================
 
 def load_artifacts(artifacts_path: str, model_path: str, device: torch.device):
     """โหลด model + artifacts"""
@@ -53,61 +46,16 @@ def load_artifacts(artifacts_path: str, model_path: str, device: torch.device):
     return model, arts
 
 
-def star_graph_predict(
-    query_emb:   np.ndarray,
-    x_train:     np.ndarray,
-    nbrs:        NearestNeighbors,
-    model:       torch.nn.Module,
-    k:           int,
-    device:      torch.device,
-) -> int:
-    """
-    ทำนาย 1 ตัวอย่างด้วย star-graph
-    เหมือน production inference ทุกประการ
+# ✅ star_graph_predict ถูกลบออก — ใช้ build_star_graph จาก graph_utils โดยตรง
 
-    ทำไม:
-    - ต้องการ metric ที่ honest กับ performance จริงๆ
-    - val mask evaluation ใน graph มี information leakage
-    - star-graph evaluation ไม่มี leakage เพราะ query ไม่อยู่ใน graph
-    """
-    q = query_emb.reshape(1, -1)
-    dists, idxs = nbrs.kneighbors(q, n_neighbors=k)
-    idxs = idxs[0]
-
-    all_nodes = np.vstack([q, x_train[idxs]])   # (k+1, 768)
-    x_t       = torch.tensor(all_nodes, dtype=torch.float).to(device)
-
-    # Star edges (bidirectional)
-    ctr  = np.array([0] * k + list(range(1, k + 1)))
-    nb   = np.array(list(range(1, k + 1)) + [0] * k)
-    ei   = torch.tensor(np.stack([ctr, nb]), dtype=torch.long).to(device)
-
-    # Self-loop at query node (center)
-    w  = np.clip(1.0 - np.concatenate([dists[0], dists[0]]), 0.0, 1.0)
-    wt = torch.tensor(w, dtype=torch.float).to(device)
-    ei, wt = add_self_loops(ei, wt, fill_value=1.0, num_nodes=k + 1)
-
-    graph = Data(x=x_t, edge_index=ei).to(device)
-    with torch.no_grad():
-        out = model(graph)
-    return int(out[0].argmax().item())
-
-
-# =============================================================================
-# MAIN EVALUATION
-# =============================================================================
 
 def run_evaluation(
     artifacts_path: str = "artifacts.pkl",
     model_path:     str = "best_model.pth",
-    holdout_x_path: str = "holdout_x.npy",    # บันทึกตอนเทรน
+    holdout_x_path: str = "holdout_x.npy",
     holdout_y_path: str = "holdout_y.npy",
     output_dir:     str = "eval_results",
 ):
-    """
-    วัดผลแบบครบถ้วน
-    ไฟล์ holdout_x.npy และ holdout_y.npy ต้องถูกบันทึกตอน train
-    """
     Path(output_dir, "img").mkdir(parents=True, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -115,27 +63,39 @@ def run_evaluation(
     print("Loading model and artifacts...")
     model, arts = load_artifacts(artifacts_path, model_path, device)
 
-    x_train = arts["x_np"]
+    x_train  = arts["x_np"]
     id2label = arts["id2label"]
     k        = int(arts.get("k", 10))
 
-    # [FIX M1] kNN จาก train-only database
     nbrs = NearestNeighbors(n_neighbors=k, metric="cosine").fit(x_train)
 
-    # โหลด holdout
     x_holdout = np.load(holdout_x_path)
     y_holdout  = np.load(holdout_y_path)
     print(f"Holdout: {len(x_holdout)} samples")
 
     # ==========================================================
-    # 1. Inductive evaluation (star-graph)
+    # Inductive evaluation (star-graph)
     # ==========================================================
     print("\nRunning inductive evaluation (star-graph)...")
 
     y_pred = []
     for i in range(len(x_holdout)):
-        pred = star_graph_predict(x_holdout[i], x_train, nbrs, model, k, device)
+        q = x_holdout[i].reshape(1, -1)
+        dists, idxs = nbrs.kneighbors(q, n_neighbors=k)
+
+        # ✅ [FIX CRITICAL] ใช้ build_star_graph → structure เหมือน training/inference ทุกประการ
+        graph = build_star_graph(
+            query_emb      = x_holdout[i],
+            neighbor_embs  = x_train[idxs[0]],
+            neighbor_dists = dists[0],
+            device         = device,
+        )
+
+        with torch.no_grad():
+            out = model(graph)
+        pred = int(out[0].argmax().item())
         y_pred.append(pred)
+
         if (i + 1) % 100 == 0:
             print(f"  {i+1}/{len(x_holdout)}")
 
@@ -160,9 +120,7 @@ def run_evaluation(
         digits=4, zero_division=0,
     ))
 
-    # ==========================================================
-    # 2. Confusion Matrix
-    # ==========================================================
+    # Confusion Matrix
     cm = confusion_matrix(y_holdout, y_pred)
     tn, fp, fn, tp = cm.ravel()
     print(f"  True Positive  (Fake ทำนายถูก): {tp}")
@@ -185,37 +143,21 @@ def run_evaluation(
     plt.close()
     print(f"\nSaved: {cm_path}")
 
-    # ==========================================================
-    # 3. Summary Table (สำหรับ thesis)
-    # ==========================================================
-    summary = {
+    # Summary
+    import pandas as pd
+    df_summary = pd.DataFrame({
         "Metric":    ["Accuracy", "Precision", "Recall", "F1-Score"],
         "Inductive": [f"{acc:.4f}", f"{prec:.4f}", f"{rec:.4f}", f"{f1:.4f}"],
-    }
-    import pandas as pd
-    df_summary = pd.DataFrame(summary)
+    })
     print("\nSummary Table:")
     print(df_summary.to_string(index=False))
     df_summary.to_csv(f"{output_dir}/eval_summary.csv", index=False)
     print(f"Saved: {output_dir}/eval_summary.csv")
 
-    return {
-        "accuracy":  acc,
-        "precision": prec,
-        "recall":    rec,
-        "f1":        f1,
-    }
+    return {"accuracy": acc, "precision": prec, "recall": rec, "f1": f1}
 
-
-# =============================================================================
-# QUICK DEMO — ใช้ได้โดยไม่ต้องมี holdout file
-# =============================================================================
 
 def demo_single_prediction(title: str, content: str = ""):
-    """
-    ทดสอบ predict ข่าวเดี่ยวสำหรับ demo
-    ใช้ในตอน present thesis
-    """
     from ai_engine import load_model_pipeline, predict_news
     pipeline = load_model_pipeline()
     result = predict_news(text=title, content=content, pipeline=pipeline)
@@ -233,10 +175,6 @@ def demo_single_prediction(title: str, content: str = ""):
     return result
 
 
-# =============================================================================
-# ENTRY POINT
-# =============================================================================
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate Thai Fake News Detector")
     parser.add_argument("--artifacts", default="artifacts.pkl")
@@ -244,7 +182,7 @@ if __name__ == "__main__":
     parser.add_argument("--holdout-x", default="holdout_x.npy")
     parser.add_argument("--holdout-y", default="holdout_y.npy")
     parser.add_argument("--output",    default="eval_results")
-    parser.add_argument("--demo",      action="store_true", help="Run single demo prediction")
+    parser.add_argument("--demo",      action="store_true")
     parser.add_argument("--title",     default="รัฐบาลประกาศแจกเงินประชาชน 10,000 บาท")
     parser.add_argument("--content",   default="")
     args = parser.parse_args()

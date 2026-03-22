@@ -50,7 +50,7 @@ class InputValidator:
     # -------------------------
 
     MIN_TEXT_LENGTH = 10
-    MAX_TEXT_LENGTH = 2000     # suitable for BERT
+    MAX_TEXT_LENGTH = 5000     # suitable for BERT
     MAX_WORDS = 600
     MAX_URL_LENGTH = 2048
 
