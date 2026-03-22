@@ -30,7 +30,7 @@ def check_env_file():
                 env_vars[key] = value[:20] + "..." if len(value) > 20 else value
     
     # Check required variables
-    required = ["SUPABASE_URL", "SUPABASE_KEY", "SENDER_EMAIL", "SENDER_PASSWORD"]
+    required = ["SUPABASE_URL", "SUPABASE_KEY", "GMAIL_EMAIL", "GMAIL_APP_PASSWORD"]
     missing = []
     
     for var in required:

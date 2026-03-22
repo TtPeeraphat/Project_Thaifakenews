@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 from sklearn.model_selection import train_test_split
 
+
 # โหลด artifacts
 with open('artifacts.pkl', 'rb') as f:
     arts = pickle.load(f)

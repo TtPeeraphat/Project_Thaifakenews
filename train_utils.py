@@ -14,7 +14,7 @@ def _build_batch_star_graphs(query_embs, support_embs, support_nbrs, k, device):
         neighbors  = np.arange(1, k + 1)
         src        = np.concatenate([np.zeros(k, dtype=np.int64), neighbors])
         dst        = np.concatenate([neighbors, np.zeros(k, dtype=np.int64)])
-        edge_weight = np.concatenate([1.0 - dists, 1.0 - dists])
+        edge_weight = np.clip(np.concatenate([1.0 - dists, 1.0 - dists]), 0.0, 1.0)
         graphs.append(Data(
             x          = torch.tensor(x_nodes,              dtype=torch.float),
             edge_index = torch.tensor(np.stack([src, dst]), dtype=torch.long),

@@ -108,7 +108,7 @@ def run_evaluation(
     วัดผลแบบครบถ้วน
     ไฟล์ holdout_x.npy และ holdout_y.npy ต้องถูกบันทึกตอน train
     """
-    Path(output_dir).mkdir(exist_ok=True)
+    Path(output_dir, "img").mkdir(parents=True, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 

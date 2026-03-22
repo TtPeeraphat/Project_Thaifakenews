@@ -462,7 +462,7 @@ def check_rate_limit_fallback() -> tuple[bool, str]:
 
 def record_prediction_timestamp():
     """บันทึก timestamp (fallback สำหรับ session state)"""
-    now = now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=timezone.utc)
     if "rate_timestamps" not in st.session_state:
         st.session_state["rate_timestamps"] = []
     st.session_state["rate_timestamps"].append(now)

@@ -103,39 +103,28 @@ def show_home_improved():
         input_text = st.session_state.input_text
 
     # =====================================================
-    # ANALYZE BUTTON
+    # ANALYZE BUTTON  ← ต้องอยู่ level เดียวกับ if/else ข้างบน
     # =====================================================
 
     if st.button("🚀 วิเคราะห์ข่าวนี้", use_container_width=True):
 
         progress = st.progress(0)
+        scraper_content = ""
 
-        # =================================================
-        # STEP 1: GET TEXT
-        # =================================================
-
+        # STEP 1
         if check_mode == "🔗 URL ลิงก์ข่าว":
-
             valid = InputValidator.validate_url(input_url)
-
             if not valid.is_valid:
                 st.error(valid.error_message)
                 st.stop()
-
             progress.progress(10)
-
-            
-
             title, content = get_content_from_url(input_url)
-
             if not title:
                 st.error("ไม่สามารถดึงข่าวจาก URL")
                 st.stop()
-
             raw_text = f"{title}\n\n{content}"
-
+            scraper_content = content
         else:
-
             raw_text = str(input_text).strip()
 
         if not raw_text:
@@ -144,79 +133,42 @@ def show_home_improved():
 
         progress.progress(30)
 
-        # =================================================
-        # STEP 2: VALIDATION
-        # =================================================
-
+        # STEP 2
         validation = InputValidator.validate_text(raw_text)
-
         if not validation.is_valid:
             st.error(validation.error_message)
             st.stop()
-
-        if validation.warning_message:
-            st.warning(validation.warning_message)
-
         progress.progress(45)
 
-        # =================================================
-        # STEP 3: PREPROCESS
-        # =================================================
-
+        # STEP 3
         cleaned_text, ok, msg = TextPreprocessor.preprocess(
-            raw_text,
-            max_length=5000,
-            min_length=10,
+            raw_text, max_length=5000, min_length=10,
         )
-
         if not ok:
             st.error(msg)
             st.stop()
-
         progress.progress(60)
 
-        with st.expander("ข้อมูลการประมวลผล"):
-            c1, c2 = st.columns(2)
-
-            c1.metric("Original length", len(raw_text))
-            c2.metric("Cleaned length", len(cleaned_text))
-
-        # =================================================
-        # STEP 4: LOAD MODEL
-        # =================================================
-
+        # STEP 4
         try:
             pipeline = get_pipeline()
         except Exception as e:
             st.error(f"โหลดโมเดลไม่ได้: {e}")
             st.stop()
-
         progress.progress(80)
 
-        # =================================================
-        # STEP 5: PREDICT
-        # =================================================
-
+        # STEP 5
         try:
-
-            result = predict_news(cleaned_text, pipeline)
-
+            result = predict_news(cleaned_text, pipeline, content=scraper_content)
             progress.progress(100)
-
             if result.get("error"):
                 st.error(result["error"])
                 st.stop()
-
         except Exception as e:
-
             st.error(f"Prediction error: {e}")
-            logger.exception(e)
             st.stop()
 
-        # =================================================
-        # SAVE RESULT
-        # =================================================
-
+        # SAVE RESULT  ← อยู่ใน if st.button ด้วยกัน
         pred_id = db.create_prediction(
             st.session_state.get("user_id"),
             cleaned_text[:50],
@@ -225,74 +177,12 @@ def show_home_improved():
             result["result"],
             result["confidence"],
         )
-
         st.session_state.current_result = result
         st.session_state.current_pred_id = pred_id
         st.session_state.feedback_given = False
-
         time.sleep(0.4)
-
         st.rerun()
 
-    # =====================================================
-    # SHOW RESULT
-    # =====================================================
-
+    # SHOW RESULT  ← อยู่นอก if st.button
     if "current_result" in st.session_state:
         show_prediction_result(st.session_state.current_result)
-
-
-# ==========================================================
-# RESULT UI
-# ==========================================================
-
-def show_prediction_result(result: dict):
-
-    label = result.get("result")
-    conf = float(result.get("confidence", 0))
-
-    if label == "Fake":
-        st.error(f"🚨 Fake News ({conf:.1f}%)")
-
-    elif label == "Real":
-        st.success(f"✅ Real News ({conf:.1f}%)")
-
-    else:
-        st.warning(f"⚠️ Uncertain ({conf:.1f}%)")
-
-    # =====================================================
-    # FEEDBACK
-    # =====================================================
-
-    if not st.session_state.get("feedback_given"):
-
-        c1, c2 = st.columns(2)
-
-        if c1.button("👍 AI ถูก"):
-            db.save_feedback(
-                st.session_state.current_pred_id,
-                "Correct",
-            )
-
-            st.session_state.feedback_given = True
-            st.success("ขอบคุณสำหรับ feedback")
-
-        if c2.button("👎 AI ผิด"):
-            db.save_feedback(
-                st.session_state.current_pred_id,
-                "Incorrect",
-            )
-
-            st.session_state.feedback_given = True
-            st.success("ขอบคุณสำหรับ feedback")
-
-    else:
-        st.info("ส่ง feedback แล้ว")
-
-
-# ==========================================================
-# RUN DIRECT
-# ==========================================================
-
-if __name__ == "__main__":
-    show_home_improved()

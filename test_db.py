@@ -2,12 +2,11 @@ from supabase import create_client
 import httpx
 import sys
 import os
+from config import config
 
 
-# 1. ใส่ URL และ KEY ตรงๆ เพื่อตัดปัญหาไฟล์ .env
-SUPABASE_URL = "https://orxtfxdernqmpkfmsijj.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yeHRmeGRlcm5xbXBrZm1zaWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMDQ5OTgsImV4cCI6MjA4Njc4MDk5OH0.6dDVQio5hQpTQj6jnnS6yZBqR2GBReqFwazza6TqolQ" 
-
+SUPABASE_URL = config.database.supabase_url
+SUPABASE_KEY = config.database.supabase_key
 print("กำลังทดสอบเชื่อมต่อ...")
 
 try:
