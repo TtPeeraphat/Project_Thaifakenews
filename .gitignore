@@ -60,5 +60,3 @@ logs/
 # Jupyter Checkpoint
 .ipynb_checkpoints/
 
-*.pth
-*.pkl
