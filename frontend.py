@@ -3779,32 +3779,41 @@ colorObs.observe(window.parent.document.body,
             # ══════════════════════════════════════
             # โหมดข้อความ
             # ══════════════════════════════════════
-            else:
-                with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
-                    m1, m2 = st.columns(2)
-                    df_trending = db.get_all_trending()
-                    with m1:
-                        if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake", width='stretch'):
-                            if not df_trending.empty:
-                                fake_news = df_trending[df_trending['label'] == 'Fake']
-                                if not fake_news.empty:
-                                    picked = fake_news.sample(1).iloc[0]
-                                    st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
-                                else:
-                                    st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท"
-                            else:
-                                st.session_state['input_text'] = "ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท"
-                    with m2:
-                        if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real", width='stretch'):
-                            if not df_trending.empty:
-                                real_news = df_trending[df_trending['label'] == 'Real']
-                                if not real_news.empty:
-                                    picked = real_news.sample(1).iloc[0]
-                                    st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
-                                else:
-                                    st.session_state['input_text'] = "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูง"
-                            else:
-                                st.session_state['input_text'] = "ชาวฮ่องกงเแห่ขับรถไปเติมน้ำมันที่จีนเแผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูง"
+            with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
+                m1, m2 = st.columns(2)
+                df_trending = db.get_all_trending()
+
+                with m1:
+                    if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake", use_container_width=True):
+                        fake_found = False
+                        if not df_trending.empty:
+                            fake_news = df_trending[df_trending['label'] == 'Fake']
+                            if not fake_news.empty:
+                                picked = fake_news.sample(1).iloc[0]
+                                st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
+                                fake_found = True
+                        
+                        # ถ้าใน DB ไม่มีข่าวปลอม ให้เซตข้อความที่เรากำหนดไว้เอง
+                        if not fake_found:
+                            st.session_state['input_text'] = "🚨 ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท เพียงคลิกลงทะเบียนรับสิทธิ์ผ่านไลน์"
+                        
+                        st.rerun()
+
+                with m2:
+                    if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real", use_container_width=True):
+                        real_found = False
+                        if not df_trending.empty:
+                            real_news = df_trending[df_trending['label'] == 'Real']
+                            if not real_news.empty:
+                                picked = real_news.sample(1).iloc[0]
+                                st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
+                                real_found = True
+                        
+                        # ถ้าใน DB ไม่มีข่าวจริง ให้เซตข้อความที่เรากำหนดไว้เอง
+                        if not real_found:
+                            st.session_state['input_text'] = "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูงขึ้นอย่างต่อเนื่องในสัปดาห์ที่ผ่านมา"
+                        
+                        st.rerun()
 
                 _, _clr_col = st.columns([5, 1])
                 with _clr_col:
