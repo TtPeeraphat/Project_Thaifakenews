@@ -3716,58 +3716,70 @@ colorObs.observe(window.parent.document.body,
         # ══════════════════════════════════════
         # --- เริ่มส่วน UI ---
         if menu == "🏠 หน้าหลัก":
-            page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI ")
+            page_header("🔍", "ตรวจสอบข่าว", "วิเคราะห์เนื้อหาข่าวด้วย AI ")
+
             # ดึงข้อความจาก session_state หรือ input
-            text_to_check = st.session_state.get('input_text', '')
+            text_to_check = st.session_state.get("input_text", "")
 
             # นับจำนวนคำ (แยกด้วยช่องว่าง)
             word_count = len(text_to_check.split())
+
             check_mode = st.radio(
                 label="เลือกโหมดการตรวจสอบ",
                 options=["📝  พิมพ์ / วางเนื้อหา   ", "🔗  URL ลิงก์ข่าว"],
                 horizontal=True,
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                key="check_mode_radio"
             )
+
             st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
 
-            input_url  = ""
+            input_url = ""
             input_text = ""
 
             # ══════════════════════════════════════
             # โหมด URL
             # ══════════════════════════════════════
             if check_mode == "🔗  URL ลิงก์ข่าว":
-                if 'input_url' not in st.session_state:
-                    st.session_state['input_url'] = ""
+                if "input_url" not in st.session_state:
+                    st.session_state["input_url"] = ""
 
                 with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
                     m1, m2 = st.columns(2)
-                    
-                    # กำหนดลิสต์ข่าวตัวอย่าง (เปลี่ยน URL เป็นข่าวที่คุณต้องการโชว์ได้เลย)
+
+                    # กำหนดลิสต์ข่าวตัวอย่าง
                     DEMO_FAKE_NEWS = [
                         "https://example-fake-news.com/get-free-money-now",
-                        "https://scam-alert.net/urgent-bank-account-update"
+                        "https://scam-alert.net/urgent-bank-account-update",
                     ]
-                    
+
                     DEMO_REAL_NEWS = [
                         "https://www.bbc.com/news/world",
-                        "https://www.thairath.co.th/news/local"
+                        "https://www.thairath.co.th/news/local",
                     ]
 
                     with m1:
-                        if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake_url", use_container_width=True):
-                            # สุ่มเลือกข่าวจาก List ที่เราตั้งไว้
+                        if st.button(
+                            "🚨 ตัวอย่างข่าวปลอม",
+                            key="demo_fake_url_button",
+                            use_container_width=True
+                        ):
                             import random
-                            st.session_state['input_url'] = random.choice(DEMO_FAKE_NEWS)
-                            st.rerun() # สั่ง rerun เพื่อให้ค่าใน text_input อัปเดตทันที
+                            st.session_state["input_url"] = random.choice(DEMO_FAKE_NEWS)
+                            st.rerun()
 
                     with m2:
-                        if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real_url", use_container_width=True):
+                        if st.button(
+                            "✅ ตัวอย่างข่าวจริง",
+                            key="demo_real_url_button",
+                            use_container_width=True
+                        ):
                             import random
-                            st.session_state['input_url'] = random.choice(DEMO_REAL_NEWS)
+                            st.session_state["input_url"] = random.choice(DEMO_REAL_NEWS)
                             st.rerun()
 
                 _url_col, _clr_url_col = st.columns([5, 1])
+
                 with _url_col:
                     st.text_input(
                         label="🔗 URL ของข่าว",
@@ -3775,10 +3787,17 @@ colorObs.observe(window.parent.document.body,
                         label_visibility="collapsed",
                         key="input_url"
                     )
+
                 with _clr_url_col:
-                    st.button("🗑️ ล้างข้อความ", type="secondary",
-                            on_click=clear_url, width='stretch')
-                input_url = st.session_state['input_url']
+                    st.button(
+                        "🗑️ ล้างข้อความ",
+                        type="secondary",
+                        on_click=clear_url,
+                        width="stretch",
+                        key="clear_url_button"
+                    )
+
+                input_url = st.session_state["input_url"]
 
             # ══════════════════════════════════════
             # โหมดข้อความ
