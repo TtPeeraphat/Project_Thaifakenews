@@ -3748,13 +3748,12 @@ colorObs.observe(window.parent.document.body,
                     m1, m2 = st.columns(2)
 
                     DEMO_FAKE_NEWS = [
-                        "https://example-fake-news.com/get-free-money-now",
-                        "https://scam-alert.net/urgent-bank-account-update",
+                        "https://telegra.ph/%E0%B8%95%E0%B8%B0%E0%B8%A5%E0%B8%87-%E0%B8%AB%E0%B8%A1%E0%B8%AD%E0%B8%8D%E0%B8%9B%E0%B8%99%E0%B9%80%E0%B8%9C%E0%B8%A2%E0%B8%AA%E0%B8%95%E0%B8%A3%E0%B8%A5%E0%B8%9A-%E0%B8%99%E0%B8%B3%E0%B8%A1%E0%B8%B0%E0%B8%99%E0%B8%B2%E0%B8%A7%E0%B8%9C%E0%B8%AA%E0%B8%A1%E0%B9%82%E0%B8%8B%E0%B8%94%E0%B8%B2-%E0%B8%86%E0%B8%B2%E0%B9%80%E0%B8%8B%E0%B8%A5%E0%B8%A5%E0%B8%A1%E0%B8%B0%E0%B9%80%E0%B8%A3%E0%B8%87%E0%B8%AB%E0%B8%B2%E0%B8%A2%E0%B8%82%E0%B8%B2%E0%B8%94-100-%E0%B9%84%E0%B8%A1%E0%B8%95%E0%B8%AD%E0%B8%87%E0%B8%97%E0%B8%B3%E0%B8%84%E0%B9%82%E0%B8%A1-03-23"
+                        
                     ]
 
                     DEMO_REAL_NEWS = [
-                        "https://www.bbc.com/news/world",
-                        "https://www.thairath.co.th/news/local",
+                        "https://www.antifakenewscenter.com/%e0%b8%99%e0%b9%82%e0%b8%a2%e0%b8%9a%e0%b8%b2%e0%b8%a2%e0%b8%a3%e0%b8%b1%e0%b8%90%e0%b8%9a%e0%b8%b2%e0%b8%a5-%e0%b8%82%e0%b9%88%e0%b8%b2%e0%b8%a7%e0%b8%aa%e0%b8%b2%e0%b8%a3/%e0%b8%9c%e0%b9%88%e0%b8%ad%e0%b8%99%e0%b8%9c%e0%b8%b1%e0%b8%99%e0%b8%a3%e0%b8%96%e0%b8%9a%e0%b8%a3%e0%b8%a3%e0%b8%97%e0%b8%b8%e0%b8%81%e0%b8%82%e0%b8%99%e0%b8%aa%e0%b9%88%e0%b8%87%e0%b8%99%e0%b9%89%e0%b8%b3%e0%b8%a1%e0%b8%b1%e0%b8%99-%e0%b9%80%e0%b8%94%e0%b8%b4%e0%b8%99%e0%b8%a3%e0%b8%96%e0%b9%83%e0%b8%99%e0%b8%97%e0%b8%b8%e0%b8%81%e0%b8%88%e0%b8%b1%e0%b8%87%e0%b8%ab%e0%b8%a7%e0%b8%b1%e0%b8%94%e0%b9%84%e0%b8%94%e0%b9%89%e0%b8%95%e0%b8%a5%e0%b8%ad%e0%b8%94-24-%e0%b8%8a%e0%b8%b1%e0%b9%88%e0%b8%a7%e0%b9%82%e0%b8%a1%e0%b8%87/"   
                     ]
 
                     with m1:
