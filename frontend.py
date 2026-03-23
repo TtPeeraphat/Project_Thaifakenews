@@ -3820,14 +3820,14 @@ colorObs.observe(window.parent.document.body,
                     st.button("🗑️ ล้างข้อความ", type="secondary",
                             on_click=clear_text, width='stretch')
 
-                st.text_area(
+            st.text_area(
                     label="กรอกเนื้อหาข่าว",
                     height=180,
                     placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
                     label_visibility="collapsed",
                     key="input_text"
                 )
-                input_text = st.session_state['input_text']
+            input_text = st.session_state['input_text']
 
             st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
