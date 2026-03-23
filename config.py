@@ -1,9 +1,6 @@
-# ✅ REFACTORED: Configuration & Security
-# Location: config.py
-# This file fixes Issue 6.1 (Credentials in Code)
 import os
 import logging
-from pathlib import Path         # เหลือแค่บรรทัดเดียว
+from pathlib import Path         
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
@@ -59,14 +56,13 @@ class DatabaseConfig:
 class EmailConfig:
     """Email configuration for notifications and OTP."""
 
-    # ✅ ให้มี field ปกติไว้ก่อน แล้วค่อย override ใน __post_init__
     sender_email:    str = ""
     sender_password: str = ""
     smtp_host:       str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port:       int = int(os.getenv("SMTP_PORT", "587"))
 
     def __post_init__(self):
-        # ลอง st.secrets ก่อน ถ้าไม่ได้ค่อย fallback ไป os.getenv
+        
         try:
             import streamlit as st
             self.sender_email    = st.secrets.get("GMAIL_EMAIL", "") or os.getenv("GMAIL_EMAIL", "")

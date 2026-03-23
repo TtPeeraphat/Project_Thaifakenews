@@ -5,7 +5,7 @@ from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
-# ✅ constant อยู่นอก class (ถูกต้อง)
+
 THAI_TOKEN_RATIO: float = 1.8
 BERT_MAX_TOKENS:  int   = 256
 
@@ -141,14 +141,14 @@ class TextPreprocessor:
                 return text[:max_length] + '...'
         return text
 
-    # ✅ อยู่ใน class — indent ถูกต้อง
+ 
     @staticmethod
     def estimate_token_count(text: str) -> int:
         """ประมาณจำนวน BERT token จากภาษาไทย"""
         word_count = len(text.split())
         return int(word_count * THAI_TOKEN_RATIO)
 
-    # ✅ อยู่ใน class — indent ถูกต้อง
+
     @staticmethod
     def preprocess(
         text: str,
@@ -181,7 +181,7 @@ class TextPreprocessor:
         if word_count < 3:
             return "", False, "ข้อความต้องมีอย่างน้อย 3 คำ"
 
-        # ✅ ใช้ estimate_token_count จาก class เดียวกัน
+        #  ใช้ estimate_token_count จาก class เดียวกัน
         estimated_tokens = TextPreprocessor.estimate_token_count(text)
         if estimated_tokens > max_length:
             safe_word_limit = int(max_length / THAI_TOKEN_RATIO)

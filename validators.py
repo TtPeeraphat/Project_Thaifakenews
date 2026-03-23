@@ -157,7 +157,7 @@ class InputValidator:
             if thai_ratio < 0.4:
                 warning += "Text contains many non-Thai characters. "
 
-        # # Character repetition (ระดับเดียวกับ Suspicious patterns)
+        #  Character repetition (ระดับเดียวกับ Suspicious patterns)
         char_counts = Counter(text)   # Counter import ไว้บนสุดไฟล์แล้ว ไม่ต้อง import ซ้ำ
         text_len    = len(text)
         for char, count in char_counts.items():
@@ -165,10 +165,6 @@ class InputValidator:
             if ratio > 0.5 and char not in " \n\t-:,.":
                 return ValidationResult(False, f"ตัวอักษร '{char}' ซ้ำกันมากเกินไป (สัดส่วน {ratio:.0%})")
 
-        # Suspicious patterns
-        # for pattern, reason in InputValidator.SUSPICIOUS_PATTERNS:  
-        #     if pattern.search(text):
-        #         return ValidationResult(False, f"Suspicious pattern: {reason}")
         # -------------------------
         # SQL Injection
         # -------------------------
@@ -382,11 +378,11 @@ def check_rate_limit(user_id: int) -> tuple[bool, str]:
         timestamps: list[datetime] = []
 
         for row in (response.data or []):
-            # ✅ cast เป็น Dict ก่อน — Pylance รู้ type แล้ว subscript ได้
+           
             row_dict: Dict[str, Any] = row if isinstance(row, dict) else {}
             raw_ts: Any = row_dict.get("timestamp")
 
-            # ✅ ตรวจสอบก่อนเรียก .replace() — ป้องกัน None/non-string
+      
             if not isinstance(raw_ts, str) or not raw_ts:
                 continue
 

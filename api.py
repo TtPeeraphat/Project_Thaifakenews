@@ -1,12 +1,3 @@
-"""
-api.py  (UPDATED)
-=================
-CHANGES:
-  - import build_star_graph จาก graph_utils แทนโค้ด inline
-  - [FIX CRITICAL #2] เพิ่ม embed_combined เพื่อรองรับ title+content
-    เหมือน ai_engine.py (เดิม api.py ใช้แค่ embed_text เสมอ)
-  - ทุกอย่างอื่นเหมือนเดิม 100%
-"""
 import sys
 import os
 import pickle
@@ -23,10 +14,9 @@ from sklearn.neighbors import NearestNeighbors
 from transformers import AutoTokenizer, AutoModel
 from model_def import GCNNet
 
-# ✅ [FIX CRITICAL #1] import shared graph builder
+
 from graph_utils import build_star_graph
-# ✅ [FIX CRITICAL #2] import embed_combined ด้วย (ไม่ใช่แค่ embed_text)
-from embed_utils import embed_text, embed_combined
+
 from validators import InputValidator
 from text_preprocessor import TextPreprocessor
 
@@ -129,8 +119,7 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
         y_cat_np = arts.get('y_cat_np')
         topn     = resources.get('k', 10)
 
-        # ✅ [FIX CRITICAL #2] ใช้ embed_combined เมื่อมี content
-        #    เหมือน ai_engine.py → embedding space ตรงกัน
+
         if req.title.strip() and req.content.strip():
             emb = embed_combined(
                 title=req.title,
@@ -154,8 +143,7 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
             if most_common:
                 pred_category = most_common[0][0]
 
-        # ✅ [FIX CRITICAL #1] ใช้ build_star_graph จาก graph_utils
-        #    → structure เหมือน training ทุกประการ
+
         graph_data = build_star_graph(
             query_emb      = emb,
             neighbor_embs  = x_np[idxs],

@@ -562,7 +562,6 @@ def _check_otp_rate_limit(email: str) -> tuple[bool, str]:
     return True, ""
 
 def send_otp_email(to_email: str) -> Tuple[bool, str]:
-    # ✅ เพิ่ม: เช็ค rate limit ก่อนทำอะไรทั้งนั้น
     allowed, rate_msg = _check_otp_rate_limit(to_email)
     if not allowed:
         return False, rate_msg
@@ -599,7 +598,7 @@ def send_otp_email(to_email: str) -> Tuple[bool, str]:
     msg = MIMEText(
         f"รหัส OTP ของคุณคือ: {otp}\n\n"
         "กรุณานำรหัสนี้ไปกรอกในหน้าเว็บเพื่อตั้งรหัสผ่านใหม่\n"
-        "รหัสนี้มีอายุ 15 นาที",   # ✅ เพิ่ม: แจ้ง user ด้วย
+        "รหัสนี้มีอายุ 15 นาที",   
         "plain",
         "utf-8"
     )
@@ -625,7 +624,6 @@ def send_otp_email(to_email: str) -> Tuple[bool, str]:
         return False, f"❌ ส่งอีเมลไม่สำเร็จ: {e}"
 
 
-# ✅ ใหม่
 MAX_OTP_ATTEMPTS = 5
 
 def verify_otp_and_reset(email: str, otp: str, new_password: str) -> Tuple[bool, str]:

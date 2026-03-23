@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torch_geometric.data import Batch
 
-# ✅ [FIX CRITICAL] import shared function แทนโค้ดซ้ำ
+
 from graph_utils import build_batch_star_graphs
 
 
@@ -27,7 +27,7 @@ def train_epoch_inductive(model, optimizer, criterion,
         batch_idx = indices[start: start + batch_size]
         optimizer.zero_grad()
 
-        # ✅ ใช้ shared function → structure เหมือน inference ทุกประการ
+
         batch_graph = build_batch_star_graphs(
             x_query[batch_idx], x_support, support_nbrs, k, device
         )
@@ -57,7 +57,7 @@ def eval_epoch_inductive(model, x_query, y_query,
     for start in range(0, len(x_query), batch_size):
         batch_idx   = np.arange(start, min(start + batch_size, len(x_query)))
 
-        # ✅ ใช้ shared function เช่นกัน
+
         batch_graph = build_batch_star_graphs(
             x_query[batch_idx], x_support, support_nbrs, k, device
         )

@@ -12,11 +12,11 @@ print("กำลังทดสอบเชื่อมต่อ...")
 try:
     # ทดสอบยิง Request แบบพื้นฐานที่สุด
     response = httpx.get(SUPABASE_URL)
-    print(f"✅ 1. การเชื่อมต่ออินเทอร์เน็ตผ่าน Python: ผ่าน! (Status: {response.status_code})")
+    print(f" การเชื่อมต่ออินเทอร์เน็ตผ่าน Python: ผ่าน! (Status: {response.status_code})")
     
     # ทดสอบสร้าง Supabase Client
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ 2. การสร้าง Supabase Client: ผ่าน!")
+    print(" การสร้าง Supabase Client: ผ่าน!")
     
 except Exception as e:
     print(f"❌ พัง!: {e}")

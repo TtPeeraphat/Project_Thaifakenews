@@ -1,8 +1,3 @@
-#!/usr/bin/env python
-"""
-Database Connection Diagnostic Tool
-Helps troubleshoot login and database connection issues.
-"""
 import sys
 import os
 from pathlib import Path

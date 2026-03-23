@@ -16,10 +16,10 @@ from text_preprocessor import TextPreprocessor
 
 logger = logging.getLogger(__name__)
 
-# ✅ โหลดค่าจากไฟล์ .env เข้าสู่ระบบก่อน
+#  โหลดค่าจากไฟล์ .env เข้าสู่ระบบก่อน
 load_dotenv()
 
-# ✅ ดึง API Token ของ Apify จาก .env
+# ดึง API Token ของ Apify จาก .env
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN", "")
 
 # ---------------------------------------------------------
@@ -80,11 +80,11 @@ def get_x_post_apify(url: str):
         return None, "⚠️ ไม่พบ APIFY_API_TOKEN ในระบบ กรุณาตรวจสอบไฟล์ .env"
         
     try:
-        # ✅ 1. ลบช่องว่างที่อาจติดมากับ URL (เช่น กรณีก็อปปี้มาผิด)
+        #  ลบช่องว่างที่อาจติดมากับ URL (เช่น กรณีก็อปปี้มาผิด)
         clean_url = url.replace(" ", "")
         logger.info("Fetching X post: %s", clean_url)
         
-        # ✅ 2. สกัดเอาเฉพาะ Tweet ID (ตัวเลขที่อยู่หลัง /status/) ออกมา
+        #  สกัดเอาเฉพาะ Tweet ID (ตัวเลขที่อยู่หลัง /status/) ออกมา
         match = re.search(r"status/(\d+)", clean_url)
         if not match:
             return None, "⚠️ ไม่พบ Tweet ID ในลิงก์ กรุณาก๊อปปี้ลิงก์โพสต์ของ X (Twitter) ให้ครบถ้วน"
@@ -94,13 +94,13 @@ def get_x_post_apify(url: str):
 
         client = ApifyClient(APIFY_API_TOKEN)
 
-        # ✅ 3. คอนฟิก Input สำหรับบอทตัวใหม่ที่รองรับ API ฟรี (ใช้ tweetIDs แทน startUrls)
+        #  คอนฟิก Input สำหรับบอทตัวใหม่ที่รองรับ API ฟรี (ใช้ tweetIDs แทน startUrls)
         run_input = {
             "tweetIDs": [tweet_id], 
             "maxItems": 1, 
         }
 
-        # ✅ 4. เรียกใช้งาน Actor ตัวใหม่ (Pay-Per-Result ตัดจากเครดิตฟรี)
+        #  เรียกใช้งาน Actor ตัวใหม่ (Pay-Per-Result ตัดจากเครดิตฟรี)
         run = client.actor("kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest").call(run_input=run_input)
 
         # ไปดึงผลลัพธ์ (Dataset)
@@ -111,7 +111,7 @@ def get_x_post_apify(url: str):
 
         post_data = dataset_items[0]
 
-        # ✅ 5. ดักจับเนื้อหาและคนโพสต์ (ตามโครงสร้างข้อมูลของบอทตัวใหม่)
+        #  ดักจับเนื้อหาและคนโพสต์ (ตามโครงสร้างข้อมูลของบอทตัวใหม่)
         content = post_data.get("text") or post_data.get("full_text") or ""
         author_info = post_data.get("author", {})
         author = author_info.get("userName") or "Unknown Author"
@@ -178,7 +178,7 @@ def get_content_from_url(url):
         if not full_content:
             return title, "⚠️ ดึงเนื้อหาไม่สำเร็จ: เว็บไซต์นี้อาจใช้ JavaScript หรือบล็อกการดึงข้อมูล"
 
-        # ✅ cleanup อยู่ตรงนี้ — ก่อน return และนอก if block
+       
         title        = clean_html(title)
         full_content = clean_html(full_content)
 

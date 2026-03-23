@@ -1,11 +1,3 @@
-"""
-ai_engine.py  (UPDATED)
-=======================
-CHANGES:
-  - ลบ _build_star_graph() ออก (โค้ดซ้ำ)
-  - import build_star_graph จาก graph_utils แทน
-  - ทุกอย่างอื่นเหมือนเดิม 100%
-"""
 import sys
 import os
 import pickle
@@ -27,7 +19,6 @@ from embed_utils import embed_combined, embed_text
 from validators import InputValidator
 from text_preprocessor import TextPreprocessor
 
-# ✅ [FIX CRITICAL] import shared function แทน _build_star_graph ที่อยู่ใน file นี้
 from graph_utils import build_star_graph
 
 logger = logging.getLogger(__name__)
@@ -64,8 +55,7 @@ def classify_category_by_keyword(text: str) -> str:
 @st.cache_resource
 def load_model_pipeline() -> Dict[str, Any]:
     """
-    โหลด model และ artifacts ทั้งหมด (ทำครั้งเดียว cache ไว้)
-    [FIX M2] id2label ดึงจาก artifacts.pkl เสมอ — ไม่ hardcode
+    โหลด model และ artifacts ทั้งหมด 
     """
     logger.info("🔄 Loading ML Pipeline...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -167,8 +157,6 @@ def predict_news(
         pred_category = _predict_category(idxs, y_cat_np, id2cat, cleaned)
 
         # ── D. Star Graph + GNN Inference ──
-        # ✅ [FIX CRITICAL] ใช้ build_star_graph จาก graph_utils
-        #    → structure เหมือน training ทุกประการ (bidirectional + self-loop)
         neighbor_embs = x_database[idxs]
         graph_data = build_star_graph(emb, neighbor_embs, dists, device)
 

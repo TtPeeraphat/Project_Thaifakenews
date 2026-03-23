@@ -1801,12 +1801,12 @@ def show_feedback_review():
                         try:
                             tfidf = TfidfVectorizer(
                                 max_features=5000,
-                                analyzer='char_wb',   # เหมาะกับภาษาไทย
+                                analyzer='char_wb',   
                                 ngram_range=(2, 3)
                             ).fit_transform(texts)
 
                             THRESHOLD = 0.85
-                            # เปรียบแบบ batch เพื่อไม่กิน RAM
+                        
                             BATCH = 200
                             for i in range(0, len(texts), BATCH):
                                 batch = tfidf[i:i+BATCH]
@@ -2844,8 +2844,8 @@ def show_system_analytics():
             margin=dict(l=0,r=0,t=0,b=0),
             plot_bgcolor='white', paper_bgcolor='white',
             font_color="#000000",
-            xaxis_title="วันที่",        # ✅ เพิ่ม
-            yaxis_title="จำนวน (ครั้ง)", # ✅ เพิ่ม
+            xaxis_title="วันที่",        
+            yaxis_title="จำนวน (ครั้ง)", 
             legend=dict(orientation="h", y=-0.35, x=0.5, xanchor="center"),
             legend_title_text='',
             xaxis=dict(
@@ -2878,7 +2878,7 @@ def show_system_analytics():
                 margin=dict(l=10,r=10,t=10,b=10),
                 showlegend=False,
                 paper_bgcolor='white',
-                font_color='#1E293B',        # ✅ เข้มขึ้น
+                font_color='#1E293B',        
                 font=dict(size=12),
                 xaxis=dict(
                     tickfont=dict(color='#1E293B', size=12),
@@ -2909,8 +2909,8 @@ def show_system_analytics():
                     labels={'Time': 'ชั่วโมง', 'Checks': 'จำนวนการตรวจ'})
     fig3.update_layout(
             margin=dict(l=0,r=0,t=0,b=0),
-            xaxis_title="ชั่วโมง",         # ✅ เพิ่ม
-            yaxis_title="จำนวนการตรวจ",    # ✅ เพิ่ม
+            xaxis_title="ชั่วโมง",         
+            yaxis_title="จำนวนการตรวจ",    
             plot_bgcolor='white', paper_bgcolor='white',
             font_color="#000000", bargap=0.35,
             xaxis=dict(
@@ -2946,7 +2946,7 @@ def show_system_analytics():
                 bg = {"ERROR":"#FFF5F5","WARNING":"#FFFBEB"}.get(level,"#F0F6FF")
                 tc = {"ERROR":"#7F1D1D","WARNING":"#78350F"}.get(level,"#1E3A5F")
 
-    # ✅ icon ตาม action
+    
                 action_icon = {
                     "PREDICT":      "🤖",
                     "USER_LOGOUT":  "🚪",
@@ -3047,7 +3047,7 @@ def show_system_analytics():
                 margin=dict(l=0, r=0, t=10, b=0),
                 xaxis_title="", yaxis_title="จำนวน (ครั้ง)",
                 bargap=0.4,
-                # ✅ เพิ่ม 4 บรรทัดนี้
+                
                 xaxis=dict(
                     tickfont=dict(color='#1E293B', size=12),
                     title_font=dict(color='#1E293B'),
@@ -3107,7 +3107,7 @@ def show_system_analytics():
 
         df_fb_stats['date'] = df_fb_stats['timestamp'].dt.date
 
-        # ✅ ดึงทุกวันที่มีข้อมูล ไม่จำกัด 7 วัน
+        
         all_dates = sorted(df_fb_stats['date'].unique())
         df_date = pd.DataFrame({'date': all_dates})
 
@@ -3132,19 +3132,19 @@ def show_system_analytics():
         fig_trend.update_layout(
             plot_bgcolor='white',
             paper_bgcolor='white',
-            font=dict(color='#1E293B', size=12),          # ✅ สีฟอนต์เข้ม
+            font=dict(color='#1E293B', size=12),          
             margin=dict(l=0, r=0, t=10, b=0),
             xaxis=dict(
                 title="วันที่",
-                tickfont=dict(color='#1E293B', size=11),   # ✅ แกน X ชัดเจน
+                tickfont=dict(color='#1E293B', size=11),   
                 title_font=dict(color='#1E293B'),
-                tickangle=-30,                              # ✅ เอียงตัวเลขป้องกันทับกัน
+                tickangle=-30,                              
                 showgrid=True,
                 gridcolor='#F1F5F9'
             ),
             yaxis=dict(
                 title="จำนวน Feedback",
-                tickfont=dict(color='#1E293B', size=11),   # ✅ แกน Y ชัดเจน
+                tickfont=dict(color='#1E293B', size=11),   
                 title_font=dict(color='#1E293B'),
                 showgrid=True,
                 gridcolor='#F1F5F9',
@@ -3153,7 +3153,7 @@ def show_system_analytics():
             legend=dict(
                 orientation="h", y=-0.35, x=0.5,
                 xanchor="center",
-                font=dict(color='#1E293B', size=12)        # ✅ legend ชัดเจน
+                font=dict(color='#1E293B', size=12)        
             ),
             legend_title_text=''
         )
@@ -3292,7 +3292,7 @@ if st.session_state['reset_mode']:
             oi=st.text_input("รหัส OTP 6 หลัก",max_chars=6)
             np=st.text_input("รหัสผ่านใหม่",type="password")
             cp=st.text_input("ยืนยันรหัสผ่านใหม่",type="password")
-            # ✅ เพิ่มตรงนี้ — เหมือน Register เลย
+            
             if np:
                 checks = {
                     "อย่างน้อย 8 ตัวอักษร":   len(np) >= 8,
@@ -3368,7 +3368,7 @@ elif st.session_state['register_mode']:
         ne=st.text_input("📧 Email")
         np=st.text_input("🔒 Password",type="password")
         cp=st.text_input("🔒 ยืนยัน Password",type="password")
-        # ✅ แสดง password strength แบบ real-time
+        
         if np:
             checks = {
                 "อย่างน้อย 8 ตัวอักษร":     len(np) >= 8,
@@ -3968,7 +3968,7 @@ colorObs.observe(window.parent.document.body,
                                 level="INFO"
                             )
 
-                            # ✅ แก้ — เพิ่ม cat ตัวสุดท้าย
+                            
                             pid = db.create_prediction(
                                 st.session_state.get('user_id'),
                                 clean[:50] + "…", clean,
@@ -4201,7 +4201,7 @@ colorObs.observe(window.parent.document.body,
                 n_real = len(df[df['label'] == 'Real'])
                 n_fake = len(df[df['label'] == 'Fake'])
 
-                # นับแต่ละหมวดหมู่
+                
                 cat_counts = df['category'].value_counts().to_dict()
                 cat_badges = "".join([
                     f"<span style='background:#EFF6FF;color:#1148A8;-webkit-text-fill-color:#1148A8;"
@@ -4271,7 +4271,7 @@ colorObs.observe(window.parent.document.body,
                                 f'margin-bottom:14px;display:block;" />'
                             )
 
-                        # ✅ คำนวณ source_html ก่อน st.markdown
+                        
                         source_url = str(row.get("source_url") or "").strip()
                         source_html = ""
                         if source_url and source_url not in ("None", "null", ""):

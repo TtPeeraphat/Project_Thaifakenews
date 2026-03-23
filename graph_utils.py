@@ -1,28 +1,3 @@
-"""
-graph_utils.py  ─ Shared Star Graph Builder
-============================================
-ไฟล์ใหม่ที่เป็น "single source of truth" สำหรับการสร้าง star graph
-
-ทำไมต้องแยกเป็นไฟล์ใหม่?
-- train_utils.py   ใช้สร้าง batch graph (training)
-- ai_engine.py     ใช้สร้าง single graph (Streamlit inference)
-- api.py           ใช้สร้าง single graph (FastAPI inference)
-- evaluate_inductive.py ใช้สร้าง single graph (evaluation)
-
-เดิม: โค้ดซ้ำ 3 ที่ และ self-loop ไม่ตรงกัน
-แก้:  ทุกที่ import จากที่เดียว → guaranteed consistent
-
-Structure ที่เลือก (มี self-loop บน center node):
-  - Bidirectional edges: center→neighbor และ neighbor→center
-  - Self-loop ที่ center (node 0) ด้วย weight=1.0
-  - Edge weight = clip(1 - cosine_distance, 0, 1)
-
-เหตุผลที่เลือก self-loop:
-  GCNConv รวม feature ของ neighbor มาอัปเดต node ตัวเอง
-  ถ้าไม่มี self-loop center node จะสูญเสีย original feature บางส่วน
-  ในงาน node classification แบบ inductive, self-loop ช่วยรักษา
-  query representation ไว้ได้ดีกว่า
-"""
 import numpy as np
 import torch
 from torch_geometric.data import Data, Batch
