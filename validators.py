@@ -166,9 +166,9 @@ class InputValidator:
                 return ValidationResult(False, f"ตัวอักษร '{char}' ซ้ำกันมากเกินไป (สัดส่วน {ratio:.0%})")
 
         # Suspicious patterns
-        for pattern, reason in InputValidator.SUSPICIOUS_PATTERNS:  
-            if pattern.search(text):
-                return ValidationResult(False, f"Suspicious pattern: {reason}")
+        # for pattern, reason in InputValidator.SUSPICIOUS_PATTERNS:  
+        #     if pattern.search(text):
+        #         return ValidationResult(False, f"Suspicious pattern: {reason}")
         # -------------------------
         # SQL Injection
         # -------------------------
