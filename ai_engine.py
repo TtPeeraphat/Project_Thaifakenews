@@ -59,7 +59,6 @@ def classify_category_by_keyword(text: str) -> str:
     return best[0] if best[1] > 0 else "ข่าวอื่นๆ"
 
 
-# ✅ _build_star_graph เดิมถูกลบออกแล้ว — ใช้ build_star_graph จาก graph_utils แทน
 
 
 @st.cache_resource

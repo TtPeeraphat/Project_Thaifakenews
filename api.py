@@ -41,8 +41,9 @@ ARTIFACTS_PATH = "artifacts.pkl"
 
 
 class NewsRequest(BaseModel):
-    text:    str
-    content: str = ""   # ✅ [FIX CRITICAL #2] เพิ่ม field content (optional)
+    text: str
+    title: str = ""      # optional — ส่งมาเมื่อดึงจาก URL scraping
+    content: str = ""    # optional — เนื้อหาเต็มจาก scraper
 
     @field_validator('text')
     @classmethod
@@ -130,10 +131,13 @@ def predict(req: NewsRequest) -> Dict[str, Any]:
 
         # ✅ [FIX CRITICAL #2] ใช้ embed_combined เมื่อมี content
         #    เหมือน ai_engine.py → embedding space ตรงกัน
-        if req.content and req.content.strip():
+        if req.title.strip() and req.content.strip():
             emb = embed_combined(
-                title=cleaned, content=req.content,
-                tokenizer=tokenizer, bert_model=bert_model, device=device,
+                title=req.title,
+                content=req.content,
+                tokenizer=tokenizer,
+                bert_model=bert_model,
+                device=device,
             )
         else:
             emb = embed_text(cleaned, tokenizer, bert_model, device)

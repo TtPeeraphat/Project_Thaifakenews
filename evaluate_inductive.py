@@ -39,14 +39,14 @@ def load_artifacts(artifacts_path: str, model_path: str, device: torch.device):
     with open(artifacts_path, "rb") as f:
         arts = pickle.load(f)
 
-    model = GCNNet(in_channels=768, hidden_channels=256, out_channels=2, dropout_rate=0.3)
+    model = GCNNet(in_channels=768, hidden_channels=256, out_channels=2, dropout_rate=0.4)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device).eval()
 
     return model, arts
 
 
-# ✅ star_graph_predict ถูกลบออก — ใช้ build_star_graph จาก graph_utils โดยตรง
+
 
 
 def run_evaluation(
