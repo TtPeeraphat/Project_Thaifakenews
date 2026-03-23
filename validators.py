@@ -81,12 +81,12 @@ class InputValidator:
         re.compile(r"exec\s*\(", re.I),
     ]
 
-    SUSPICIOUS_PATTERNS = [
-        (re.compile(r'(https?://[^\s]+){5,}'), "Too many URLs"),
-        (re.compile(r'(.{1,10})\1{10,}'), "High repetition pattern"),
-        (re.compile(r'[^\w\s\u0E00-\u0E7F]{30,}'), "Too many special characters"),
-        (re.compile(r'(!!!+|\?\?\?+|\.\.\.)\s*(!!!+|\?\?\?+|\.\.\.)+'), "Excessive punctuation"),
-    ]
+    # SUSPICIOUS_PATTERNS = [
+    #     (re.compile(r'(https?://[^\s]+){5,}'), "Too many URLs"),
+    #     (re.compile(r'(.{1,10})\1{10,}'), "High repetition pattern"),
+    #     (re.compile(r'[^\w\s\u0E00-\u0E7F]{30,}'), "Too many special characters"),
+    #     (re.compile(r'(!!!+|\?\?\?+|\.\.\.)\s*(!!!+|\?\?\?+|\.\.\.)+'), "Excessive punctuation"),
+    # ]
 
     URL_REGEX = re.compile(r'https?://[^\s]+')
 
