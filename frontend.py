@@ -3717,7 +3717,11 @@ colorObs.observe(window.parent.document.body,
         # --- เริ่มส่วน UI ---
         if menu == "🏠 หน้าหลัก":
             page_header("🔍","ตรวจสอบข่าว","วิเคราะห์เนื้อหาข่าวด้วย AI ")
+            # ดึงข้อความจาก session_state หรือ input
+            text_to_check = st.session_state.get('input_text', '')
 
+            # นับจำนวนคำ (แยกด้วยช่องว่าง)
+            word_count = len(text_to_check.split())
             check_mode = st.radio(
                 label="เลือกโหมดการตรวจสอบ",
                 options=["📝  พิมพ์ / วางเนื้อหา   ", "🔗  URL ลิงก์ข่าว"],
