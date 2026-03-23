@@ -3810,10 +3810,10 @@ colorObs.observe(window.parent.document.body,
                         st.session_state['input_text'] = random.choice(REAL_DEMO_LIST)
                         st.rerun()
 
-                _, _clr_col = st.columns([5, 1])
-                with _clr_col:
-                    st.button("🗑️ ล้างข้อความ", type="secondary",
-                            on_click=clear_text, width='stretch')
+                    _, _clr_col = st.columns([5, 1])
+                    with _clr_col:
+                        st.button("🗑️ ล้างข้อความ", type="secondary",
+                                on_click=clear_text, width='stretch')
 
             st.text_area(
                     label="กรอกเนื้อหาข่าว",
