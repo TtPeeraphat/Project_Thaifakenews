@@ -42,9 +42,9 @@ env/
 # Data files
 *.csv
 !AFNC_news_dataset_tf-2.csv
-*.pkl
+#*.pkl
 *.pickle
-*.pth
+#*.pth
 
 # Cache
 .cache/
