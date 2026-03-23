@@ -3738,7 +3738,7 @@ colorObs.observe(window.parent.document.body,
             input_text = ""
 
             # ══════════════════════════════════════
-            # โหมด URL
+            # โหมด URL / โหมดข้อความ
             # ══════════════════════════════════════
             if check_mode == "🔗  URL ลิงก์ข่าว":
                 if "input_url" not in st.session_state:
@@ -3747,7 +3747,6 @@ colorObs.observe(window.parent.document.body,
                 with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
                     m1, m2 = st.columns(2)
 
-                    # กำหนดลิสต์ข่าวตัวอย่าง
                     DEMO_FAKE_NEWS = [
                         "https://example-fake-news.com/get-free-money-now",
                         "https://scam-alert.net/urgent-bank-account-update",
@@ -3798,50 +3797,65 @@ colorObs.observe(window.parent.document.body,
                     )
 
                 input_url = st.session_state["input_url"]
+                input_text = ""
 
-            # ══════════════════════════════════════
-            # โหมดข้อความ
-            # ══════════════════════════════════════
-            with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
-                m1, m2 = st.columns(2)
-                
-                # 1. กำหนดลิสต์ข้อความข่าวปลอมที่ต้องการโชว์
-                REAL_DEMO_LIST = [
-                    "ผ่อนผันรถบรรทุกขนส่งน้ำมัน เดินรถในทุกจังหวัดได้ตลอด 24 ชั่วโมงด้วยสถานการณ์สงครามตะวันออกกลางยังคงมีความตึงเครียดมาก ส่งผลกระทบต่อการเดินทางขนส่งในหลายพื้นที่ของตะวันออกกลาง และทำให้ส่งผลกระทบต่อภาพรวมด้านน้ำมันเชื้อเพลิงของประชาชนในประเทศไทย ดังนั้น กระทรวงพลังงาน กลุ่มผู้ค้าน้ำมัน และสำนักงานตำรวจแห่งชาติ จึงได้ประเมินสถานการณ์ และวางมาตรการแก้ไขปัญหาการกระจายน้ำมันไปยังสถานีบริการน้ำมันในพื้นที่ต่าง ๆ ให้รองรับและเพียงพอต่อความต้องการของประชาชนในแต่ละวันได้ เพื่อให้การบริหารจัดการจราจรสำหรับการกระจายน้ำมันไปยังสถานีบริการน้ำมันในพื้นที่ทั่วประเทศ รวมถึงเป็นการสร้างความเชื่อมั่นเกี่ยวกับสถานการณ์น้ำมันในประเทศให้กับประชาชนสำนักงานตำรวจแห่งชาติจึงได้พิจารณาอนุญาตผ่อนผันให้รถบรรทุกขนส่งน้ำมันเดินรถในเขตกรุงเทพมหานคร และปริมณฑล รวมถึงจังหวัดอื่น ๆ ได้ตลอด 24 ชั่วโมง ตั้งแต่วันที่ 20 มีนาคม ถึงวันที่ 30 เมษายน 2569"
-            
-                ]
-                # 2. กำหนดลิสต์ข้อความข่าวจริงที่ต้องการโชว์
-                FAKE_DEMO_LIST = [
-                    "หุ้น SET 50 กองทุนทองคำฮั่วเซ่งเฮง เริ่มต้น 1,000 บาท ปันผลวันละ 320 บาท ติดต่อซื้อหุ้นได้ที่เพจ Gold Investment Advisory TH"
-                ]
+            else:
+                if "input_text" not in st.session_state:
+                    st.session_state["input_text"] = ""
 
-                with m1:
-                    if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake", use_container_width=True):
-                        import random
-                        # สุ่มข้อความจาก List ข่าวปลอม
-                        st.session_state['input_text'] = random.choice(FAKE_DEMO_LIST)
-                        st.rerun()
+                with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
+                    m1, m2 = st.columns(2)
 
-                with m2:
-                    if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real", use_container_width=True):
-                        import random
-                        # สุ่มข้อความจาก List ข่าวจริง
-                        st.session_state['input_text'] = random.choice(REAL_DEMO_LIST)
-                        st.rerun()
+                    REAL_DEMO_LIST = [
+                        "ผ่อนผันรถบรรทุกขนส่งน้ำมัน เดินรถในทุกจังหวัดได้ตลอด 24 ชั่วโมงด้วยสถานการณ์สงครามตะวันออกกลางยังคงมีความตึงเครียดมาก ส่งผลกระทบต่อการเดินทางขนส่งในหลายพื้นที่ของตะวันออกกลาง และทำให้ส่งผลกระทบต่อภาพรวมด้านน้ำมันเชื้อเพลิงของประชาชนในประเทศไทย ดังนั้น กระทรวงพลังงาน กลุ่มผู้ค้าน้ำมัน และสำนักงานตำรวจแห่งชาติ จึงได้ประเมินสถานการณ์ และวางมาตรการแก้ไขปัญหาการกระจายน้ำมันไปยังสถานีบริการน้ำมันในพื้นที่ต่าง ๆ ให้รองรับและเพียงพอต่อความต้องการของประชาชนในแต่ละวันได้ เพื่อให้การบริหารจัดการจราจรสำหรับการกระจายน้ำมันไปยังสถานีบริการน้ำมันในพื้นที่ทั่วประเทศ รวมถึงเป็นการสร้างความเชื่อมั่นเกี่ยวกับสถานการณ์น้ำมันในประเทศให้กับประชาชนสำนักงานตำรวจแห่งชาติจึงได้พิจารณาอนุญาตผ่อนผันให้รถบรรทุกขนส่งน้ำมันเดินรถในเขตกรุงเทพมหานคร และปริมณฑล รวมถึงจังหวัดอื่น ๆ ได้ตลอด 24 ชั่วโมง ตั้งแต่วันที่ 20 มีนาคม ถึงวันที่ 30 เมษายน 2569"
+                    ]
 
-                    _, _clr_col = st.columns([5, 1])
-                    with _clr_col:
-                        st.button("🗑️ ล้างข้อความ", type="secondary",
-                                on_click=clear_text, width='stretch')
+                    FAKE_DEMO_LIST = [
+                        "หุ้น SET 50 กองทุนทองคำฮั่วเซ่งเฮง เริ่มต้น 1,000 บาท ปันผลวันละ 320 บาท ติดต่อซื้อหุ้นได้ที่เพจ Gold Investment Advisory TH"
+                    ]
 
-            st.text_area(
-                    label="กรอกเนื้อหาข่าว",
-                    height=180,
-                    placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
-                    label_visibility="collapsed",
-                    key="input_text"
-                )
-            input_text = st.session_state['input_text']
+                    with m1:
+                        if st.button(
+                            "🚨 ตัวอย่างข่าวปลอม",
+                            key="demo_fake_text_button",
+                            use_container_width=True
+                        ):
+                            import random
+                            st.session_state["input_text"] = random.choice(FAKE_DEMO_LIST)
+                            st.rerun()
+
+                    with m2:
+                        if st.button(
+                            "✅ ตัวอย่างข่าวจริง",
+                            key="demo_real_text_button",
+                            use_container_width=True
+                        ):
+                            import random
+                            st.session_state["input_text"] = random.choice(REAL_DEMO_LIST)
+                            st.rerun()
+
+                _text_col, _clr_text_col = st.columns([5, 1])
+
+                with _text_col:
+                    st.text_area(
+                        label="กรอกเนื้อหาข่าว",
+                        height=180,
+                        placeholder="วางหรือพิมพ์เนื้อหาข่าวที่ต้องการตรวจสอบที่นี่...",
+                        label_visibility="collapsed",
+                        key="input_text"
+                    )
+
+                with _clr_text_col:
+                    st.button(
+                        "🗑️ ล้างข้อความ",
+                        type="secondary",
+                        on_click=clear_text,
+                        width="stretch",
+                        key="clear_text_button"
+                    )
+
+                input_text = st.session_state["input_text"]
+                input_url = ""
 
             st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
