@@ -3738,31 +3738,30 @@ colorObs.observe(window.parent.document.body,
 
                 with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
                     m1, m2 = st.columns(2)
-                    df_trending = db.get_all_trending()
+                    
+                    # กำหนดลิสต์ข่าวตัวอย่าง (เปลี่ยน URL เป็นข่าวที่คุณต้องการโชว์ได้เลย)
+                    DEMO_FAKE_NEWS = [
+                        "https://example-fake-news.com/get-free-money-now",
+                        "https://scam-alert.net/urgent-bank-account-update"
+                    ]
+                    
+                    DEMO_REAL_NEWS = [
+                        "https://www.bbc.com/news/world",
+                        "https://www.thairath.co.th/news/local"
+                    ]
+
                     with m1:
-                        if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake_url", width='stretch'):
-                            if not df_trending.empty:
-                                fake_news = df_trending[
-                                    (df_trending['label'] == 'Fake') &
-                                    (df_trending['source_url'].notna()) &
-                                    (df_trending['source_url'] != '')
-                                ]
-                                if not fake_news.empty:
-                                    st.session_state['input_url'] = str(fake_news.sample(1).iloc[0]['source_url'])
-                                else:
-                                    st.warning("ยังไม่มีข่าวปลอมที่มี URL ใน DB")
+                        if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake_url", use_container_width=True):
+                            # สุ่มเลือกข่าวจาก List ที่เราตั้งไว้
+                            import random
+                            st.session_state['input_url'] = random.choice(DEMO_FAKE_NEWS)
+                            st.rerun() # สั่ง rerun เพื่อให้ค่าใน text_input อัปเดตทันที
+
                     with m2:
-                        if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real_url", width='stretch'):
-                            if not df_trending.empty:
-                                real_news = df_trending[
-                                    (df_trending['label'] == 'Real') &
-                                    (df_trending['source_url'].notna()) &
-                                    (df_trending['source_url'] != '')
-                                ]
-                                if not real_news.empty:
-                                    st.session_state['input_url'] = str(real_news.sample(1).iloc[0]['source_url'])
-                                else:
-                                    st.warning("ยังไม่มีข่าวจริงที่มี URL ใน DB")
+                        if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real_url", use_container_width=True):
+                            import random
+                            st.session_state['input_url'] = random.choice(DEMO_REAL_NEWS)
+                            st.rerun()
 
                 _url_col, _clr_url_col = st.columns([5, 1])
                 with _url_col:
