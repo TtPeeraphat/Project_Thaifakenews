@@ -1,0 +1,37 @@
+# ---------------------------------
+# Supabase Configuration
+# ---------------------------------
+# ใช้สำหรับเชื่อมต่อกับฐานข้อมูล Supabase เพื่อจัดการข้อมูลผู้ใช้, ประวัติ, feedback ฯลฯ
+# สามารถหาค่าเหล่านี้ได้จากหน้า Project Settings > API ใน Dashboard ของ Supabase
+SUPABASE_URL="https://your-project-url.supabase.co"
+SUPABASE_KEY="your-public-anon-key"
+
+
+# ---------------------------------
+# OpenAI API Configuration
+# ---------------------------------
+# ใช้สำหรับเรียกใช้โมเดล GPT ผ่าน API ของ OpenAI เพื่อทำนายหมวดหมู่ข่าว
+# และอาจรวมถึงการทำนายว่าเป็นข่าวจริง/ปลอม หากโมเดลหลักถูกโฮสต์ผ่าน OpenAI
+# สามารถสร้าง API Key ได้จาก https://platform.openai.com/api-keys
+OPENAI_API_KEY="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+
+# ---------------------------------
+# Apify API Configuration
+# ---------------------------------
+# ใช้สำหรับดึงเนื้อหาข่าวจาก URL ผ่านบริการของ Apify
+# หากไม่ได้ใช้ Apify หรือใช้ Scraper ตัวอื่น สามารถลบส่วนนี้ออกได้
+# สามารถหา API Token ได้จากหน้า Account > Integrations ใน Dashboard ของ Apify
+APIFY_API_TOKEN="apify_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+
+# ---------------------------------
+# Email (SMTP) Configuration
+# ---------------------------------
+# ใช้สำหรับส่งอีเมล OTP เพื่อรีเซ็ตรหัสผ่าน
+# ใช้ข้อมูลจากผู้ให้บริการอีเมลของคุณ (เช่น Gmail, SendGrid, Mailgun)
+# หากใช้ Gmail ต้องสร้าง App Password (https://myaccount.google.com/apppasswords)
+SMTP_SERVER="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USERNAME="your-email@gmail.com"
+SMTP_PASSWORD="your-gmail-app-password"
