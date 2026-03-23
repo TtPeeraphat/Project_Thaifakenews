@@ -3781,38 +3781,33 @@ colorObs.observe(window.parent.document.body,
             # ══════════════════════════════════════
             with st.expander("💡 ลองใช้ข่าวตัวอย่าง (Demo)"):
                 m1, m2 = st.columns(2)
-                df_trending = db.get_all_trending()
+                
+                # 1. กำหนดลิสต์ข้อความข่าวปลอมที่ต้องการโชว์
+                FAKE_DEMO_LIST = [
+                    "🚨 ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท เพียงคลิกลงทะเบียนรับสิทธิ์ผ่านไลน์",
+                    "🍋 มหัศจรรย์! สูตรน้ำมะนาวผสมโซดา ดื่มทุกเช้าช่วยฆ่าเซลล์มะเร็งให้หายขาดได้ใน 7 วัน แชร์ต่อได้บุญมหาศาล",
+                    "💰 ธนาคารออมสินเปิดกู้เงินฉุกเฉินผ่านเฟซบุ๊ก วงเงิน 50,000 บาท ไม่เช็คเครดิตบูโร อนุมัติไวใน 10 นาที แอดไลน์เลย"
+                ]
+
+                # 2. กำหนดลิสต์ข้อความข่าวจริงที่ต้องการโชว์
+                REAL_DEMO_LIST = [
+                    "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูงขึ้นอย่างต่อเนื่องในสัปดาห์ที่ผ่านมา",
+                    "กระทรวงการคลังเตือนประชาชน อย่าหลงเชื่อลิงก์ปลอมระบาด อ้างชื่อหน่วยงานรัฐหลอกให้กรอกข้อมูลส่วนตัวเพื่อรับเงินเยียวยา",
+                    "กรมอุตุนิยมวิทยาประกาศเตือน พายุฤดูร้อนบริเวณประเทศไทยตอนบน มีฝนฟ้าคะนองและลมกระโชกแรงบางแห่งในระยะ 1-2 วันนี้"
+                ]
 
                 with m1:
                     if st.button("🚨 ตัวอย่างข่าวปลอม", key="demo_fake", use_container_width=True):
-                        fake_found = False
-                        if not df_trending.empty:
-                            fake_news = df_trending[df_trending['label'] == 'Fake']
-                            if not fake_news.empty:
-                                picked = fake_news.sample(1).iloc[0]
-                                st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
-                                fake_found = True
-                        
-                        # ถ้าใน DB ไม่มีข่าวปลอม ให้เซตข้อความที่เรากำหนดไว้เอง
-                        if not fake_found:
-                            st.session_state['input_text'] = "🚨 ด่วนที่สุด! ครม. อนุมัติแล้ว แจกเงินช่วยเหลือเยียวยาพิเศษให้ประชาชนทุกคน คนละ 5,000 บาท เพียงคลิกลงทะเบียนรับสิทธิ์ผ่านไลน์"
-                        
+                        import random
+                        # สุ่มข้อความจาก List ข่าวปลอม
+                        st.session_state['input_text'] = random.choice(FAKE_DEMO_LIST)
                         st.rerun()
 
                 with m2:
                     if st.button("✅ ตัวอย่างข่าวจริง", key="demo_real", use_container_width=True):
-                        real_found = False
-                        if not df_trending.empty:
-                            real_news = df_trending[df_trending['label'] == 'Real']
-                            if not real_news.empty:
-                                picked = real_news.sample(1).iloc[0]
-                                st.session_state['input_text'] = str(picked.get('content') or picked.get('headline') or '')
-                                real_found = True
-                        
-                        # ถ้าใน DB ไม่มีข่าวจริง ให้เซตข้อความที่เรากำหนดไว้เอง
-                        if not real_found:
-                            st.session_state['input_text'] = "ชาวฮ่องกงเเห่ขับรถไปเติมน้ำมันที่จีนเเผ่นดินใหญ่ หลังสงครามทำพิษราคาน้ำมันพุ่งสูงขึ้นอย่างต่อเนื่องในสัปดาห์ที่ผ่านมา"
-                        
+                        import random
+                        # สุ่มข้อความจาก List ข่าวจริง
+                        st.session_state['input_text'] = random.choice(REAL_DEMO_LIST)
                         st.rerun()
 
                 _, _clr_col = st.columns([5, 1])
