@@ -119,8 +119,11 @@ class TextPreprocessor:
             return True, f"Too many URLs ({url_count})"
         if len(re.findall(r'[!@#$%^&*]{5,}', text)) > 3:
             return True, "Excessive special characters"
-        if len(text) > 20 and text.isupper():
-            return True, "All uppercase text"
+        english_letters = [c for c in text if c.isascii() and c.isalpha()]
+            if english_letters and len(english_letters) > 10:
+                uppercase_ratio = sum(1 for c in english_letters if c.isupper()) / len(english_letters)
+                if uppercase_ratio > 0.8:
+                    return True, "All uppercase text"
         return False, ""
 
     @staticmethod
