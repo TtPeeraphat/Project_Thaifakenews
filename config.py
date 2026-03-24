@@ -16,12 +16,10 @@ env_path = PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path=env_path)
 
 
-# ============================================================================
-# ✅ CRITICAL FIX: Load from environment, not hardcoded
-# ============================================================================
+
 @dataclass
 class DatabaseConfig:
-    # ✅ ลบ hardcode URL ออก
+    
     supabase_url: str = os.getenv("SUPABASE_URL", "").strip().strip('"').strip("'")
     supabase_key: str = os.getenv("SUPABASE_KEY", "")
 
@@ -31,7 +29,7 @@ class DatabaseConfig:
     db_user:     str = os.getenv("DB_USER", "")
     db_password: str = os.getenv("DB_PASSWORD", "")
 
-    # ✅ validate ตัวเดียว — รวมการตรวจสอบทั้งหมด
+    
     def validate(self) -> bool:
         warnings_list = []
 
@@ -102,7 +100,7 @@ class ModelConfig:
     # Inference settings
     max_text_length: int = int(os.getenv("MAX_TEXT_LENGTH", "5000"))
     max_tokens: int = int(os.getenv("MAX_TOKENS", "256"))
-    confidence_threshold: float = float(os.getenv("CONFIDENCE_THRESHOLD", "0.5"))
+    confidence_threshold: float = float(os.getenv("CONFIDENCE_THRESHOLD", "90.0"))
     
     # Performance
     cache_model: bool = os.getenv("CACHE_MODEL", "true").lower() == "true"

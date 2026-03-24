@@ -23,6 +23,11 @@ from validators import InputValidator, check_rate_limit_fallback,check_rate_limi
 from ai_engine import classify_category_by_keyword as guess_category, classify_category_by_keyword
 from model_def import GCNNet
 from frontend_improvements import show_home_improved
+from config import config
+
+
+THRESHOLD = config.model.confidence_threshold * 100  # → 90.0
+
 sys.modules['__main__'].GCNNet = GCNNet
 
 if sys.platform == 'win32':
@@ -1034,7 +1039,7 @@ def show_prediction_result(result: dict):
     preview  = (preview + "…") if len(str(raw_text)) > 150 else preview
  
     # ── เลือก color config ตาม verdict ──────────────────────────────────────
-    if conf < 70:
+    if conf < THRESHOLD:
         cfg = dict(
             bg="#FFFBEB", border="#F59E0B", bc="#92400E", bbg="#FEF3C7",
             icon="⚠️", verdict="UNVERIFIED", bar="#F59E0B",
