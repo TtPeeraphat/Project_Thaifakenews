@@ -3441,7 +3441,7 @@ elif not st.session_state['logged_in']:
                 font-size:2.25rem !important;font-weight:800 !important;
                 letter-spacing:-0.5px !important;margin:0 0 10px;">TrueCheck AI</h1>
         <p style="color:rgba(255,255,255,0.80);font-size:1rem;margin:0 0 32px;line-height:1.5;">
-        ตรวจสอบความน่าเชื่อถือของข่าวด้วย AI<br>รวดเร็ว แม่นยำ โปร่งใส
+        ตรวจสอบความน่าเชื่อถือของข่าวด้วย AI<br>
         </p>
     </div>
     </div>""", unsafe_allow_html=True)
