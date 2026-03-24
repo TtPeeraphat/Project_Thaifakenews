@@ -18,7 +18,7 @@ import ai_engine as ai
 from scraper_ops import get_content_from_url
 import streamlit.components.v1 as components
 import html  
-from validators import InputValidator, check_rate_limit_fallback,check_rate_limit, record_prediction_timestamp
+from validators import InputValidator, check_rate_limit_fallback, record_prediction_timestamp
 
 from ai_engine import classify_category_by_keyword as guess_category, classify_category_by_keyword
 from model_def import GCNNet
@@ -26,7 +26,7 @@ from frontend_improvements import show_home_improved
 from config import config
 
 
-THRESHOLD = config.model.confidence_threshold * 100  # → 90.0
+THRESHOLD = config.model.confidence_threshold   # → 90.0
 
 sys.modules['__main__'].GCNNet = GCNNet
 
@@ -3867,11 +3867,7 @@ colorObs.observe(window.parent.document.body,
             # ปุ่มวิเคราะห์
             # ══════════════════════════════════════
             if st.button("🚀  วิเคราะห์ข่าวนี้", type="primary", width="stretch"):
-                _uid = st.session_state.get('user_id')
-                if _uid and st.session_state.get('logged_in'):
-                    allowed, msg = check_rate_limit(_uid)        # ← login: ใช้ DB
-                else:
-                    allowed, msg = check_rate_limit_fallback()   # ← guest: ใช้ session_state
+                allowed, msg = check_rate_limit_fallback()
                 if not allowed:
                     st.warning(msg)
                     st.stop()

@@ -1,3 +1,5 @@
+#uvicorn api:app --reload      run frontend.py                                          
+
 import sys
 import os
 import pickle
