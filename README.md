@@ -12,6 +12,7 @@
 3. ตรวจสอบการติดตั้งใน Terminal หรือ Command Prompt:
 ```bash
 python --version
+```
 การติดตั้งแพ็กเกจที่จำเป็นเบื้องต้นเปิด Terminal หรือ Command Prompt แล้วพิมพ์คำสั่งต่อไปนี้เพื่อติดตั้งแพ็กเกจพื้นฐาน:Bashpip install streamlit fastapi uvicorn
 ตรวจสอบการติดตั้ง Streamlit:Bashstreamlit --version
 2. การติดตั้งโปรเจค2.1 การ Clone โค้ดจาก GitHubเปิด Terminal และดำเนินการ Clone โค้ดลงมาที่เครื่องของคุณ:Bashgit clone [https://github.com/TtPeeraphat/Project_Thaifakenews.git](https://github.com/TtPeeraphat/Project_Thaifakenews.git)
